@@ -57,3 +57,6 @@ last_run_prepared/
 docs/bizait lab network.md
 
 values-secrets.yaml
+
+# VPN configs
+*.ovpn
