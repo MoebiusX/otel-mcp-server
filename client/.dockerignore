@@ -1,0 +1,19 @@
+# Frontend build context
+# Exclude non-essential files but INCLUDE client/
+
+node_modules/
+client/node_modules/
+docs/
+k8s/
+scripts/
+.git/
+.github/
+.vscode/
+coverage/
+playwright-report/
+test-results/
+*.md
+*.log
+.DS_Store
+.env
+.env.*

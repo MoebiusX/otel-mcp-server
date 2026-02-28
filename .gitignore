@@ -1,0 +1,59 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+package-lock.json
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.*.local
+# Allow example files (they should never contain real secrets)
+!.env.example
+!.env.*.example
+
+# Logs
+logs.txt
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# OS
+Thumbs.db
+
+# Secrets (never commit real secrets)
+secrets/
+*.pem
+*.key
+
+# Confidential documentation (whitepaper, screenshots, zip bundles)
+docs/OBSERVABILITY_WHITEPAPER.md
+docs/OBSERVABILITY_ADOPTION_GUIDE.md
+docs/OBSERVABILITY_MATHEMATICS.md
+docs/images/
+docs/api/
+docs/*.zip
+docs-bundle.zip
+
+# Model training artifacts (large binary files)
+lora-anomaly-analyzer/
+last_run_prepared/
+*.gguf
+*.safetensors
+*.bin
+
+# Confidential
+docs/bizait lab network.md
+
+values-secrets.yaml

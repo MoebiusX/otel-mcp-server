@@ -1,0 +1,283 @@
+# KrystalineX Helm Chart - Pre-Production Values
+# Use this file for on-prem K8s cluster (kube, worker1, worker2)
+
+global:
+  storageClass: "local-storage"  # Local PVs for bare-metal cluster
+
+# Enable dev/test secrets creation
+secrets:
+  create: true
+
+# Enable standalone PostgreSQL and RabbitMQ (not Bitnami subcharts)
+postgresql:
+  enabled: true
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 512Mi
+
+kongPostgresql:
+  enabled: false
+
+rabbitmq:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+# ============================================
+# Core Application Services
+# ============================================
+
+server:
+  image:
+    repository: localhost:5000/krystalinex-server
+    tag: "v2.1.1"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 5000
+    initialDelaySeconds: 90
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 5000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+paymentProcessor:
+  image:
+    repository: moebiusx/krystalinex-payment-processor
+    tag: "v2.0.0"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 3001
+    initialDelaySeconds: 120
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 3001
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 5
+
+frontend:
+  image:
+    repository: moebiusx/krystalinex-frontend
+    tag: "v2.1.7"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+# ============================================
+# Observability
+# ============================================
+
+grafana:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+ollama:
+  enabled: true
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 3Gi
+
+# ============================================
+# Networking
+# ============================================
+
+networkPolicy:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "kx-krystalinex-server"
+  hosts:
+    - host: www.krystaline.io
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: server
+        - path: /ws
+          pathType: Prefix
+          service: server
+        - path: /grafana
+          pathType: Prefix
+          service: grafana
+        - path: /jaeger
+          pathType: Prefix
+          service: jaeger
+        - path: /prometheus
+          pathType: Prefix
+          service: prometheus
+        - path: /alertmanager
+          pathType: Prefix
+          service: alertmanager
+        - path: /goalert
+          pathType: Prefix
+          service: goalert
+  tls:
+    - secretName: krystalinex-tls
+      hosts:
+        - www.krystaline.io
+
+prometheus:
+  persistence:
+    enabled: true
+    size: 10Gi
+
+alertmanager:
+  enabled: true
+  image:
+    repository: prom/alertmanager
+    tag: "v0.27.0"
+  persistence:
+    enabled: true
+    size: 2Gi
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+goalert:
+  enabled: true
+  image:
+    repository: goalert/goalert
+    tag: "v0.33.0"
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+nodeExporter:
+  enabled: true
+  image:
+    repository: prom/node-exporter
+    tag: "v1.7.0"
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+postgresExporter:
+  enabled: true
+  image:
+    repository: prometheuscommunity/postgres-exporter
+    tag: "v0.15.0"
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+loki:
+  enabled: true
+  image:
+    repository: grafana/loki
+    tag: "3.0.0"
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+promtail:
+  enabled: true
+  image:
+    repository: grafana/promtail
+    tag: "3.0.0"
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi

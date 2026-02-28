@@ -1,0 +1,91 @@
+{
+    "tradeForm": {
+        "title": "Trade",
+        "buy": "Buy",
+        "sell": "Sell",
+        "amount": "Amount",
+        "price": "Price",
+        "total": "Total",
+        "availableBalance": "Available: {{balance}} {{asset}}",
+        "submit": "Place Order",
+        "submitting": "Placing order...",
+        "marketOrder": "Market Order",
+        "limitOrder": "Limit Order"
+    },
+    "tradeVerified": {
+        "title": "Trade Verified ✓",
+        "subtitle": "Your trade was executed with full transparency",
+        "traceId": "Trace ID",
+        "executionTime": "Execution Time",
+        "viewTrace": "View Full Trace in Jaeger",
+        "viewTraceSubtitle": "See exactly how your trade was processed",
+        "close": "Close",
+        "tradeAgain": "Trade Again",
+        "whyMatters": "Why This Matters",
+        "whyMattersDesc": "Every trade on Krystaline generates a cryptographic trace that proves exactly what happened—no black boxes, no hidden processes."
+    },
+    "orderHistory": {
+        "title": "Order History",
+        "noOrders": "No orders yet",
+        "status": {
+            "pending": "Pending",
+            "filled": "Filled",
+            "cancelled": "Cancelled",
+            "failed": "Failed"
+        },
+        "side": {
+            "buy": "Buy",
+            "sell": "Sell"
+        }
+    },
+    "assets": {
+        "BTC": "Bitcoin",
+        "ETH": "Ethereum",
+        "USD": "US Dollar",
+        "USDT": "Tether",
+        "EUR": "Euro"
+    },
+    "convert": {
+        "title": "Convert",
+        "instant": "Instant swap",
+        "from": "From",
+        "to": "To",
+        "available": "Available",
+        "balance": "Balance",
+        "rate": "Rate",
+        "fee": "Fee",
+        "youWillReceive": "You'll receive",
+        "converting": "Converting...",
+        "gettingQuote": "Getting quote...",
+        "enterAmount": "Enter amount to convert"
+    },
+    "proofOfObservability": {
+        "title": "Proof of Observability™",
+        "description": "Track your trades and transfers with full transparency",
+        "traceExplainer": "Every transaction has a unique Trace ID. Click \"View Trace\" to see exactly how your order was processed."
+    },
+    "transparency": {
+        "title": "System Transparency",
+        "subtitle": "Real-time visibility into how your trades are processed",
+        "systemStatus": "System Status",
+        "allOperational": "All Systems Operational",
+        "issuesDetected": "Issues Detected",
+        "minorIssues": "Minor Issues",
+        "checking": "Checking...",
+        "uptime": "Uptime",
+        "activeServices": "Active Services",
+        "avgResponse": "Avg Response",
+        "operationsTracked": "Operations Tracked",
+        "healthyServices": "Healthy Services",
+        "serviceHealth": "Service Health",
+        "response": "Response",
+        "requests": "Requests",
+        "whatWeMonitor": "What We Monitor",
+        "everyTrade": "Every Trade",
+        "everyTradeDesc": "Each order generates a unique trace ID that tracks its journey from your click to execution.",
+        "systemPerformance": "System Performance",
+        "systemPerfDesc": "We continuously measure response times and detect anomalies. If something slows down, we know immediately.",
+        "serviceHealth24": "Service Health",
+        "serviceHealthDesc": "All microservices are monitored 24/7. Issues are detected and addressed before they affect your experience."
+    }
+}

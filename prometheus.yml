@@ -1,0 +1,77 @@
+# Prometheus Configuration for Krystaline Exchange
+# Scrapes metrics from all services
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Load alerting rules
+rule_files:
+  - /etc/prometheus/alerting-rules.yml
+
+scrape_configs:
+  # ============================================
+  # APPLICATION METRICS
+  # ============================================
+
+  # Krystaline Exchange API (main Express server)
+  - job_name: 'krystaline-exchange'
+    static_configs:
+      - targets: ['host.docker.internal:5000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Order Matcher / Payment Processor (runs natively on host)
+  - job_name: 'order-matcher'
+    static_configs:
+      - targets: ['host.docker.internal:3001']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # ============================================
+  # INFRASTRUCTURE METRICS
+  # ============================================
+
+  # RabbitMQ metrics (via rabbitmq_prometheus plugin)
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # PostgreSQL - App Database (wallets, orders, users)
+  - job_name: 'postgres-app'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 15s
+
+  # PostgreSQL - Kong Database
+  - job_name: 'postgres-kong'
+    static_configs:
+      - targets: ['kong-postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # ============================================
+  # SYSTEM METRICS
+  # ============================================
+
+  # Node Exporter - OS/Host metrics (CPU, memory, disk, network)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # ============================================
+  # OBSERVABILITY STACK
+  # ============================================
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

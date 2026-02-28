@@ -1,0 +1,34 @@
+# Server build - exclude everything not needed
+client/
+client/node_modules/
+docs/
+k8s/
+scripts/
+.git/
+.github/
+.vscode/
+coverage/
+playwright-report/
+*.log
+.DS_Store
+.env
+.env.*
+*.md
+!package.json
+!package-lock.json
+!tsconfig.json
+!drizzle.config.ts
+
+# Large dev dependencies in root node_modules
+node_modules/.cache/
+node_modules/@types/
+node_modules/typescript/
+node_modules/eslint*/
+node_modules/prettier*/
+node_modules/@playwright/
+node_modules/playwright*/
+node_modules/vite/
+node_modules/@vitejs/
+node_modules/tailwindcss/
+node_modules/postcss/
+node_modules/autoprefixer/

@@ -1,0 +1,956 @@
+[
+  {
+    "spanKey": "api-gateway:kong.router",
+    "service": "api-gateway",
+    "operation": "kong.router",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 1.86,
+    "stdDev": 10.23,
+    "sampleCount": 348,
+    "thresholds": {
+      "sev5": 6.072355313731304,
+      "sev4": 8.668907567089802,
+      "sev3": 8.668907567089802,
+      "sev2": 8.668907567089802,
+      "sev1": 8.668907567089802
+    },
+    "lastUpdated": "2026-01-26T18:10:28.790Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.access.plugin.cors",
+    "service": "api-gateway",
+    "operation": "kong.access.plugin.cors",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 1.16,
+    "stdDev": 8.37,
+    "sampleCount": 348,
+    "thresholds": {
+      "sev5": 1.1471813409331428,
+      "sev4": 10.57237382640137,
+      "sev3": 10.57237382640137,
+      "sev2": 10.57237382640137,
+      "sev1": 10.57237382640137
+    },
+    "lastUpdated": "2026-01-26T18:10:28.791Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.access.plugin.opentelemetry",
+    "service": "api-gateway",
+    "operation": "kong.access.plugin.opentelemetry",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 2.04,
+    "stdDev": 5.99,
+    "sampleCount": 340,
+    "thresholds": {
+      "sev5": 2.9060801274184556,
+      "sev4": 2.9959319183107653,
+      "sev3": 8.177273852591474,
+      "sev2": 8.177273852591474,
+      "sev1": 8.177273852591474
+    },
+    "lastUpdated": "2026-01-26T18:10:28.791Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.balancer",
+    "service": "api-gateway",
+    "operation": "kong.balancer",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 53.16,
+    "stdDev": 105.17,
+    "sampleCount": 340,
+    "thresholds": {
+      "sev5": 2.671284573900871,
+      "sev4": 4.29921503061568,
+      "sev3": 4.492450057287556,
+      "sev2": 4.492450057287556,
+      "sev1": 4.492450057287556
+    },
+    "lastUpdated": "2026-01-26T18:10:28.791Z"
+  },
+  {
+    "spanKey": "kx-wallet:HTTP GET",
+    "service": "kx-wallet",
+    "operation": "HTTP GET",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 193.26,
+    "stdDev": 628.6,
+    "sampleCount": 668,
+    "thresholds": {
+      "sev5": 0.5,
+      "sev4": 1,
+      "sev3": 1.5,
+      "sev2": 11.429686732482883,
+      "sev1": 16.321486716187753
+    },
+    "lastUpdated": "2026-01-26T18:10:28.796Z"
+  },
+  {
+    "spanKey": "api-gateway:kong",
+    "service": "api-gateway",
+    "operation": "kong",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 66.21,
+    "stdDev": 131.83,
+    "sampleCount": 348,
+    "thresholds": {
+      "sev5": 2.9488131545513165,
+      "sev4": 3.772917885373143,
+      "sev3": 5.040969129570613,
+      "sev2": 5.040969129570613,
+      "sev1": 5.040969129570613
+    },
+    "lastUpdated": "2026-01-26T18:10:28.797Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.dns",
+    "service": "api-gateway",
+    "operation": "kong.dns",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 1.85,
+    "stdDev": 9.94,
+    "sampleCount": 340,
+    "thresholds": {
+      "sev5": 3.300204933132602,
+      "sev4": 9.756384821370398,
+      "sev3": 9.756384821370398,
+      "sev2": 9.756384821370398,
+      "sev1": 9.756384821370398
+    },
+    "lastUpdated": "2026-01-26T18:10:28.797Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.header_filter.plugin.cors",
+    "service": "api-gateway",
+    "operation": "kong.header_filter.plugin.cors",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 0.45,
+    "stdDev": 0.57,
+    "sampleCount": 346,
+    "thresholds": {
+      "sev5": 1.6664146530956416,
+      "sev4": 2.176900312532659,
+      "sev3": 3.9882442558453857,
+      "sev2": 4.894796375190434,
+      "sev1": 4.894796375190434
+    },
+    "lastUpdated": "2026-01-26T18:10:28.802Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.header_filter.plugin.opentelemetry",
+    "service": "api-gateway",
+    "operation": "kong.header_filter.plugin.opentelemetry",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 0.09,
+    "stdDev": 0.16,
+    "sampleCount": 346,
+    "thresholds": {
+      "sev5": 1.7306713161683867,
+      "sev4": 2.979328485466108,
+      "sev3": 5.301830820359871,
+      "sev2": 5.720130972074607,
+      "sev1": 5.720130972074607
+    },
+    "lastUpdated": "2026-01-26T18:10:28.802Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.connect",
+    "service": "kx-exchange",
+    "operation": "pg.connect",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 291.27,
+    "stdDev": 15.43,
+    "sampleCount": 224,
+    "thresholds": {
+      "sev5": 1.4851232821094098,
+      "sev4": 1.8991190175826576,
+      "sev3": 2.0075125142489987,
+      "sev2": 3.362171907992964,
+      "sev1": 3.362171907992964
+    },
+    "lastUpdated": "2026-01-26T18:10:28.802Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg-pool.connect",
+    "service": "kx-exchange",
+    "operation": "pg-pool.connect",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 49.51,
+    "stdDev": 109.81,
+    "sampleCount": 1328,
+    "thresholds": {
+      "sev5": 2.352537748111581,
+      "sev4": 2.41302259177432,
+      "sev3": 2.4748551856421313,
+      "sev2": 2.6083188816254346,
+      "sev1": 2.6944838305469707
+    },
+    "lastUpdated": "2026-01-26T18:10:28.803Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.query:SELECT crypto_exchange",
+    "service": "kx-exchange:pg.query",
+    "operation": "SELECT crypto_exchange",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 6.23,
+    "stdDev": 7.32,
+    "sampleCount": 1168,
+    "thresholds": {
+      "sev5": 0.9813275257765416,
+      "sev4": 1.4764451842284128,
+      "sev3": 2.054196272573631,
+      "sev2": 6.518450249538985,
+      "sev1": 12.960716345042268
+    },
+    "lastUpdated": "2026-01-26T18:10:28.803Z"
+  },
+  {
+    "spanKey": "kx-exchange:GET",
+    "service": "kx-exchange",
+    "operation": "GET",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 246.85,
+    "stdDev": 176.42,
+    "sampleCount": 2023,
+    "thresholds": {
+      "sev5": 0.9470917416801428,
+      "sev4": 1.1186332931206364,
+      "sev3": 1.5,
+      "sev2": 2,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.807Z"
+  },
+  {
+    "spanKey": "kx-exchange:dns.lookup",
+    "service": "kx-exchange",
+    "operation": "dns.lookup",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 1.86,
+    "stdDev": 3.49,
+    "sampleCount": 1399,
+    "thresholds": {
+      "sev5": 0.8002428910895066,
+      "sev4": 1.1159038477029328,
+      "sev3": 1.6959988241810968,
+      "sev2": 7.7181688241958994,
+      "sev1": 28.59471956130942
+    },
+    "lastUpdated": "2026-01-26T18:10:28.808Z"
+  },
+  {
+    "spanKey": "kx-exchange:tcp.connect",
+    "service": "kx-exchange",
+    "operation": "tcp.connect",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 253.97,
+    "stdDev": 48.09,
+    "sampleCount": 1399,
+    "thresholds": {
+      "sev5": 0.5,
+      "sev4": 1,
+      "sev3": 1.5,
+      "sev2": 2,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.809Z"
+  },
+  {
+    "spanKey": "kx-exchange:tcp.connect",
+    "service": "kx-exchange",
+    "operation": "tcp.connect",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 252.35,
+    "stdDev": 54.63,
+    "sampleCount": 335,
+    "thresholds": {
+      "sev5": 0.5,
+      "sev4": 1,
+      "sev3": 1.5,
+      "sev2": 2,
+      "sev1": 2.7029822089500333
+    },
+    "lastUpdated": "2026-01-26T18:10:28.809Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.connect",
+    "service": "kx-exchange",
+    "operation": "pg.connect",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 296.02,
+    "stdDev": 62.61,
+    "sampleCount": 52,
+    "thresholds": {
+      "sev5": 0.5,
+      "sev4": 4.784218222879125,
+      "sev3": 4.784218222879125,
+      "sev2": 4.784218222879125,
+      "sev1": 4.784218222879125
+    },
+    "lastUpdated": "2026-01-26T18:10:28.809Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.query:SELECT crypto_exchange",
+    "service": "kx-exchange:pg.query",
+    "operation": "SELECT crypto_exchange",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 7.62,
+    "stdDev": 10.45,
+    "sampleCount": 211,
+    "thresholds": {
+      "sev5": 1.2582043502668936,
+      "sev4": 2.9766204132295417,
+      "sev3": 4.869978810960274,
+      "sev2": 6.776926821129226,
+      "sev1": 6.776926821129226
+    },
+    "lastUpdated": "2026-01-26T18:10:28.809Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg-pool.connect",
+    "service": "kx-exchange",
+    "operation": "pg-pool.connect",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 66.81,
+    "stdDev": 127.67,
+    "sampleCount": 232,
+    "thresholds": {
+      "sev5": 1.900004516901526,
+      "sev4": 1.942270934167325,
+      "sev3": 2.005678392982493,
+      "sev2": 4.176814012728875,
+      "sev1": 4.176814012728875
+    },
+    "lastUpdated": "2026-01-26T18:10:28.809Z"
+  },
+  {
+    "spanKey": "kx-exchange:GET",
+    "service": "kx-exchange",
+    "operation": "GET",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 301.44,
+    "stdDev": 224.52,
+    "sampleCount": 442,
+    "thresholds": {
+      "sev5": 0.7668728867046469,
+      "sev4": 1.1915931406176694,
+      "sev3": 1.630494936404483,
+      "sev2": 4.580852482400159,
+      "sev1": 5.276104354363488
+    },
+    "lastUpdated": "2026-01-26T18:10:28.809Z"
+  },
+  {
+    "spanKey": "kx-exchange:dns.lookup",
+    "service": "kx-exchange",
+    "operation": "dns.lookup",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 1.75,
+    "stdDev": 3.04,
+    "sampleCount": 335,
+    "thresholds": {
+      "sev5": 0.8806272625188323,
+      "sev4": 1.730918099952249,
+      "sev3": 2.3989802627480983,
+      "sev2": 15.392147910507248,
+      "sev1": 15.392147910507248
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-wallet:HTTP GET",
+    "service": "kx-wallet",
+    "operation": "HTTP GET",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 374.8,
+    "stdDev": 415.48,
+    "sampleCount": 111,
+    "thresholds": {
+      "sev5": 3.1775086765123843,
+      "sev4": 3.1847292029776884,
+      "sev3": 3.1847292029776884,
+      "sev2": 3.1847292029776884,
+      "sev1": 3.1847292029776884
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.query:DELETE crypto_exchange",
+    "service": "kx-exchange:pg.query",
+    "operation": "DELETE crypto_exchange",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 3.97,
+    "stdDev": 0,
+    "sampleCount": 1,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-exchange:POST",
+    "service": "kx-exchange",
+    "operation": "POST",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 14525.34,
+    "stdDev": 12331.53,
+    "sampleCount": 111,
+    "thresholds": {
+      "sev5": 1.1285562654698513,
+      "sev4": 1.2411669330020885,
+      "sev3": 1.5,
+      "sev2": 2.558361145964505,
+      "sev1": 2.558361145964505
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-wallet:HTTP POST",
+    "service": "kx-wallet",
+    "operation": "HTTP POST",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 308.47,
+    "stdDev": 313.47,
+    "sampleCount": 34,
+    "thresholds": {
+      "sev5": 2.745190488718768,
+      "sev4": 2.745190488718768,
+      "sev3": 3.0386813578387457,
+      "sev2": 3.0386813578387457,
+      "sev1": 3.0386813578387457
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-matcher:order.response",
+    "service": "kx-matcher",
+    "operation": "order.response",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 0.6,
+    "stdDev": 0.43,
+    "sampleCount": 36,
+    "thresholds": {
+      "sev5": 0.5,
+      "sev4": 3.0477188528868457,
+      "sev3": 3.0477188528868457,
+      "sev2": 3.0477188528868457,
+      "sev1": 3.0477188528868457
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-wallet:order.response.received",
+    "service": "kx-wallet",
+    "operation": "order.response.received",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 0,
+    "stdDev": 0,
+    "sampleCount": 24,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.query:UPDATE crypto_exchange",
+    "service": "kx-exchange:pg.query",
+    "operation": "UPDATE crypto_exchange",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 6.24,
+    "stdDev": 8.22,
+    "sampleCount": 113,
+    "thresholds": {
+      "sev5": 1.0867864427043328,
+      "sev4": 3.0094786297233096,
+      "sev3": 3.0094786297233096,
+      "sev2": 8.091392211057439,
+      "sev1": 8.091392211057439
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-exchange:payment_response process",
+    "service": "kx-exchange",
+    "operation": "payment_response process",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 0.31,
+    "stdDev": 0.2,
+    "sampleCount": 36,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.810Z"
+  },
+  {
+    "spanKey": "kx-exchange:publish orders",
+    "service": "kx-exchange",
+    "operation": "publish orders",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 2.48,
+    "stdDev": 1.46,
+    "sampleCount": 36,
+    "thresholds": {
+      "sev5": 2.7012279125538647,
+      "sev4": 2.7012279125538647,
+      "sev3": 2.7012279125538647,
+      "sev2": 2.7012279125538647,
+      "sev1": 2.7012279125538647
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-wallet:order.submit.client",
+    "service": "kx-wallet",
+    "operation": "order.submit.client",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 190.13,
+    "stdDev": 56.39,
+    "sampleCount": 24,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-exchange:publish <default>",
+    "service": "kx-exchange",
+    "operation": "publish <default>",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 0.46,
+    "stdDev": 0.33,
+    "sampleCount": 36,
+    "thresholds": {
+      "sev5": 2.0531317783136873,
+      "sev4": 2.0531317783136873,
+      "sev3": 2.0531317783136873,
+      "sev2": 2.0531317783136873,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-matcher:order.match",
+    "service": "kx-matcher",
+    "operation": "order.match",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 86.92,
+    "stdDev": 4.03,
+    "sampleCount": 36,
+    "thresholds": {
+      "sev5": 1.224301133082817,
+      "sev4": 1.6206134004841883,
+      "sev3": 1.6206134004841883,
+      "sev2": 2,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.query:INSERT crypto_exchange",
+    "service": "kx-exchange:pg.query",
+    "operation": "INSERT crypto_exchange",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 7.1,
+    "stdDev": 5.18,
+    "sampleCount": 41,
+    "thresholds": {
+      "sev5": 1.9430580370090436,
+      "sev4": 1.9430580370090436,
+      "sev3": 1.9430580370090436,
+      "sev2": 2,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "api-gateway:kong",
+    "service": "api-gateway",
+    "operation": "kong",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 468.89,
+    "stdDev": 291.64,
+    "sampleCount": 41,
+    "thresholds": {
+      "sev5": 1.6950640815744942,
+      "sev4": 1.8505367509709179,
+      "sev3": 1.8505367509709179,
+      "sev2": 2,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.access.plugin.cors",
+    "service": "api-gateway",
+    "operation": "kong.access.plugin.cors",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 14.81,
+    "stdDev": 28.67,
+    "sampleCount": 41,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.access.plugin.opentelemetry",
+    "service": "api-gateway",
+    "operation": "kong.access.plugin.opentelemetry",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 100.08,
+    "stdDev": 80.49,
+    "sampleCount": 37,
+    "thresholds": {
+      "sev5": 1.715652129734537,
+      "sev4": 1.715652129734537,
+      "sev3": 1.715652129734537,
+      "sev2": 2,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.header_filter.plugin.opentelemetry",
+    "service": "api-gateway",
+    "operation": "kong.header_filter.plugin.opentelemetry",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 3.22,
+    "stdDev": 4.73,
+    "sampleCount": 41,
+    "thresholds": {
+      "sev5": 2.9105177830496456,
+      "sev4": 2.9105177830496456,
+      "sev3": 2.9105177830496456,
+      "sev2": 2.9105177830496456,
+      "sev1": 2.9105177830496456
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.balancer",
+    "service": "api-gateway",
+    "operation": "kong.balancer",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 251.53,
+    "stdDev": 246.1,
+    "sampleCount": 37,
+    "thresholds": {
+      "sev5": 1.0815667158495736,
+      "sev4": 2.4878483054143725,
+      "sev3": 2.4878483054143725,
+      "sev2": 2.4878483054143725,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.router",
+    "service": "api-gateway",
+    "operation": "kong.router",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 22.94,
+    "stdDev": 31.36,
+    "sampleCount": 41,
+    "thresholds": {
+      "sev5": 2.5764794791610615,
+      "sev4": 2.5764794791610615,
+      "sev3": 2.5764794791610615,
+      "sev2": 2.5764794791610615,
+      "sev1": 2.5764794791610615
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.dns",
+    "service": "api-gateway",
+    "operation": "kong.dns",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 13.59,
+    "stdDev": 17.33,
+    "sampleCount": 37,
+    "thresholds": {
+      "sev5": 2.6066510765627964,
+      "sev4": 2.6066510765627964,
+      "sev3": 2.6066510765627964,
+      "sev2": 2.6066510765627964,
+      "sev1": 2.6066510765627964
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "api-gateway:kong.header_filter.plugin.cors",
+    "service": "api-gateway",
+    "operation": "kong.header_filter.plugin.cors",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 12.02,
+    "stdDev": 9.86,
+    "sampleCount": 41,
+    "thresholds": {
+      "sev5": 0.8486137686700399,
+      "sev4": 2.602971903694039,
+      "sev3": 2.602971903694039,
+      "sev2": 2.602971903694039,
+      "sev1": 2.602971903694039
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-matcher:order.response",
+    "service": "kx-matcher",
+    "operation": "order.response",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 4.78,
+    "stdDev": 0.05,
+    "sampleCount": 6,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-matcher:order.match",
+    "service": "kx-matcher",
+    "operation": "order.match",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 93.64,
+    "stdDev": 4.89,
+    "sampleCount": 6,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-exchange:publish <default>",
+    "service": "kx-exchange",
+    "operation": "publish <default>",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 1.65,
+    "stdDev": 1.61,
+    "sampleCount": 6,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-exchange:publish orders",
+    "service": "kx-exchange",
+    "operation": "publish orders",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 3.82,
+    "stdDev": 1.78,
+    "sampleCount": 6,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-exchange:payment_response process",
+    "service": "kx-exchange",
+    "operation": "payment_response process",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 0.39,
+    "stdDev": 0.24,
+    "sampleCount": 6,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.query:UPDATE crypto_exchange",
+    "service": "kx-exchange:pg.query",
+    "operation": "UPDATE crypto_exchange",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 13.2,
+    "stdDev": 14.26,
+    "sampleCount": 15,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-exchange:pg.query:INSERT crypto_exchange",
+    "service": "kx-exchange:pg.query",
+    "operation": "INSERT crypto_exchange",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 46.14,
+    "stdDev": 43.77,
+    "sampleCount": 6,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "kx-exchange:POST",
+    "service": "kx-exchange",
+    "operation": "POST",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 15489.43,
+    "stdDev": 11491.71,
+    "sampleCount": 21,
+    "thresholds": {
+      "sev5": 0.898295873526698,
+      "sev4": 1,
+      "sev3": 1.9032493518896794,
+      "sev2": 2,
+      "sev1": 2.5
+    },
+    "lastUpdated": "2026-01-26T18:10:28.811Z"
+  },
+  {
+    "spanKey": "jaeger-all-in-one:/api/traces",
+    "service": "jaeger-all-in-one",
+    "operation": "/api/traces",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 88.64,
+    "stdDev": 51.12,
+    "sampleCount": 1125,
+    "thresholds": {
+      "sev5": 1.4007196618769955,
+      "sev4": 2.297751523510615,
+      "sev3": 2.820736473849409,
+      "sev2": 3.930984073016425,
+      "sev1": 4.356515738548671
+    },
+    "lastUpdated": "2026-01-26T18:10:28.812Z"
+  },
+  {
+    "spanKey": "jaeger-all-in-one:/api/traces",
+    "service": "jaeger-all-in-one",
+    "operation": "/api/traces",
+    "dayOfWeek": 1,
+    "hourOfDay": 19,
+    "mean": 142.86,
+    "stdDev": 131.33,
+    "sampleCount": 268,
+    "thresholds": {
+      "sev5": 1.2563016514454628,
+      "sev4": 2.763936069627473,
+      "sev3": 4.187860819904667,
+      "sev2": 7.063951102545555,
+      "sev1": 7.063951102545555
+    },
+    "lastUpdated": "2026-01-26T18:10:28.814Z"
+  },
+  {
+    "spanKey": "kx-matcher:tcp.connect",
+    "service": "kx-matcher",
+    "operation": "tcp.connect",
+    "dayOfWeek": 1,
+    "hourOfDay": 18,
+    "mean": 300.52,
+    "stdDev": 0,
+    "sampleCount": 1,
+    "thresholds": {
+      "sev5": 1.3,
+      "sev4": 1.65,
+      "sev3": 2,
+      "sev2": 2.6,
+      "sev1": 3.3
+    },
+    "lastUpdated": "2026-01-26T18:10:28.814Z"
+  }
+]

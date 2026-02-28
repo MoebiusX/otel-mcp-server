@@ -1,0 +1,1682 @@
+{
+  "baselines": [],
+  "anomalies": [],
+  "analyses": [
+    {
+      "traceId": "985e9a9994b349e8f0a15bf89ae4f1fd",
+      "summary": "The exchange-api service experienced a significant performance anomaly with a GET operation, resulting in an unusually long response time of 77.13ms, which is 3 standard deviations above the expected value.",
+      "possibleCauses": [
+        "Network congestion or high latency issues might have affected the underlying infrastructure, causing delays in data retrieval.",
+        "Overload on the API endpoint due to high traffic or increased load could be a contributing factor to the prolonged response time.",
+        "Potential issues with the service's caching mechanism or database performance might also lead to slower responses."
+      ],
+      "recommendations": [
+        "Monitor network latency and congestion metrics to identify potential bottlenecks and implement measures to optimize data retrieval.",
+        "Investigate API endpoint usage patterns and adjust load balancing or queueing strategies as needed to prevent overload.",
+        "Review cache and database performance to ensure they are not contributing to slow responses, and consider implementing caching invalidation or optimization techniques."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T09:18:02.783Z"
+    },
+    {
+      "traceId": "7bfe0321d40307fbd717f8a5a175aa01",
+      "summary": "Unable to generate summary",
+      "possibleCauses": [],
+      "recommendations": [],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T09:19:45.130Z"
+    },
+    {
+      "traceId": "9c44e3f20870a890ec202cf098ebcaf9",
+      "summary": "Unable to generate summary",
+      "possibleCauses": [],
+      "recommendations": [],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T09:20:16.280Z"
+    },
+    {
+      "traceId": "c1e40dc9eaa8b8eb6f2752884e016397",
+      "summary": "** The jaeger-all-in-one service experienced a significant performance anomaly, with a span duration of 108.75ms (3.9σ from the mean), indicating an unexpected delay in handling incoming requests.",
+      "possibleCauses": [
+        "*",
+        "1. **Resource congestion**: The server might be experiencing high CPU or memory usage, causing it to slow down and leading to increased latency.",
+        "2. **Network issues**: A problem with the network connection between the client and server could be causing delays in data transmission, resulting in longer span durations.",
+        "3. **Instrumentation overhead**: Excessive instrumentation overhead due to the use of OpenTelemetry or other libraries might be contributing to the anomaly.",
+        "*"
+      ],
+      "recommendations": [
+        "*",
+        "1. **Monitor resource utilization**: Investigate the CPU and memory usage of the server to identify any potential bottlenecks that could be causing the performance issue.",
+        "2. **Verify network connectivity**: Check the network connection between the client and server to ensure it is stable and not experiencing any issues that could cause delays.",
+        "3. **Optimize instrumentation configuration**: Review the instrumentation configuration to ensure that it is not introducing unnecessary overhead, and consider optimizing or reducing it if necessary.",
+        "*"
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T09:20:37.773Z"
+    },
+    {
+      "traceId": "19e4919b5869520d92bac5a6abc384c2",
+      "summary": "The jaeger-all-in-one service experienced a critical performance anomaly with an unusually long duration for the /api/traces operation, indicating potential issues with request processing or network latency.",
+      "possibleCauses": [
+        "**High load or resource contention**: The system might be experiencing high traffic or resource constraints that are causing the /api/traces operation to take longer than expected.",
+        "**Network congestion or packet loss**: Network issues could be contributing to the prolonged duration, such as packet loss or increased latency due to network congestion.",
+        "**Instrumentation or configuration errors**: Misconfiguration or instrumentation issues with OpenTelemetry or Jaeger might be causing incorrect tracing data or inaccurate performance metrics."
+      ],
+      "recommendations": [
+        "Monitor system resources (CPU, memory, and network) to identify any potential bottlenecks that may be contributing to the anomaly.",
+        "Investigate network latency and packet loss by analyzing network logs and checking for any signs of congestion or packet loss.",
+        "Review OpenTelemetry instrumentation and Jaeger configuration to ensure accurate tracing data and correct error handling mechanisms."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T10:32:28.200Z"
+    },
+    {
+      "traceId": "15bf76e5b77500c3928822c60e37ae7e",
+      "summary": "The api-gateway service experienced a significant performance anomaly in the kong.dns operation, resulting in an average response time that is 11 times longer than expected and has a high deviation from the mean.",
+      "possibleCauses": [
+        "Overloading of the dns resolution: The long duration of the kong.dns operation may indicate that there is an excessive load on the DNS resolution process, causing it to take longer than usual to resolve hostnames.",
+        "Network congestion or connectivity issues: It's possible that there are network congestion or connectivity issues between the api-gateway service and the DNS server, resulting in slower DNS resolution times.",
+        "Congestion in the kong router: The long duration of the kong.dns operation may also indicate that the kong router is congested, causing it to delay the dns resolution process."
+      ],
+      "recommendations": [
+        "Increase dns resolution timeout: Temporarily increase the dns resolution timeout to see if it resolves the issue. If the problem persists, this will help identify whether the root cause is related to network congestion or connectivity issues.",
+        "Monitor and optimize kong router performance: Investigate ways to improve the performance of the kong router, such as adding more resources (e.g., CPU, memory) or optimizing the configuration.",
+        "Verify network connectivity and congestion: Perform a thorough investigation into network connectivity and congestion issues between the api-gateway service and the DNS server to ensure that there are no underlying problems."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T11:46:42.645Z"
+    },
+    {
+      "traceId": "ed80bd86712e2682ececcae068ca6dea",
+      "summary": "The exchange-api service experienced a performance anomaly with a tcp.connect operation that took significantly longer than expected, indicating potential issues with network connectivity or system resource utilization.",
+      "possibleCauses": [
+        "**Network Congestion**: The high duration could be due to network congestion or high latency between the client and server, causing the tcp.connect operation to take longer than usual.",
+        "**System Resource Utilization**: It's possible that the system resources (e.g., CPU, memory) are being overutilized, leading to a slow response time for the tcp.connect operation.",
+        "**Temporary Network Issue**: The unusual timestamp could be indicative of a temporary network issue or a misconfigured network setting."
+      ],
+      "recommendations": [
+        "**Monitor Network Utilization**: Closely monitor system resource utilization and network usage to identify any potential bottlenecks that may have contributed to the anomaly.",
+        "**Investigate Network Configuration**: Verify that the network configuration is correct and there are no temporary issues with the network connection between the client and server.",
+        "**Optimize System Resources**: Consider optimizing system resources (e.g., increasing CPU or memory allocation) to ensure that the system can handle increased traffic without performance degradation."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T11:56:10.188Z"
+    },
+    {
+      "traceId": "ce3df5e4b8ecb2ad71b2c60e4d266308",
+      "summary": "The exchange-api service experienced a critical performance anomaly with an unusually long tcp.connect operation, exceeding the expected duration by 22.68 standard deviations.",
+      "possibleCauses": [
+        "Network congestion or high latency on the localhost peer, causing a delay in the connection attempt.",
+        "Misconfiguration of the network transport (e.g., IP_TCP) leading to inefficient communication.",
+        "Potential issues with the underlying infrastructure or hardware that may be impacting performance."
+      ],
+      "recommendations": [
+        "Monitor and investigate network traffic patterns on localhost to identify potential bottlenecks and optimize connectivity.",
+        "Review and adjust the network transport configuration to ensure it aligns with expected performance characteristics.",
+        "Perform a thorough examination of the underlying infrastructure and hardware to determine if any issues are contributing to the anomaly."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T12:06:39.633Z"
+    },
+    {
+      "traceId": "f51823967c9bd3045f3477b41422ff7a",
+      "summary": "Unable to generate summary",
+      "possibleCauses": [
+        "**Network Congestion**: The long latency could be caused by network congestion or high traffic volumes, which might be affecting the performance of the api-gateway service.",
+        "**Service Failure or Bottleneck**: A specific service like kong.balancer is experiencing issues, causing a ripple effect and leading to the prolonged response times for downstream services.",
+        "**System Overload**: The system might be overloaded due to high request volumes or resource-intensive tasks, resulting in performance degradation.",
+        "##"
+      ],
+      "recommendations": [
+        "**Investigate Downstream Services**: Analyze the performance of kong.balancer and its dependencies to identify any issues that may be contributing to the overall anomaly. This could involve checking for errors, monitoring resource utilization, or verifying configuration settings.",
+        "**Optimize API Gateway Configuration**: Review the api-gateway service's configuration to ensure it is properly optimized for high-performance environments. This might include tweaking settings related to caching, connection pooling, or latency reduction techniques.",
+        "**Implement Monitoring and Alerting Enhancements**: Consider enhancing monitoring and alerting capabilities to provide more timely insights into performance issues like this one. This could involve setting up additional metrics, adjusting thresholds, or integrating with other observability tools.",
+        "##"
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T12:09:53.456Z"
+    },
+    {
+      "traceId": "86c46526dabd73fcd456096d3cd6b9e6",
+      "summary": "Unable to generate summary",
+      "possibleCauses": [
+        "**Overload due to high traffic**: The sudden spike in requests could have overwhelmed the api-gateway service, causing delays and increased latency for subsequent requests.",
+        "**System resource constraints**: Insufficient resources (e.g., CPU, memory) might have led to performance degradation and slow down the opentelemetry span execution.",
+        "**Interference from other services or system components**: Interactions with other services or system components could have introduced latency and affected the opentelemetry span.",
+        "##"
+      ],
+      "recommendations": [
+        "**Conduct a thorough traffic analysis**: Investigate the sudden surge in requests to identify the root cause of the overload and measure the impact on subsequent requests.",
+        "**Monitor system resource utilization**: Continuously monitor CPU, memory, and other resource utilization metrics for api-gateway service to ensure they are within healthy ranges.",
+        "**Optimize opentelemetry configuration**: Review and adjust the opentelemetry configuration to optimize its performance, such as reducing sampling rates or adjusting tracing settings.",
+        "##"
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T12:11:47.942Z"
+    },
+    {
+      "traceId": "afd95371d7394133c7a6cf7eac95a178",
+      "summary": "Unable to generate summary",
+      "possibleCauses": [
+        "**Network Congestion**: The high latency of 393.24ms could be due to network congestion caused by a large number of concurrent requests or a slow network connection.",
+        "**System Resource Overload**: It's possible that the system is experiencing resource overload, leading to slower performance and increased execution times.",
+        "**Temporary Service Issue**: A temporary issue with the service itself, such as a misconfigured server or a software bug, could also be causing the anomaly.",
+        "##"
+      ],
+      "recommendations": [
+        "**Monitor Network Performance**: Regularly monitor network performance metrics, such as latency and throughput, to identify any potential issues that may be contributing to the anomaly.",
+        "**Investigate Service Configuration**: Review the service configuration to ensure that it is optimized for high-performance and resource-efficient operation.",
+        "**Implement Load Balancing**: Consider implementing load balancing techniques to distribute incoming traffic across multiple servers, reducing the likelihood of resource overload.",
+        "##"
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T15:06:28.095Z"
+    },
+    {
+      "traceId": "ed8670bfdb881c3d0fdc467309230bba",
+      "summary": "The exchange-api service experienced an unexpected performance anomaly, resulting in a significantly longer response time (336.5ms) compared to the expected value of 12.8ms ± 46.07ms.",
+      "possibleCauses": [
+        "**Network congestion or packet loss**: High network traffic or packet loss could be causing delays in the request-response cycle.",
+        "**Resource-intensive database query**: The GET operation might have involved a resource-intensive database query that took longer than usual to complete, leading to the observed anomaly.",
+        "**Server-side overload**: The exchange-api service might be experiencing an unexpected increase in requests, causing it to become overloaded and resulting in slower response times."
+      ],
+      "recommendations": [
+        "**Investigate network traffic patterns**: Monitor network traffic patterns to identify any potential bottlenecks or issues that could be contributing to the anomaly.",
+        "**Optimize database queries**: Review database query performance to ensure they are efficient and not causing unnecessary delays, and consider optimizing or rewriting resource-intensive queries.",
+        "**Monitor server-side load and adjust as needed**: Continuously monitor server-side load and adjust resources (e.g., increase memory or CPU allocation) to prevent overloading and maintain optimal performance."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T15:10:42.698Z"
+    },
+    {
+      "traceId": "a5179d73fe34bb8ef7365059e0ea7ce5",
+      "summary": "The api-gateway service experienced a significant performance anomaly in the kong.access.plugin.opentelemetry operation, with a duration that is approximately 72 times longer than expected.",
+      "possibleCauses": [
+        "**Service Load**: A sudden increase in incoming requests to the api-gateway service may have caused the opentelemetry plugin to become overwhelmed, leading to an extended response time.",
+        "**Plugin Configuration**: An incorrect or incomplete configuration of the opentelemetry plugin could be causing it to behave erratically, resulting in prolonged execution times for the kong.access.plugin.opentelemetry operation.",
+        "**External Service Impact**: The api-gateway service may be experiencing issues with one of its external dependencies, such as the crypto-wallet service (HTTP GET), which is causing a cascade effect on the overall system performance."
+      ],
+      "recommendations": [
+        "**Monitor Plugin Performance**: Continuously monitor the opentelemetry plugin's performance and adjust its configuration or resource allocation as needed to prevent similar anomalies in the future.",
+        "**Implement Caching or Load Balancing**: Consider implementing caching mechanisms or load balancing strategies for the api-gateway service to distribute incoming requests more efficiently, reducing the likelihood of service overload.",
+        "**Analyze External Service Dependencies**: Investigate and address any issues with external dependencies, such as the crypto-wallet service, to prevent cascading effects on system performance."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T15:18:38.584Z"
+    },
+    {
+      "traceId": "2b9665bd9e0cf35f92138e4f89a8ff0b",
+      "summary": "Unable to generate summary",
+      "possibleCauses": [],
+      "recommendations": [],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T16:38:21.134Z"
+    },
+    {
+      "traceId": "494717d19741b4e2f3ecdc771fd2b73d",
+      "summary": "The api-gateway service experienced a performance anomaly, with the opentelemetry span taking significantly longer than expected to complete (8.22ms vs 1.17ms ± 1.79ms), indicating potential issues with tracing or instrumentation.",
+      "possibleCauses": [
+        "**Instrumentation issues**: There might be problems with instrumenting the api-gateway service correctly, leading to inaccurate timing data and incorrect tracing.",
+        "**Tracing bottleneck**: The anomaly could be caused by a bottleneck in the tracing pipeline, where the opentelemetry span is taking longer than usual to propagate through the system.",
+        "**External service issues**: The crypto-wallet service, which is called from within the api-gateway service, might be experiencing issues that are causing delays and impacting the performance of the opentelemetry span."
+      ],
+      "recommendations": [
+        "**Verify instrumentation**: Double-check that the opentelemetry instrumentation is correctly configured and up-to-date on all nodes in the api-gateway service.",
+        "**Analyze tracing pipeline**: Investigate the tracing pipeline to identify potential bottlenecks or issues that could be causing delays in the propagation of the opentelemetry span.",
+        "**Monitor external services**: Monitor the crypto-wallet service for any signs of issues or performance degradation, and consider implementing circuit breakers or fallbacks if needed."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T16:38:29.309Z"
+    },
+    {
+      "traceId": "e73ebc961ab9a43867618f35844045f3",
+      "summary": "The jaeger-all-in-one service experienced a significant performance anomaly when handling the /api/traces operation, resulting in an average response time that is 3.9 standard deviations above the expected value.",
+      "possibleCauses": [
+        "Overwhelming load on the service, potentially due to high traffic or sudden spikes in usage.",
+        "Configuration issues with the jaeger-all-in-one service, such as incorrect logging levels or inefficient data retention policies.",
+        "Resource constraints on the underlying infrastructure, including insufficient CPU, memory, or disk space."
+      ],
+      "recommendations": [
+        "Monitor and analyze the system logs and metrics to identify any potential bottlenecks or resource usage patterns that may be contributing to the anomaly.",
+        "Investigate and adjust the logging levels and data retention policies of the jaeger-all-in-one service to optimize its performance under heavy loads.",
+        "Perform a thorough analysis of the underlying infrastructure resources, including CPU, memory, and disk space, to ensure they meet the required capacity for the service."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T16:40:54.251Z"
+    },
+    {
+      "traceId": "0536142d04d20a35566886aff36c6943",
+      "summary": "The exchange-api service experienced a significant performance anomaly in the tcp.connect operation, resulting in an average duration of 31.86ms, which is approximately 5 times longer than the expected value.",
+      "possibleCauses": [
+        "**Network congestion**: High network traffic or temporary connectivity issues between the service and its peer might have caused the delay.",
+        "**Resource allocation**: Insufficient resources (e.g., CPU, memory) within the service or peer could lead to prolonged execution of the tcp.connect operation.",
+        "**Instrumentation overhead**: The use of OpenTelemetry instrumentation might introduce additional overhead that is contributing to the anomaly."
+      ],
+      "recommendations": [
+        "**Monitor network traffic and resource utilization**: Use tools like Prometheus and Grafana to monitor network traffic, CPU, memory usage, and other relevant metrics to identify potential bottlenecks.",
+        "**Optimize service configuration and resource allocation**: Review the service's configuration and ensure that it is properly allocated resources. Consider scaling or load balancing if necessary.",
+        "**Instrumentation tuning and profiling**: Analyze the instrumentation overhead by using tools like OpenTelemetry's tracing API and adjust settings to minimize impact on performance."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T16:41:46.931Z"
+    },
+    {
+      "traceId": "5edccb02101a5bfeb0f234a4064973ad",
+      "summary": "A critical performance anomaly occurred on the crypto-wallet service, resulting in a significant increase in HTTP GET request duration. This anomaly is likely related to an overload of system resources.",
+      "possibleCauses": [
+        "**Overloaded API Gateway**: The high CPU usage and active connections indicate that the API gateway was heavily loaded at the time of the anomaly. This could be due to an unexpected surge in incoming requests or a misconfigured load balancer.",
+        "**Insufficient Resource Utilization**: Although memory usage is within normal limits, the high P99 latency suggests that there might be resource constraints (e.g., CPU, disk I/O) that are not being utilized efficiently. This could lead to performance bottlenecks, especially during peak traffic periods.",
+        "**Network or DNS Issues**: The short span duration of the kong.dns and kong.header_filter.plugin.cors spans suggests that there might be network or DNS-related issues affecting the API gateway's ability to resolve hostnames or filter requests."
+      ],
+      "recommendations": [
+        "**Increase API Gateway Resources**: Consider increasing the CPU, memory, or both for the API gateway to handle the expected traffic load. This can help prevent overloading and maintain performance during peak periods.",
+        "**Optimize System Resource Utilization**: Implement resource utilization monitoring and optimize system configurations to ensure that resources are utilized efficiently. This might involve adjusting caching strategies, optimizing database queries, or using more efficient algorithms for compute-intensive tasks.",
+        "**Investigate Network and DNS Issues**: Perform a thorough investigation into network and DNS-related issues affecting the API gateway. This could involve verifying hostname resolution, checking DNS cache sizes, and monitoring network latency to ensure optimal performance."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T16:58:11.950Z"
+    },
+    {
+      "traceId": "8b1dfb66aef9be85b228812738a75aa0",
+      "summary": "The order-matcher service experienced a performance anomaly with an unusually long duration of 95.04ms, which is 7.57% above the expected value, likely due to a bottleneck in the system.",
+      "possibleCauses": [
+        "**Resource contention**: High CPU usage (0.4%) and memory consumption (88MB) could be indicative of resource utilization issues, particularly if other services are competing for resources.",
+        "**Network latency or connectivity issues**: The slow latency from the crypto-wallet service (192.00ms), which is a dependent service in the order-matching process, might have contributed to the anomaly.",
+        "**System overload due to high request rate**: Although the request rate is currently 0.0 req/s, an unexpected surge could lead to resource exhaustion and performance degradation."
+      ],
+      "recommendations": [
+        "**Monitor CPU and memory usage**: Implement monitoring tools to track these metrics in real-time and receive alerts when thresholds are exceeded.",
+        "**Investigate network latency and connectivity issues**: Verify the health of dependent services like crypto-wallet and ensure they can communicate with order-matcher without significant delays.",
+        "**Implement queue management or load balancing**: If resource contention is identified, consider implementing queuing mechanisms or load balancing to distribute incoming requests more efficiently."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T17:05:06.744Z"
+    },
+    {
+      "traceId": "76d037fc083b78fbc977bd6f3c4fd3fa",
+      "summary": "Unable to generate summary",
+      "possibleCauses": [
+        "High HTTP response body size (1064401 bytes), which may indicate a resource-constrained request or an inefficient data processing pipeline.",
+        "Insufficient CPU utilization (0.6%), suggesting that the service might not be handling the increased workload effectively.",
+        "The presence of a high P99 latency value (10000ms) in the correlated system metrics, indicating potential issues with network latency or service bottlenecks.",
+        "##"
+      ],
+      "recommendations": [
+        "**Optimize data processing and reduce response body sizes**: Review the request payload to identify areas for compression or optimization. Consider caching or buffering mechanisms to reduce the load on the service.",
+        "**Investigate CPU utilization and optimize server configuration**: Analyze the CPU usage pattern to determine if there are any specific processes or threads consuming excessive resources. Adjust server configurations, such as increasing memory allocation or optimizing worker thread counts, to improve handling of high workloads.",
+        "**Improve network latency and consider load balancing**: Investigate potential network issues or bottlenecks that could be contributing to the increased P99 latency value. Consider implementing load balancing or caching mechanisms to reduce the load on individual servers and improve overall system responsiveness.",
+        "##"
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T17:13:27.016Z"
+    },
+    {
+      "traceId": "17be274f731cd04413cc6aeea5dcdb8a",
+      "summary": "The given trace data and correlated metrics indicate a performance anomaly in the exchange-api service. A potential cause for this anomaly is an excessive number of concurrent requests, leading to elevated CPU usage, memory consumption, and potentially causing resource degradation.",
+      "possibleCauses": [
+        "High request rate: 0.0 req/s may be due to a temporary increase in incoming traffic or a misconfigured router/switch.",
+        "Elevated CPU usage (0.2%): This could be attributed to the exchange-api service being under heavy load, possibly caused by an unexpected spike in network activity or an unresponsive database.",
+        "Potential resource utilization: Insufficient RAM or disk space may lead to memory and storage contention, causing the 87MB memory consumption."
+      ],
+      "recommendations": [
+        "Monitor CPU usage and adjust resource allocation if necessary. Consider scaling up resources (e.g., adding more nodes) or optimizing query plans for faster execution times.",
+        "Review the Jaeger configuration and ensure that it's properly set up to handle a high request rate without impacting performance.",
+        "Investigate network activity and database queries to identify potential bottlenecks and optimize their configuration."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T18:42:13.433Z"
+    },
+    {
+      "traceId": "1713f072f10844e93c31f9b466077d56",
+      "summary": "The given trace data and correlated system metrics indicate a significant performance anomaly. It appears that the service was under heavy load, resulting in increased CPU usage and memory consumption, while also experiencing high request rates and error rates.",
+      "possibleCauses": [
+        "1. **Insufficient Resource Utilization**: The active connections metric is extremely low at 0, indicating no concurrent requests were being handled by the server. This suggests that there might not be sufficient resources (e.g., CPU, memory) to handle the increased load.",
+        "2. **Resource Overcommitment**: The high request rate and error rates may indicate that the system was overcommitting resources, leading to excessive CPU usage and memory consumption. This could be due to a misconfigured resource allocation or an underlying issue with the server's capacity.",
+        "3. **Network Congestion**: Although not directly indicated by the metrics, network congestion might have played a role in this scenario. The high peer port number (36748) could indicate that there was significant network traffic coming from other sources, further exacerbating the load on the server."
+      ],
+      "recommendations": [
+        "Review and optimize resource allocation to ensure sufficient resources are available for handling incoming requests.",
+        "Investigate the cause of excessive CPU usage and memory consumption by analyzing system logs or running resource-intensive workloads under stress testing scenarios.",
+        "Consider implementing network traffic optimization techniques, such as rate limiting or traffic shaping, to mitigate congestion issues."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T18:43:07.532Z"
+    },
+    {
+      "traceId": "874bfc41a0031daa795b08918f1804d8",
+      "summary": "The provided trace data and correlated metrics indicate that a significant deviation in the latency of the \"order-response\" process occurred during an operation on the order-matcher service. This likely resulted from increased resource utilization, as indicated by the high CPU usage and memory metrics.",
+      "possibleCauses": [
+        "Increased load due to a sudden spike in orders being matched.",
+        "Excessive use of RabbitMQ's replication and caching mechanisms, leading to increased CPU usage and memory allocation."
+      ],
+      "recommendations": [
+        "Implement rate limiting on the order-matcher service to prevent excessive traffic during peak periods.",
+        "Optimize RabbitMQ configuration to reduce overhead associated with message replication and caching.",
+        "Consider implementing a load balancing strategy to distribute incoming orders more evenly across available instances, reducing the likelihood of sudden spikes in resource utilization."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T18:44:32.971Z"
+    },
+    {
+      "traceId": "500bd9f485740e889085038cec7530be",
+      "summary": "The anomalous performance of the \"order-matcher\" service is likely due to an increased request rate from external APIs, causing a surge in concurrent connections and resulting in higher CPU usage. This is exacerbated by the high request rate being published to RabbitMQ, leading to increased latency.",
+      "possibleCauses": [
+        "Increased request rate from external APIs, leading to high incoming requests",
+        "High request rate being published to RabbitMQ, causing congestion",
+        "Insufficient resources (CPU, memory) to handle the increased load"
+      ],
+      "recommendations": [
+        "1. Increase resource utilization by allocating more CPU and memory resources to the \"order-matcher\" service.",
+        "2. Implement a content delivery network (CDN) or load balancing to distribute incoming requests across multiple instances of the \"order-matcher\" service.",
+        "3. Optimize RabbitMQ configuration to handle increased request rates, such as increasing the number of queues or adjusting message buffering times."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T18:55:50.797Z"
+    },
+    {
+      "traceId": "4a2f3eb8246db389d1e4e37ff8d8441a",
+      "summary": "The GET request from exchange-api to http://localhost:16686/api/traces resulted in a latency anomaly, with a deviation of 4 standard deviations from the expected mean. This may be due to an increased CPU usage or memory pressure on the system resources.",
+      "possibleCauses": [
+        "Increased CPU usage and memory pressure due to the high volume of API requests",
+        "Potential resource contention between API calls, such as network packets or database queries"
+      ],
+      "recommendations": [
+        "Monitor CPU usage and memory utilization in real-time to identify potential bottlenecks",
+        "Optimize database queries and reduce the load on APIs during peak periods",
+        "Implement rate limiting on API endpoints to prevent excessive traffic"
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T20:05:57.028Z"
+    },
+    {
+      "traceId": "49acea82dfc1a467a118c481c479941a",
+      "summary": "The HTTP GET request to the crypto-wallet service experienced a deviation from its expected duration of 30.3ms, resulting in an anomaly that is considered minor (SEV4) and likely caused by insufficient network latency or buffer loading issues.",
+      "possibleCauses": [
+        "Insufficient network latency: The P99 Latency metric indicates that the API gateway has been experiencing high latency, which could be causing the crypto-wallet request to take longer than expected.",
+        "Buffer loading issues: The CPU Usage and Memory metrics suggest that there may not be sufficient resources available in the system to handle a large number of requests simultaneously. This could be contributing to the delay caused by the crypto-wallet request."
+      ],
+      "recommendations": [
+        "Increase network latency mitigation strategies: Implement techniques such as load shedding, queuing, or circuit breaking to mitigate the effects of high latency.",
+        "Optimize buffer loading: Review and optimize the buffer allocation strategy for the API gateway and other services that receive requests from the crypto-wallet service. Consider implementing workarounds like caching, buffering at the application layer, or using distributed systems with higher throughput.",
+        "Monitor and analyze system resources: Regularly monitor CPU usage, memory, and network latency to identify potential bottlenecks and optimize system resources accordingly."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T20:06:35.469Z"
+    },
+    {
+      "traceId": "9d7b8e0136e51883b8e26c26cd93a687",
+      "summary": "The ananomaly is likely caused by an unusually high latency of the POST operation to the exchange-api service. This could be due to excessive network traffic or resource utilization issues, which may have been masked by normal variation in CPU usage and request rates.",
+      "possibleCauses": [
+        "High P99 Latency (235ms): Elevated latency could indicate a bottleneck in network communication between the client and server.",
+        "Elevated Active Connections: A sudden increase in active connections might be related to an overload of API requests or excessive HTTP traffic."
+      ],
+      "recommendations": [
+        "Monitor CPU usage and adjust resource allocation if necessary to prevent further spikes in P99 Latency.",
+        "Investigate the API's request rate limits and adjust them according to service requirements to avoid overload."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T21:35:01.568Z"
+    },
+    {
+      "traceId": "8b643a0ee6ac43abd4c3637270f51c85",
+      "summary": "The provided trace data and correlated metrics suggest that the exchange-api service experienced an anomaly in its GET request operation. The increased error rate (2.0%) could be due to a temporary network issue, such as a brief connection timeout or a misconfigured API endpoint.",
+      "possibleCauses": [
+        "Increased network latency (P99 Latency of 372ms) may have caused the HTTP request to time out and return an error response.",
+        "The high error rate (2.0%) in the GET operation could be related to a temporary issue with the API endpoint, such as a temporary server overload or a misconfigured API configuration."
+      ],
+      "recommendations": [
+        "Monitor network latency and response times for any patterns that may indicate a temporary issue.",
+        "Verify that the API endpoint is correctly configured and functioning within expected parameters.",
+        "Consider implementing error handling mechanisms to handle transient errors and reduce the overall error rate."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T21:47:59.516Z"
+    },
+    {
+      "traceId": "1dc92834efd22a99b7af9c0ca9f08b40",
+      "summary": "The order-matcher service experienced a significant deviation in its response time from the expected 2.38ms, resulting in an SEV5 (Low) severity issue. Based on correlated system metrics and trace data analysis, it appears that the high error rate (>100.0%) likely caused by excessive errors led to this anomaly.",
+      "possibleCauses": [
+        "High Error Rate: The presence of a critical error rate exceeding 100.0% may have compromised the service's stability, leading to unexpected response times.",
+        "Resource Utilization: Excessive requests for resources (e.g., CPU Usage, Memory) could also contribute to the high error rate, further exacerbating the situation."
+      ],
+      "recommendations": [
+        "Implement Error Recovery Mechanisms: Develop and implement strategies to recover from errors, such as retry mechanisms or exponential backoff, to minimize the impact of errors on the service.",
+        "Optimize Resource Utilization: Analyze the system's resource utilization patterns and optimize resource allocation to reduce the likelihood of high error rates. This may involve implementing load balancing, caching, or other techniques to improve performance.",
+        "Monitor and Log Error Details: Regularly log detailed error information to better understand the root cause of errors and identify potential bottlenecks."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T21:48:57.089Z"
+    },
+    {
+      "traceId": "03255dc16a60e7ca8b5be1c48df9eed9",
+      "summary": "The tcp.connect operation on the exchange-api service experienced a significant deviation from its expected duration, resulting in a SEV1 (Critical) anomaly. This is likely due to a resource-intensive issue that consumed excessive CPU and memory resources.",
+      "possibleCauses": [
+        "High CPU usage (> 0.3%) may indicate a resource-intensive task or a complex operation being performed by the exchange-api service.",
+        "Elevated memory usage (91MB) might be indicative of an inefficient data processing or storage mechanism.",
+        "The high request rate (0 req/s) and low active connections (< 1) suggest that there are no apparent user interactions, but rather a resource-hungry operation."
+      ],
+      "recommendations": [
+        "Increase the CPU budget for the exchange-api service to enable more complex operations without exceeding available resources.",
+        "Optimize memory usage by re-designing data storage or implementing efficient algorithms for processing large datasets.",
+        "Review and refine the request rate and active connections metrics to ensure they are representative of actual user activity, rather than a resource-intensive operation."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T21:51:21.605Z"
+    },
+    {
+      "traceId": "9ee45505c08ce9f7da0f2897a3c303dd",
+      "summary": "The crypto-wallet service experienced an unexpected HTTP GET request that took 61ms, which is significantly longer than the expected 27.88ms. This deviation from the norm can be attributed to resource utilization issues in the API Gateway.",
+      "possibleCauses": [
+        "**Resource Overload**: Increased request rate and concurrent connections may have led to CPU usage exceeding acceptable limits, causing the latency increase.",
+        "**Memory Pressure**: High memory usage could result from inefficient data processing or large requests, leading to slowdowns and increased latency.",
+        "**Network Congestion**: Heavy network traffic from other services or external sources might have caused a bottleneck in the API Gateway's resources."
+      ],
+      "recommendations": [
+        "**Optimize Resource Utilization**:",
+        "- Review and optimize the API Gateway configuration to ensure it can handle increased requests without exceeding CPU limits.",
+        "- Implement load balancing strategies to distribute incoming requests more efficiently, reducing congestion on individual servers.",
+        "**Improve Request Handling**:",
+        "- Ensure that the crypto-wallet service is properly configured to handle large requests and concurrent connections, with sufficient resources allocated for data processing.",
+        "- Consider implementing request caching or buffering mechanisms to reduce the number of requests made to external services.",
+        "**Monitor and Analyze Network Traffic**:",
+        "- Regularly review network logs and metrics to identify potential bottlenecks or issues related to third-party services or external networks.",
+        "- Implement traffic shaping or queuing mechanisms to prevent excessive resource utilization from other services."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T21:53:37.929Z"
+    },
+    {
+      "traceId": "e40cfa5de6af864d708532e4821bfc28",
+      "summary": "The GET request from the exchange-api service to the /api/traces endpoint on localhost took significantly longer than expected, indicating a potential delay in processing or transmitting data. This could be due to various factors such as network latency, server load, or cache misses.",
+      "possibleCauses": [
+        "High P99 Latency: A 4th percentile value of 3551ms indicates that the average response time was exceptionally high.",
+        "Elevated CPU Usage: The system's CPU usage is at a moderate level (0.2%), but this might not be directly related to the anomaly, as other processes are running concurrently."
+      ],
+      "recommendations": [
+        "Optimize Network Latency by configuring the Jaeger instrumentation to reduce latency, or by using a more efficient network protocol.",
+        "Review Server Load and Caching: Ensure that there are no bottlenecks in the server's processing capacity or caching mechanisms. Consider implementing rate limiting or optimizing database queries if necessary."
+      ],
+      "confidence": "medium",
+      "analyzedAt": "2026-01-15T21:54:56.536Z"
+    },
+    {
+      "traceId": "d11aab99187ed150022e2d960cf8122d",
+      "summary": "The anomaly is likely caused by a prolonged delay in the response from the exchange-api service, resulting in an excessive latency and CPU usage spike. This may be due to an issue with the API's performance or resource utilization.",
+      "possibleCauses": [
+        "**Resource Utilization**: The high request rate (0.0 req/s) combined with the slow response time (53.59ms) suggests that there is a significant delay in processing requests from clients, which could be caused by an overreliance on a single database query or an inefficient data retrieval mechanism.",
+        "**Network Latency**: The P99 latency of 3525ms indicates that the network is not responding within a reasonable time frame. This could be due to a high volume of traffic, congestion in the network, or a long-latency database connection.",
+        "**Server Load**: The CPU usage of 0.2% and memory utilization of 100MB suggest that the server is under heavy load, which may be causing it to slow down or even experience crashes."
+      ],
+      "recommendations": [
+        "**Optimize Database Queries**: Review and optimize the query structure to reduce latency and improve data retrieval performance.",
+        "**Implement Network Latency Mitigation Strategies**: Consider implementing network optimization techniques such as load balancing, caching, or QoS (Quality of Service) configurations to reduce latency.",
+        "**Monitor Server Load and Performance**: Continuously monitor server performance and CPU utilization to identify potential bottlenecks and take corrective action before they impact the system."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T21:56:08.324Z"
+    },
+    {
+      "traceId": "81884bab334808b4d81f26d529dfa185",
+      "summary": "The anomaly likely resulted from a delayed response to the GET request by exchange-api, which caused a significant deviation in latency. This delay was exacerbated by high CPU usage and memory consumption of the node.",
+      "possibleCauses": [
+        "High CPU usage (0.4%) may have caused an idle thread or process to consume resources without releasing them back to the system, leading to increased latency.",
+        "Memory (97MB) consumption may have resulted from memory-intensive operations within exchange-api, contributing to a decrease in available resources for other tasks.",
+        "Increased request rate (0.0 req/s) might indicate that exchange-api is handling an unusually high volume of requests, putting additional pressure on system resources."
+      ],
+      "recommendations": [
+        "Implement throttling or rate limiting for the GET requests from exchange-api to prevent excessive resource consumption and latency increases.",
+        "Optimize memory allocation and deallocation mechanisms within exchange-api to reduce memory usage when not in use.",
+        "Consider upgrading the node's hardware or adding more resources (e.g., CPU, RAM) to improve overall system performance and stability."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T22:09:10.033Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: exchange-api\n- Operation: GET\n- Duration: 94.58ms (expected: 16.06ms ± 27.09ms)\n- Deviation: 2.9σ (standard deviations from mean)\n- Severity: SEV2 (Major)\n- Timestamp: Thu Jan 15 2026 23:08:36 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"http.request.method\": \"GET\",\n  \"http.request.method_original\": \"GET\",\n  \"http.response.status_code\": 200,\n  \"network.peer.address\": \"::1\",\n  \"network.peer.port\": 16686,\n  \"otel.scope.name\": \"@opentelemetry/instrumentation-undici\",\n  \"otel.scope.version\": \"0.13.1\",\n  \"server.address\": \"localhost\",\n  \"server.port\": 16686,\n  \"span.kind\": \"client\",\n  \"url.full\": \"http://localhost:16686/api/traces?service=crypto-wallet&lookback=1h&limit=100\",\n  \"url.path\": \"/api/traces\",\n  \"url.query\": \"?service=crypto-wallet&lookback=1h&limit=100\",\n  \"url.scheme\": \"http\",\n  \"user_agent.original\": \"node\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.4%\n- Memory: 97MB\n- Request Rate: 0.0 req/s\n- Error Rate: 0.0%\n- P99 Latency: 243ms\n- Active Connections: 0\n\n## Trace Context\nThe full trace contains 2 spans:\n- exchange-api: GET (94.58ms)\n- jaeger-all-in-one: /api/traces (85.82ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The anomaly likely resulted from a delayed response to the GET request by exchange-api, which caused a significant deviation in latency. This delay was exacerbated by high CPU usage and memory consumption of the node.\n\nCAUSES:\n- High CPU usage (0.4%) may have caused an idle thread or process to consume resources without releasing them back to the system, leading to increased latency.\n- Memory (97MB) consumption may have resulted from memory-intensive operations within exchange-api, contributing to a decrease in available resources for other tasks.\n- Increased request rate (0.0 req/s) might indicate that exchange-api is handling an unusually high volume of requests, putting additional pressure on system resources.\n\nRECOMMENDATIONS:\n- Implement throttling or rate limiting for the GET requests from exchange-api to prevent excessive resource consumption and latency increases.\n- Optimize memory allocation and deallocation mechanisms within exchange-api to reduce memory usage when not in use.\n- Consider upgrading the node's hardware or adding more resources (e.g., CPU, RAM) to improve overall system performance and stability."
+    },
+    {
+      "traceId": "76e073b144c7955d39a68869e44afc9a",
+      "summary": "The order-matcher service experienced a minor latency anomaly, where the response time increased by approximately 10% (from 89.11ms to 99.57ms) during the operation of matching an order.",
+      "possibleCauses": [
+        "1. Increased CPU usage: The high CPU utilization might be due to the excessive processing required for the order.match operation, which could be caused by a surge in incoming orders or a complex algorithm implementation.",
+        "2. Resource contention: The increased resource utilization could also indicate that there is a bottleneck in the RabbitMQ messaging channel, leading to congestion and delays during the exchange-api's payment response process.",
+        "3. Connection issues with API Gateway: Although not directly related to the order-matcher service, an error rate of 0.0% in API Gateway indicates that there are no errors propagating through the entire system. However, a P99 latency of 10ms suggests that there might be some level of congestion or network latency, which could contribute to this anomaly."
+      ],
+      "recommendations": [
+        "1. Optimize algorithm complexity: Review and optimize the order.match operation to reduce its computational requirements.",
+        "2. Implement CPU-bound tasks in parallel: Consider utilizing multiple processing cores or parallelizing computationally intensive tasks within the order-matcher service to improve overall system performance.",
+        "3. Monitor RabbitMQ messaging channel: Keep an eye on the RabbitMQ metrics to identify any bottlenecks or resource contention issues that might be causing the increased latency and high CPU usage."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-15T22:17:15.520Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: order-matcher\n- Operation: order.match\n- Duration: 99.57ms (expected: 89.11ms ± 5.36ms)\n- Deviation: 1.95σ (standard deviations from mean)\n- Severity: SEV4 (Minor)\n- Timestamp: Thu Jan 15 2026 23:15:06 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"messaging.destination\": \"payment_response\",\n  \"messaging.operation\": \"process\",\n  \"messaging.source\": \"payments\",\n  \"messaging.system\": \"rabbitmq\",\n  \"order.id\": \"ORD-1768515306796-1\",\n  \"order.pair\": \"BTC/USD\",\n  \"order.price\": 42755.21,\n  \"order.quantity\": 0.01,\n  \"order.side\": \"BUY\",\n  \"otel.scope.name\": \"order-matcher\",\n  \"otel.scope.version\": \"1.0.0\",\n  \"otel.status_code\": \"OK\",\n  \"processor.id\": \"matcher-1768515285069\",\n  \"span.kind\": \"consumer\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.1%\n- Memory: 88MB\n- Request Rate: N/A\n- Error Rate: 0.0%\n- P99 Latency: 10ms\n- Active Connections: 0\n\n## Trace Context\nThe full trace contains 17 spans:\n- exchange-api: payment_response process (0.64ms)\n- crypto-wallet: HTTP POST (285.00ms)\n- api-gateway: kong.balancer (275.90ms)\n- exchange-api: publish <default> (1.36ms)\n- crypto-wallet: order.submit.client (285.80ms)\n- api-gateway: kong (277.94ms)\n- api-gateway: kong.access.plugin.cors (0.27ms)\n- api-gateway: kong.access.plugin.opentelemetry (0.23ms)\n- order-matcher: order.response (2.85ms)\n- exchange-api: publish orders (3.55ms)\n... and 7 more spans\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The order-matcher service experienced a minor latency anomaly, where the response time increased by approximately 10% (from 89.11ms to 99.57ms) during the operation of matching an order.\n\nCAUSES:\n1. Increased CPU usage: The high CPU utilization might be due to the excessive processing required for the order.match operation, which could be caused by a surge in incoming orders or a complex algorithm implementation.\n2. Resource contention: The increased resource utilization could also indicate that there is a bottleneck in the RabbitMQ messaging channel, leading to congestion and delays during the exchange-api's payment response process.\n3. Connection issues with API Gateway: Although not directly related to the order-matcher service, an error rate of 0.0% in API Gateway indicates that there are no errors propagating through the entire system. However, a P99 latency of 10ms suggests that there might be some level of congestion or network latency, which could contribute to this anomaly.\n\nRECOMMENDATIONS:\n1. Optimize algorithm complexity: Review and optimize the order.match operation to reduce its computational requirements.\n2. Implement CPU-bound tasks in parallel: Consider utilizing multiple processing cores or parallelizing computationally intensive tasks within the order-matcher service to improve overall system performance.\n3. Monitor RabbitMQ messaging channel: Keep an eye on the RabbitMQ metrics to identify any bottlenecks or resource contention issues that might be causing the increased latency and high CPU usage."
+    },
+    {
+      "traceId": "d979e89a06df62356ffbcdd709fffc77",
+      "summary": "The anomaly in the exchange-api service is likely caused by an excessive number of TCP connections being established, resulting in a high error rate and significant CPU usage. This indicates a resource-intensive issue that may be impacting system performance.",
+      "possibleCauses": [
+        "Increased request rate (0.0 req/s) coupled with a low active connections metric (< 1), suggesting the service is not handling requests efficiently.",
+        "The 100% critical error rate, although unusual for this operation, could indicate an underlying problem such as excessive resource utilization or a bug in the code that's causing the errors to propagate and overwhelm the system."
+      ],
+      "recommendations": [
+        "Implement a connection pooling mechanism to limit the number of new connections established per request.",
+        "Monitor CPU usage and adjust any resource-intensive operations within the service to prevent further degradation.",
+        "Consider implementing rate limiting on the TCP connections to prevent excessive activity, or implement error handling mechanisms that can be configured to log errors at different levels (e.g., INFO, ERROR)."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-16T06:40:22.568Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: exchange-api\n- Operation: tcp.connect\n- Duration: 21.44ms (expected: 4.32ms ± 2.3ms)\n- Deviation: 7.44σ (standard deviations from mean)\n- Severity: SEV1 (Critical)\n- Timestamp: Fri Jan 16 2026 07:36:35 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"net.host.ip\": \"::1\",\n  \"net.host.port\": 31549,\n  \"net.peer.ip\": \"::1\",\n  \"net.peer.name\": \"localhost\",\n  \"net.peer.port\": \"16686\",\n  \"net.transport\": \"ip_tcp\",\n  \"otel.scope.name\": \"@opentelemetry/instrumentation-net\",\n  \"otel.scope.version\": \"0.46.1\",\n  \"span.kind\": \"internal\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.2%\n- Memory: 95MB\n- Request Rate: 0.0 req/s\n- Error Rate: 100.0% ⚠️ HIGH\n- P99 Latency: 980ms\n- Active Connections: 0\n\n## Auto-Detected Issues\n- 🔥 Critical error rate (100.0%) - service degradation\n\n## Trace Context\nThe full trace contains 1 spans:\n- exchange-api: tcp.connect (21.44ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The anomaly in the exchange-api service is likely caused by an excessive number of TCP connections being established, resulting in a high error rate and significant CPU usage. This indicates a resource-intensive issue that may be impacting system performance.\n\nCAUSES:\n- Increased request rate (0.0 req/s) coupled with a low active connections metric (< 1), suggesting the service is not handling requests efficiently.\n- The 100% critical error rate, although unusual for this operation, could indicate an underlying problem such as excessive resource utilization or a bug in the code that's causing the errors to propagate and overwhelm the system.\n\nRECOMMENDATIONS:\n- Implement a connection pooling mechanism to limit the number of new connections established per request.\n- Monitor CPU usage and adjust any resource-intensive operations within the service to prevent further degradation.\n- Consider implementing rate limiting on the TCP connections to prevent excessive activity, or implement error handling mechanisms that can be configured to log errors at different levels (e.g., INFO, ERROR)."
+    },
+    {
+      "traceId": "3e0bc386bae09f531c1968c94aa22d7a",
+      "summary": "The observed HTTP GET request to the crypto-wallet service experienced a latency deviation of 3.74 standard deviations from its expected value, suggesting an unexpected delay in the response time. This anomaly may be caused by an issue with the exchange API, which is responsible for routing requests to other services.",
+      "possibleCauses": [
+        "**Exchange API Delay**: The latency deviation could be attributed to an excessive delay in processing requests through the exchange API, potentially due to a bottleneck or incorrect configuration.",
+        "**Request Burden on crypto-wallet Service**: If the crypto-wallet service is under heavy load, it may be experiencing increased CPU usage and memory allocation, causing delays in its response time."
+      ],
+      "recommendations": [
+        "**Optimize Exchange API Configuration**: Review the exchange API's configuration to ensure it is optimized for performance. This may involve adjusting parameters such as request handling rates or caching mechanisms.",
+        "**Monitor and Optimize Request Burden on crypto-wallet Service**: Regularly monitor CPU usage, memory allocation, and request rates on the crypto-wallet service to identify potential bottlenecks. Implement measures to optimize resource utilization and reduce latency when necessary.",
+        "**Analyze and Resolve Resource Utilization Issues**: Investigate any issues related to resource utilization within the system, such as high CPU or memory usage patterns. Take corrective action to resolve these issues, ensuring that resources are allocated efficiently to support the expected workload of the crypto-wallet service."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-16T06:41:52.832Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: crypto-wallet\n- Operation: HTTP GET\n- Duration: 110ms (expected: 35.33ms ± 19.95ms)\n- Deviation: 3.74σ (standard deviations from mean)\n- Severity: SEV1 (Critical)\n- Timestamp: Fri Jan 16 2026 07:40:58 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"component\": \"fetch\",\n  \"http.host\": \"localhost:8000\",\n  \"http.method\": \"GET\",\n  \"http.response_content_length\": 95283,\n  \"http.scheme\": \"http\",\n  \"http.status_code\": 200,\n  \"http.status_text\": \"OK\",\n  \"http.url\": \"\",\n  \"http.user_agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0\",\n  \"otel.scope.name\": \"@opentelemetry/instrumentation-fetch\",\n  \"otel.scope.version\": \"0.209.0\",\n  \"span.kind\": \"client\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.4%\n- Memory: 103MB\n- Request Rate: 0.2 req/s\n- Error Rate: 4.0%\n- P99 Latency: 17ms\n- Active Connections: 0\n\n## Auto-Detected Issues\n- 📊 Notable error rate (4.0%)\n\n## Trace Context\nThe full trace contains 10 spans:\n- api-gateway: kong.router (0.07ms)\n- api-gateway: kong.access.plugin.opentelemetry (0.27ms)\n- api-gateway: kong.dns (0.06ms)\n- api-gateway: kong.header_filter.plugin.opentelemetry (0.54ms)\n- api-gateway: kong.balancer (11.31ms)\n- exchange-api: GET (9.37ms)\n- api-gateway: kong.access.plugin.cors (0.06ms)\n- api-gateway: kong.header_filter.plugin.cors (0.56ms)\n- crypto-wallet: HTTP GET (110.00ms)\n- api-gateway: kong (13.07ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The observed HTTP GET request to the crypto-wallet service experienced a latency deviation of 3.74 standard deviations from its expected value, suggesting an unexpected delay in the response time. This anomaly may be caused by an issue with the exchange API, which is responsible for routing requests to other services.\n\nCAUSES:\n- **Exchange API Delay**: The latency deviation could be attributed to an excessive delay in processing requests through the exchange API, potentially due to a bottleneck or incorrect configuration.\n- **Request Burden on crypto-wallet Service**: If the crypto-wallet service is under heavy load, it may be experiencing increased CPU usage and memory allocation, causing delays in its response time.\nRECOMMENDATIONS:\n- **Optimize Exchange API Configuration**: Review the exchange API's configuration to ensure it is optimized for performance. This may involve adjusting parameters such as request handling rates or caching mechanisms.\n- **Monitor and Optimize Request Burden on crypto-wallet Service**: Regularly monitor CPU usage, memory allocation, and request rates on the crypto-wallet service to identify potential bottlenecks. Implement measures to optimize resource utilization and reduce latency when necessary.\n- **Analyze and Resolve Resource Utilization Issues**: Investigate any issues related to resource utilization within the system, such as high CPU or memory usage patterns. Take corrective action to resolve these issues, ensuring that resources are allocated efficiently to support the expected workload of the crypto-wallet service."
+    },
+    {
+      "traceId": "0fa80a27eee30953642c7f0aa594a25e",
+      "summary": "The given anomaly in the kx-exchange service indicates a critical issue with the GET request, which resulted in an unexpected latency of 395ms. This delay is likely due to increased CPU usage and memory consumption caused by resource-intensive code or high traffic.",
+      "possibleCauses": [
+        "Elevated CPU Usage (0.6%): High CPU utilization could be attributed to complex calculations, long-running operations, or thread density issues.",
+        "Increased Memory Consumption: The spike in memory usage might be related to the execution of resource-hungry data processing scripts or inefficient caching mechanisms."
+      ],
+      "recommendations": [
+        "Optimize Database Queries and Reduce Complexity",
+        "Implement Efficient Caching Strategies",
+        "Monitor and Analyze Resource Utilization for Performance Bottlenecks"
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-19T07:07:07.672Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: kx-exchange\n- Operation: GET\n- Duration: 431.98ms (expected: 31.59ms ± 110.08ms)\n- Deviation: 3.64σ (standard deviations from mean)\n- Severity: SEV1 (Critical)\n- Timestamp: Mon Jan 19 2026 08:06:23 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"http.request.method\": \"GET\",\n  \"http.request.method_original\": \"GET\",\n  \"http.response.status_code\": 200,\n  \"network.peer.address\": \"127.0.0.1\",\n  \"network.peer.port\": 16686,\n  \"otel.scope.name\": \"@opentelemetry/instrumentation-undici\",\n  \"otel.scope.version\": \"0.13.1\",\n  \"server.address\": \"localhost\",\n  \"server.port\": 16686,\n  \"span.kind\": \"client\",\n  \"url.full\": \"http://localhost:16686/api/traces?service=kx-exchange&lookback=1h&limit=100\",\n  \"url.path\": \"/api/traces\",\n  \"url.query\": \"?service=kx-exchange&lookback=1h&limit=100\",\n  \"url.scheme\": \"http\",\n  \"user_agent.original\": \"node\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.6%\n- Memory: 22MB\n- Request Rate: 0.1 req/s\n- Error Rate: 2.8%\n- P99 Latency: 395ms\n- Active Connections: 0\n\n## Auto-Detected Issues\n- 📊 Notable error rate (2.8%)\n\n## Trace Context\nThe full trace contains 2 spans:\n- kx-exchange: GET (431.98ms)\n- jaeger-all-in-one: /api/traces (98.44ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The given anomaly in the kx-exchange service indicates a critical issue with the GET request, which resulted in an unexpected latency of 395ms. This delay is likely due to increased CPU usage and memory consumption caused by resource-intensive code or high traffic.\n\nCAUSES:\n- Elevated CPU Usage (0.6%): High CPU utilization could be attributed to complex calculations, long-running operations, or thread density issues.\n- Increased Memory Consumption: The spike in memory usage might be related to the execution of resource-hungry data processing scripts or inefficient caching mechanisms.\nRECOMMENDATIONS:\n- Optimize Database Queries and Reduce Complexity\n- Implement Efficient Caching Strategies\n- Monitor and Analyze Resource Utilization for Performance Bottlenecks"
+    },
+    {
+      "traceId": "80bd3a57a75c373c75737ca52f38e9fa",
+      "summary": "The DNS lookup operation on the kx-exchange service experienced an unexpected latency deviation of 4.02 standard deviations from its expected value, prompting a critical Severity SEV1 (Critical) alert.",
+      "possibleCauses": [
+        "Resource utilization issues in the network, which could have resulted in increased latency for the DNS lookup operation.",
+        "A potential issue with the DNS server or its configuration, causing it to take longer than usual to resolve domain names.",
+        "Overhead from monitoring and logging systems consuming system resources during this period."
+      ],
+      "recommendations": [
+        "Reviewing the network infrastructure and ensuring that there are no bottlenecks or unexpected load on the DNS server during this time frame.",
+        "Monitoring the system's performance logs to identify any signs of resource utilization spikes or unusual behavior from DNS servers, which may be contributing to the observed latency deviation."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-19T16:29:36.785Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: kx-exchange\n- Operation: dns.lookup\n- Duration: 5.59ms (expected: 1.48ms ± 1.02ms)\n- Deviation: 4.02σ (standard deviations from mean)\n- Severity: SEV1 (Critical)\n- Timestamp: Mon Jan 19 2026 17:24:21 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"otel.scope.name\": \"@opentelemetry/instrumentation-dns\",\n  \"otel.scope.version\": \"0.46.0\",\n  \"peer.ipv6\": \"::1\",\n  \"peer[1].ipv4\": \"127.0.0.1\",\n  \"span.kind\": \"client\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.4%\n- Memory: 21MB\n- Request Rate: 0.0 req/s\n- Error Rate: 0.0%\n- P99 Latency: 210ms\n- Active Connections: 0\n\n## Trace Context\nThe full trace contains 1 spans:\n- kx-exchange: dns.lookup (5.58ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The DNS lookup operation on the kx-exchange service experienced an unexpected latency deviation of 4.02 standard deviations from its expected value, prompting a critical Severity SEV1 (Critical) alert.\n\nCAUSES:\n- Resource utilization issues in the network, which could have resulted in increased latency for the DNS lookup operation.\n- A potential issue with the DNS server or its configuration, causing it to take longer than usual to resolve domain names.\n- Overhead from monitoring and logging systems consuming system resources during this period.\n\nRECOMMENDATIONS:\n- Reviewing the network infrastructure and ensuring that there are no bottlenecks or unexpected load on the DNS server during this time frame.\n- Monitoring the system's performance logs to identify any signs of resource utilization spikes or unusual behavior from DNS servers, which may be contributing to the observed latency deviation."
+    },
+    {
+      "traceId": "bdca9bfc520a8e8c013fe3dd965ce38a",
+      "summary": "The anomaly is likely caused by a delay in processing the GET request, resulting in a significant deviation from the expected latency of 29.71ms. This could be due to an issue with network connectivity or resource utilization.",
+      "possibleCauses": [
+        "High CPU usage on the server (0.6%) may indicate that some critical system tasks are running at a high priority.",
+        "Low active connections (0) might suggest that there is not enough traffic being handled by the system, potentially leading to resource starvation.",
+        "Resource utilization: The P99 Latency metric suggests that there may be issues with request processing times, which could be exacerbated by other factors such as network latency or server load."
+      ],
+      "recommendations": [
+        "Monitor CPU usage and adjust resource allocation if necessary to prevent critical tasks from running at high priority.",
+        "Increase the number of active connections on the system to ensure that it can handle a sufficient amount of traffic without resource starvation.",
+        "Investigate the P99 Latency metric further to identify specific causes and optimize request processing times."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-19T16:33:03.270Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: jaeger-all-in-one\n- Operation: /api/traces\n- Duration: 87.47ms (expected: 29.71ms ± 17.04ms)\n- Deviation: 3.39σ (standard deviations from mean)\n- Severity: SEV1 (Critical)\n- Timestamp: Mon Jan 19 2026 17:27:55 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"client.address\": \"172.21.0.1\",\n  \"http.request.method\": \"GET\",\n  \"http.response.body.size\": 1015557,\n  \"http.response.status_code\": 200,\n  \"http.route\": \"/api/traces\",\n  \"network.peer.address\": \"172.21.0.1\",\n  \"network.peer.port\": 59998,\n  \"network.protocol.version\": \"1.1\",\n  \"otel.scope.name\": \"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp\",\n  \"otel.scope.version\": \"0.63.0\",\n  \"server.address\": \"localhost\",\n  \"server.port\": 16686,\n  \"span.kind\": \"server\",\n  \"url.path\": \"/api/traces\",\n  \"url.scheme\": \"http\",\n  \"user_agent.original\": \"node\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.6%\n- Memory: 22MB\n- Request Rate: 0.0 req/s\n- Error Rate: 0.0%\n- P99 Latency: NaNms\n- Active Connections: 0\n\n## Trace Context\nThe full trace contains 2 spans:\n- kx-exchange: GET (396.97ms)\n- jaeger-all-in-one: /api/traces (87.47ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The anomaly is likely caused by a delay in processing the GET request, resulting in a significant deviation from the expected latency of 29.71ms. This could be due to an issue with network connectivity or resource utilization.\n\nCAUSES:\n- High CPU usage on the server (0.6%) may indicate that some critical system tasks are running at a high priority.\n- Low active connections (0) might suggest that there is not enough traffic being handled by the system, potentially leading to resource starvation.\n- Resource utilization: The P99 Latency metric suggests that there may be issues with request processing times, which could be exacerbated by other factors such as network latency or server load.\n\nRECOMMENDATIONS:\n- Monitor CPU usage and adjust resource allocation if necessary to prevent critical tasks from running at high priority.\n- Increase the number of active connections on the system to ensure that it can handle a sufficient amount of traffic without resource starvation.\n- Investigate the P99 Latency metric further to identify specific causes and optimize request processing times."
+    },
+    {
+      "traceId": "d730687e0c91e1636b43bd61963a95e3",
+      "summary": "The given anomaly likely resulted from an unexpected surge in CPU usage, possibly due to the service's sudden demand for resources or an overload of incoming requests.",
+      "possibleCauses": [
+        "Resource Utilization: High CPU usage could be a sign of excessive computation requirements or a temporary spike in system load.",
+        "Overwhelming Incoming Requests: Too many users or applications sending requests simultaneously might have overwhelmed the service's capacity, leading to increased CPU utilization and latency."
+      ],
+      "recommendations": [
+        "Monitor System Load and Performance Metrics More Diversely: Implementing metrics that cover multiple aspects of system performance, such as memory usage and request rates, could help identify potential issues before they escalate into anomalies like this one.",
+        "Implement Rate Limiting or Caching: Introducing rate limiting or caching mechanisms to manage incoming requests might help prevent similar surges in CPU usage and ensure smoother system operation."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-20T09:04:25.443Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: unknown\n- Operation: unknown\n- Duration: 0ms (expected: 0ms ± 0ms)\n- Deviation: 0σ (standard deviations from mean)\n- Severity: SEV5 (Low)\n- Timestamp: Tue Jan 20 2026 10:04:04 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.3%\n- Memory: 18MB\n- Request Rate: 0.0 req/s\n- Error Rate: 0.0%\n- P99 Latency: 417ms\n- Active Connections: 1\n\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The given anomaly likely resulted from an unexpected surge in CPU usage, possibly due to the service's sudden demand for resources or an overload of incoming requests.\n\nCAUSES:\n- Resource Utilization: High CPU usage could be a sign of excessive computation requirements or a temporary spike in system load.\n- Overwhelming Incoming Requests: Too many users or applications sending requests simultaneously might have overwhelmed the service's capacity, leading to increased CPU utilization and latency.\nRECOMMENDATIONS:\n- Monitor System Load and Performance Metrics More Diversely: Implementing metrics that cover multiple aspects of system performance, such as memory usage and request rates, could help identify potential issues before they escalate into anomalies like this one.\n- Implement Rate Limiting or Caching: Introducing rate limiting or caching mechanisms to manage incoming requests might help prevent similar surges in CPU usage and ensure smoother system operation.\nCONFIDENCE: Low"
+    },
+    {
+      "traceId": "2bcd9fb59215c932e0b4c6b2e8f8d734",
+      "summary": "The observed anomaly is likely caused by an issue with the TCP connection to kx-exchange, resulting in a significant deviation from the expected latency of 4.36ms. This discrepancy may be due to excessive network usage or resource contention.",
+      "possibleCauses": [
+        "High CPU Usage: A spike in CPU utilization might indicate that the system is struggling to handle requests efficiently.",
+        "Insufficient Memory: The 21MB memory usage could be a sign of temporary memory exhaustion, which might be caused by an increased number of concurrent connections.",
+        "Resource Contention: Overloaded network resources or competing traffic might have led to excessive latency."
+      ],
+      "recommendations": [
+        "Optimize CPU Usage: Consider implementing resource allocation strategies to prevent sudden spikes in CPU utilization.",
+        "Memory Reallocation: Ensure that the system has sufficient memory available to handle incoming requests without experiencing memory exhaustion.",
+        "Network Optimization: Review and adjust network configurations to reduce contention among concurrent connections."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-21T06:52:07.028Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: kx-exchange\n- Operation: tcp.connect\n- Duration: 7.74ms (expected: 4.36ms ± 1.73ms)\n- Deviation: 1.95σ (standard deviations from mean)\n- Severity: SEV4 (Minor)\n- Timestamp: Wed Jan 21 2026 07:51:55 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"net.host.ip\": \"::1\",\n  \"net.host.port\": 3969,\n  \"net.peer.ip\": \"::1\",\n  \"net.peer.name\": \"localhost\",\n  \"net.peer.port\": \"16686\",\n  \"net.transport\": \"ip_tcp\",\n  \"otel.scope.name\": \"@opentelemetry/instrumentation-net\",\n  \"otel.scope.version\": \"0.46.1\",\n  \"span.kind\": \"internal\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.5%\n- Memory: 21MB\n- Request Rate: 0.0 req/s\n- Error Rate: 0.0%\n- P99 Latency: 10ms\n- Active Connections: 0\n\n## Trace Context\nThe full trace contains 1 spans:\n- kx-exchange: tcp.connect (7.74ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The observed anomaly is likely caused by an issue with the TCP connection to kx-exchange, resulting in a significant deviation from the expected latency of 4.36ms. This discrepancy may be due to excessive network usage or resource contention.\n\nCAUSES:\n- High CPU Usage: A spike in CPU utilization might indicate that the system is struggling to handle requests efficiently.\n- Insufficient Memory: The 21MB memory usage could be a sign of temporary memory exhaustion, which might be caused by an increased number of concurrent connections.\n- Resource Contention: Overloaded network resources or competing traffic might have led to excessive latency.\n\nRECOMMENDATIONS:\n- Optimize CPU Usage: Consider implementing resource allocation strategies to prevent sudden spikes in CPU utilization.\n- Memory Reallocation: Ensure that the system has sufficient memory available to handle incoming requests without experiencing memory exhaustion.\n- Network Optimization: Review and adjust network configurations to reduce contention among concurrent connections."
+    },
+    {
+      "traceId": "0358eb5f8f126b0a792d31eaade20ab7",
+      "summary": "The anomaly is likely caused by a critical error rate (10.8%) in the kx-exchange service, which indicates service degradation and potential impact on user experience.",
+      "possibleCauses": [
+        "High Request Rate: 0.0 req/s - This might be contributing to the high error rate, as it could indicate a bottleneck in handling incoming requests.",
+        "Elevated Error Rate: 10.8% - This is a severe issue that warrants immediate attention and potential resource allocation to mitigate its impact on system reliability."
+      ],
+      "recommendations": [
+        "Monitor CPU Usage and Memory closely to ensure they remain within acceptable ranges.",
+        "Increase the Request Rate Limit to prevent overwhelming the service with too many requests, potentially causing further errors or degradation."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-21T09:16:13.791Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: kx-exchange\n- Operation: GET\n- Duration: 619.38ms (expected: 73.37ms ± 164.67ms)\n- Deviation: 3.32σ (standard deviations from mean)\n- Severity: SEV1 (Critical)\n- Timestamp: Wed Jan 21 2026 10:10:54 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"http.request.method\": \"GET\",\n  \"http.request.method_original\": \"GET\",\n  \"http.response.status_code\": 200,\n  \"network.peer.address\": \"::1\",\n  \"network.peer.port\": 16686,\n  \"otel.scope.name\": \"@opentelemetry/instrumentation-undici\",\n  \"otel.scope.version\": \"0.13.1\",\n  \"server.address\": \"localhost\",\n  \"server.port\": 16686,\n  \"span.kind\": \"client\",\n  \"url.full\": \"http://localhost:16686/api/traces?service=kx-exchange&lookback=1m&limit=20\",\n  \"url.path\": \"/api/traces\",\n  \"url.query\": \"?service=kx-exchange&lookback=1m&limit=20\",\n  \"url.scheme\": \"http\",\n  \"user_agent.original\": \"node\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 1.2%\n- Memory: 18MB\n- Request Rate: 0.0 req/s\n- Error Rate: 10.8% ⚠️ HIGH\n- P99 Latency: 1390ms\n- Active Connections: 0\n\n## Auto-Detected Issues\n- 🔥 Critical error rate (10.8%) - service degradation\n\n## Trace Context\nThe full trace contains 2 spans:\n- jaeger-all-in-one: /api/traces (602.88ms)\n- kx-exchange: GET (619.38ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The anomaly is likely caused by a critical error rate (10.8%) in the kx-exchange service, which indicates service degradation and potential impact on user experience.\n\nCAUSES:\n- High Request Rate: 0.0 req/s - This might be contributing to the high error rate, as it could indicate a bottleneck in handling incoming requests.\n- Elevated Error Rate: 10.8% - This is a severe issue that warrants immediate attention and potential resource allocation to mitigate its impact on system reliability.\n\nRECOMMENDATIONS:\n- Monitor CPU Usage and Memory closely to ensure they remain within acceptable ranges.\n- Increase the Request Rate Limit to prevent overwhelming the service with too many requests, potentially causing further errors or degradation."
+    },
+    {
+      "traceId": "ab17daf68ef4efbd30b7c42aff16f082",
+      "summary": "The kx-exchange GET request experienced an elevated error rate of 7.9%, suggesting a potential issue with the service's API. The correlation between this anomaly and correlated system metrics, such as CPU usage and memory, further supports the likelihood of resource utilization being the root cause.",
+      "possibleCauses": [
+        "Elevated Error Rate (7.9%): This could indicate a technical issue with the kx-exchange service, possibly due to resource constraints or unexpected network conditions.",
+        "Resource Utilization: The observed 17MB memory usage might be a sign of excessive CPU or I/O operations, which can lead to elevated error rates."
+      ],
+      "recommendations": [
+        "Monitor and analyze the system's resources (CPU, memory) more closely to identify potential bottlenecks or resource overloading issues that may be contributing to the error rate.",
+        "Adjust the kx-exchange service configuration or add additional resources (e.g., CPU cores or memory) as needed to ensure optimal performance."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-21T09:17:16.944Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: kx-exchange\n- Operation: GET\n- Duration: 485ms (expected: 42.64ms ± 108.48ms)\n- Deviation: 4.08σ (standard deviations from mean)\n- Severity: SEV1 (Critical)\n- Timestamp: Wed Jan 21 2026 10:12:24 GMT+0100 (Central European Standard Time)\n\n## Span Attributes\n{\n  \"http.request.method\": \"GET\",\n  \"http.request.method_original\": \"GET\",\n  \"http.response.status_code\": 200,\n  \"network.peer.address\": \"::1\",\n  \"network.peer.port\": 16686,\n  \"otel.scope.name\": \"@opentelemetry/instrumentation-undici\",\n  \"otel.scope.version\": \"0.13.1\",\n  \"server.address\": \"localhost\",\n  \"server.port\": 16686,\n  \"span.kind\": \"client\",\n  \"url.full\": \"http://localhost:16686/api/traces?service=kx-exchange&lookback=1m&limit=20\",\n  \"url.path\": \"/api/traces\",\n  \"url.query\": \"?service=kx-exchange&lookback=1m&limit=20\",\n  \"url.scheme\": \"http\",\n  \"user_agent.original\": \"node\"\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: 0.8%\n- Memory: 17MB\n- Request Rate: 0.0 req/s\n- Error Rate: 7.9% ⚠️ HIGH\n- P99 Latency: 497ms\n- Active Connections: 0\n\n## Auto-Detected Issues\n- ⚠️ Elevated error rate (7.9%)\n\n## Trace Context\nThe full trace contains 2 spans:\n- kx-exchange: GET (485.00ms)\n- jaeger-all-in-one: /api/traces (456.15ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The kx-exchange GET request experienced an elevated error rate of 7.9%, suggesting a potential issue with the service's API. The correlation between this anomaly and correlated system metrics, such as CPU usage and memory, further supports the likelihood of resource utilization being the root cause.\n\nCAUSES:\n- Elevated Error Rate (7.9%): This could indicate a technical issue with the kx-exchange service, possibly due to resource constraints or unexpected network conditions.\n- Resource Utilization: The observed 17MB memory usage might be a sign of excessive CPU or I/O operations, which can lead to elevated error rates.\n\nRECOMMENDATIONS:\n- Monitor and analyze the system's resources (CPU, memory) more closely to identify potential bottlenecks or resource overloading issues that may be contributing to the error rate.\n- Adjust the kx-exchange service configuration or add additional resources (e.g., CPU cores or memory) as needed to ensure optimal performance."
+    },
+    {
+      "traceId": "d572038fb9480e39ecfee5348383e1b9",
+      "summary": "The provided trace data and correlated metrics suggest that a latency anomaly occurred in the Kong Balancer service. This could be due to excessive request processing or network latency issues, which are common problems faced by distributed systems.",
+      "possibleCauses": [
+        "The 1.68σ deviation from the mean indicates a significant increase in latency, likely caused by an overload of requests on the Balancer.",
+        "The correlated system metrics show that CPU usage and memory were not affected, suggesting that resource utilization was within normal limits at other points in time.",
+        "The high Active Connections metric for the Kx Wallet service may indicate excessive traffic from this client."
+      ],
+      "recommendations": [
+        "Monitor the request rate and latency of the Balancer to identify potential bottlenecks or overload situations. Consider implementing rate limiting or sharding strategies to reduce demand on the system.",
+        "Optimize the Kong configuration, particularly the balancer's settings, to improve performance and reduce latency. This may involve adjusting the number of replicas, using more efficient data structures, or implementing caching mechanisms.",
+        "Investigate the Kx Wallet service traffic patterns to ensure that it is not contributing to the observed latency issue. Consider adding logging or monitoring for this service to identify any potential issues."
+      ],
+      "confidence": "low",
+      "analyzedAt": "2026-01-22T13:53:39.479Z",
+      "prompt": "You are an expert in distributed systems and observability. Analyze this performance anomaly:\n\n## Anomaly Details\n- Service: api-gateway\n- Operation: kong.balancer\n- Duration: 198.95ms (expected: 65.47ms ± 79.64ms)\n- Deviation: 1.68σ (standard deviations from mean)\n- Severity: SEV4 (Minor)\n- Timestamp: Thu Jan 22 2026 13:52:12 GMT+0000 (Coordinated Universal Time)\n\n## Span Attributes\n{\n  \"net.peer.ip\": \"192.168.65.254\",\n  \"net.peer.name\": \"host.docker.internal\",\n  \"net.peer.port\": 5000,\n  \"otel.scope.name\": \"kong-internal\",\n  \"otel.scope.version\": \"0.1.0\",\n  \"peer.service\": \"payment-api\",\n  \"span.kind\": \"client\",\n  \"try_count\": 1\n}\n\n## Correlated System Metrics (at time of anomaly)\n- CPU Usage: N/A\n- Memory: N/A\n- Request Rate: N/A\n- Error Rate: 0%\n- P99 Latency: N/A\n- Active Connections: N/A\n\n## Trace Context\nThe full trace contains 9 spans:\n- api-gateway: kong.access.plugin.cors (0.04ms)\n- api-gateway: kong.dns (0.02ms)\n- api-gateway: kong.header_filter.plugin.cors (0.07ms)\n- api-gateway: kong.header_filter.plugin.opentelemetry (0.00ms)\n- api-gateway: kong.balancer (198.95ms)\n- api-gateway: kong (200.95ms)\n- api-gateway: kong.router (0.06ms)\n- api-gateway: kong.access.plugin.opentelemetry (0.33ms)\n- kx-wallet: HTTP GET (207.00ms)\n\n\nBased on the trace data AND correlated metrics, provide:\n1. A brief summary (1-2 sentences) of what likely caused this anomaly\n2. 2-3 possible root causes (consider resource utilization if metrics show issues)\n3. 2-3 actionable recommendations\n\nFormat your response as:\nSUMMARY: [your summary]\nCAUSES:\n- [cause 1]\n- [cause 2]\nRECOMMENDATIONS:\n- [recommendation 1]\n- [recommendation 2]\nCONFIDENCE: [low/medium/high]",
+      "rawResponse": "SUMMARY: The provided trace data and correlated metrics suggest that a latency anomaly occurred in the Kong Balancer service. This could be due to excessive request processing or network latency issues, which are common problems faced by distributed systems.\n\nCAUSES:\n- The 1.68σ deviation from the mean indicates a significant increase in latency, likely caused by an overload of requests on the Balancer.\n- The correlated system metrics show that CPU usage and memory were not affected, suggesting that resource utilization was within normal limits at other points in time.\n- The high Active Connections metric for the Kx Wallet service may indicate excessive traffic from this client.\n\nRECOMMENDATIONS:\n- Monitor the request rate and latency of the Balancer to identify potential bottlenecks or overload situations. Consider implementing rate limiting or sharding strategies to reduce demand on the system.\n- Optimize the Kong configuration, particularly the balancer's settings, to improve performance and reduce latency. This may involve adjusting the number of replicas, using more efficient data structures, or implementing caching mechanisms.\n- Investigate the Kx Wallet service traffic patterns to ensure that it is not contributing to the observed latency issue. Consider adding logging or monitoring for this service to identify any potential issues."
+    }
+  ],
+  "lastUpdated": "2026-01-15T09:09:39.700Z",
+  "timeBaselines": [
+    {
+      "spanKey": "api-gateway:kong.router",
+      "service": "api-gateway",
+      "operation": "kong.router",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 1.86,
+      "stdDev": 10.23,
+      "sampleCount": 348,
+      "thresholds": {
+        "sev5": 6.072355313731304,
+        "sev4": 8.668907567089802,
+        "sev3": 8.668907567089802,
+        "sev2": 8.668907567089802,
+        "sev1": 8.668907567089802
+      },
+      "lastUpdated": "2026-01-26T18:10:28.790Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.access.plugin.cors",
+      "service": "api-gateway",
+      "operation": "kong.access.plugin.cors",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 1.16,
+      "stdDev": 8.37,
+      "sampleCount": 348,
+      "thresholds": {
+        "sev5": 1.1471813409331428,
+        "sev4": 10.57237382640137,
+        "sev3": 10.57237382640137,
+        "sev2": 10.57237382640137,
+        "sev1": 10.57237382640137
+      },
+      "lastUpdated": "2026-01-26T18:10:28.791Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.access.plugin.opentelemetry",
+      "service": "api-gateway",
+      "operation": "kong.access.plugin.opentelemetry",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 2.04,
+      "stdDev": 5.99,
+      "sampleCount": 340,
+      "thresholds": {
+        "sev5": 2.9060801274184556,
+        "sev4": 2.9959319183107653,
+        "sev3": 8.177273852591474,
+        "sev2": 8.177273852591474,
+        "sev1": 8.177273852591474
+      },
+      "lastUpdated": "2026-01-26T18:10:28.791Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.balancer",
+      "service": "api-gateway",
+      "operation": "kong.balancer",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 53.16,
+      "stdDev": 105.17,
+      "sampleCount": 340,
+      "thresholds": {
+        "sev5": 2.671284573900871,
+        "sev4": 4.29921503061568,
+        "sev3": 4.492450057287556,
+        "sev2": 4.492450057287556,
+        "sev1": 4.492450057287556
+      },
+      "lastUpdated": "2026-01-26T18:10:28.791Z"
+    },
+    {
+      "spanKey": "kx-wallet:HTTP GET",
+      "service": "kx-wallet",
+      "operation": "HTTP GET",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 193.26,
+      "stdDev": 628.6,
+      "sampleCount": 668,
+      "thresholds": {
+        "sev5": 0.5,
+        "sev4": 1,
+        "sev3": 1.5,
+        "sev2": 11.429686732482883,
+        "sev1": 16.321486716187753
+      },
+      "lastUpdated": "2026-01-26T18:10:28.796Z"
+    },
+    {
+      "spanKey": "api-gateway:kong",
+      "service": "api-gateway",
+      "operation": "kong",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 66.21,
+      "stdDev": 131.83,
+      "sampleCount": 348,
+      "thresholds": {
+        "sev5": 2.9488131545513165,
+        "sev4": 3.772917885373143,
+        "sev3": 5.040969129570613,
+        "sev2": 5.040969129570613,
+        "sev1": 5.040969129570613
+      },
+      "lastUpdated": "2026-01-26T18:10:28.797Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.dns",
+      "service": "api-gateway",
+      "operation": "kong.dns",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 1.85,
+      "stdDev": 9.94,
+      "sampleCount": 340,
+      "thresholds": {
+        "sev5": 3.300204933132602,
+        "sev4": 9.756384821370398,
+        "sev3": 9.756384821370398,
+        "sev2": 9.756384821370398,
+        "sev1": 9.756384821370398
+      },
+      "lastUpdated": "2026-01-26T18:10:28.797Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.header_filter.plugin.cors",
+      "service": "api-gateway",
+      "operation": "kong.header_filter.plugin.cors",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 0.45,
+      "stdDev": 0.57,
+      "sampleCount": 346,
+      "thresholds": {
+        "sev5": 1.6664146530956416,
+        "sev4": 2.176900312532659,
+        "sev3": 3.9882442558453857,
+        "sev2": 4.894796375190434,
+        "sev1": 4.894796375190434
+      },
+      "lastUpdated": "2026-01-26T18:10:28.802Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.header_filter.plugin.opentelemetry",
+      "service": "api-gateway",
+      "operation": "kong.header_filter.plugin.opentelemetry",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 0.09,
+      "stdDev": 0.16,
+      "sampleCount": 346,
+      "thresholds": {
+        "sev5": 1.7306713161683867,
+        "sev4": 2.979328485466108,
+        "sev3": 5.301830820359871,
+        "sev2": 5.720130972074607,
+        "sev1": 5.720130972074607
+      },
+      "lastUpdated": "2026-01-26T18:10:28.802Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.connect",
+      "service": "kx-exchange",
+      "operation": "pg.connect",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 291.27,
+      "stdDev": 15.43,
+      "sampleCount": 224,
+      "thresholds": {
+        "sev5": 1.4851232821094098,
+        "sev4": 1.8991190175826576,
+        "sev3": 2.0075125142489987,
+        "sev2": 3.362171907992964,
+        "sev1": 3.362171907992964
+      },
+      "lastUpdated": "2026-01-26T18:10:28.802Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg-pool.connect",
+      "service": "kx-exchange",
+      "operation": "pg-pool.connect",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 49.51,
+      "stdDev": 109.81,
+      "sampleCount": 1328,
+      "thresholds": {
+        "sev5": 2.352537748111581,
+        "sev4": 2.41302259177432,
+        "sev3": 2.4748551856421313,
+        "sev2": 2.6083188816254346,
+        "sev1": 2.6944838305469707
+      },
+      "lastUpdated": "2026-01-26T18:10:28.803Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.query:SELECT crypto_exchange",
+      "service": "kx-exchange:pg.query",
+      "operation": "SELECT crypto_exchange",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 6.23,
+      "stdDev": 7.32,
+      "sampleCount": 1168,
+      "thresholds": {
+        "sev5": 0.9813275257765416,
+        "sev4": 1.4764451842284128,
+        "sev3": 2.054196272573631,
+        "sev2": 6.518450249538985,
+        "sev1": 12.960716345042268
+      },
+      "lastUpdated": "2026-01-26T18:10:28.803Z"
+    },
+    {
+      "spanKey": "kx-exchange:GET",
+      "service": "kx-exchange",
+      "operation": "GET",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 246.85,
+      "stdDev": 176.42,
+      "sampleCount": 2023,
+      "thresholds": {
+        "sev5": 0.9470917416801428,
+        "sev4": 1.1186332931206364,
+        "sev3": 1.5,
+        "sev2": 2,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.807Z"
+    },
+    {
+      "spanKey": "kx-exchange:dns.lookup",
+      "service": "kx-exchange",
+      "operation": "dns.lookup",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 1.86,
+      "stdDev": 3.49,
+      "sampleCount": 1399,
+      "thresholds": {
+        "sev5": 0.8002428910895066,
+        "sev4": 1.1159038477029328,
+        "sev3": 1.6959988241810968,
+        "sev2": 7.7181688241958994,
+        "sev1": 28.59471956130942
+      },
+      "lastUpdated": "2026-01-26T18:10:28.808Z"
+    },
+    {
+      "spanKey": "kx-exchange:tcp.connect",
+      "service": "kx-exchange",
+      "operation": "tcp.connect",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 253.97,
+      "stdDev": 48.09,
+      "sampleCount": 1399,
+      "thresholds": {
+        "sev5": 0.5,
+        "sev4": 1,
+        "sev3": 1.5,
+        "sev2": 2,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.809Z"
+    },
+    {
+      "spanKey": "kx-exchange:tcp.connect",
+      "service": "kx-exchange",
+      "operation": "tcp.connect",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 252.35,
+      "stdDev": 54.63,
+      "sampleCount": 335,
+      "thresholds": {
+        "sev5": 0.5,
+        "sev4": 1,
+        "sev3": 1.5,
+        "sev2": 2,
+        "sev1": 2.7029822089500333
+      },
+      "lastUpdated": "2026-01-26T18:10:28.809Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.connect",
+      "service": "kx-exchange",
+      "operation": "pg.connect",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 296.02,
+      "stdDev": 62.61,
+      "sampleCount": 52,
+      "thresholds": {
+        "sev5": 0.5,
+        "sev4": 4.784218222879125,
+        "sev3": 4.784218222879125,
+        "sev2": 4.784218222879125,
+        "sev1": 4.784218222879125
+      },
+      "lastUpdated": "2026-01-26T18:10:28.809Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.query:SELECT crypto_exchange",
+      "service": "kx-exchange:pg.query",
+      "operation": "SELECT crypto_exchange",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 7.62,
+      "stdDev": 10.45,
+      "sampleCount": 211,
+      "thresholds": {
+        "sev5": 1.2582043502668936,
+        "sev4": 2.9766204132295417,
+        "sev3": 4.869978810960274,
+        "sev2": 6.776926821129226,
+        "sev1": 6.776926821129226
+      },
+      "lastUpdated": "2026-01-26T18:10:28.809Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg-pool.connect",
+      "service": "kx-exchange",
+      "operation": "pg-pool.connect",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 66.81,
+      "stdDev": 127.67,
+      "sampleCount": 232,
+      "thresholds": {
+        "sev5": 1.900004516901526,
+        "sev4": 1.942270934167325,
+        "sev3": 2.005678392982493,
+        "sev2": 4.176814012728875,
+        "sev1": 4.176814012728875
+      },
+      "lastUpdated": "2026-01-26T18:10:28.809Z"
+    },
+    {
+      "spanKey": "kx-exchange:GET",
+      "service": "kx-exchange",
+      "operation": "GET",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 301.44,
+      "stdDev": 224.52,
+      "sampleCount": 442,
+      "thresholds": {
+        "sev5": 0.7668728867046469,
+        "sev4": 1.1915931406176694,
+        "sev3": 1.630494936404483,
+        "sev2": 4.580852482400159,
+        "sev1": 5.276104354363488
+      },
+      "lastUpdated": "2026-01-26T18:10:28.809Z"
+    },
+    {
+      "spanKey": "kx-exchange:dns.lookup",
+      "service": "kx-exchange",
+      "operation": "dns.lookup",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 1.75,
+      "stdDev": 3.04,
+      "sampleCount": 335,
+      "thresholds": {
+        "sev5": 0.8806272625188323,
+        "sev4": 1.730918099952249,
+        "sev3": 2.3989802627480983,
+        "sev2": 15.392147910507248,
+        "sev1": 15.392147910507248
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-wallet:HTTP GET",
+      "service": "kx-wallet",
+      "operation": "HTTP GET",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 374.8,
+      "stdDev": 415.48,
+      "sampleCount": 111,
+      "thresholds": {
+        "sev5": 3.1775086765123843,
+        "sev4": 3.1847292029776884,
+        "sev3": 3.1847292029776884,
+        "sev2": 3.1847292029776884,
+        "sev1": 3.1847292029776884
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.query:DELETE crypto_exchange",
+      "service": "kx-exchange:pg.query",
+      "operation": "DELETE crypto_exchange",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 3.97,
+      "stdDev": 0,
+      "sampleCount": 1,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-exchange:POST",
+      "service": "kx-exchange",
+      "operation": "POST",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 14525.34,
+      "stdDev": 12331.53,
+      "sampleCount": 111,
+      "thresholds": {
+        "sev5": 1.1285562654698513,
+        "sev4": 1.2411669330020885,
+        "sev3": 1.5,
+        "sev2": 2.558361145964505,
+        "sev1": 2.558361145964505
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-wallet:HTTP POST",
+      "service": "kx-wallet",
+      "operation": "HTTP POST",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 308.47,
+      "stdDev": 313.47,
+      "sampleCount": 34,
+      "thresholds": {
+        "sev5": 2.745190488718768,
+        "sev4": 2.745190488718768,
+        "sev3": 3.0386813578387457,
+        "sev2": 3.0386813578387457,
+        "sev1": 3.0386813578387457
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-matcher:order.response",
+      "service": "kx-matcher",
+      "operation": "order.response",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 0.6,
+      "stdDev": 0.43,
+      "sampleCount": 36,
+      "thresholds": {
+        "sev5": 0.5,
+        "sev4": 3.0477188528868457,
+        "sev3": 3.0477188528868457,
+        "sev2": 3.0477188528868457,
+        "sev1": 3.0477188528868457
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-wallet:order.response.received",
+      "service": "kx-wallet",
+      "operation": "order.response.received",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 0,
+      "stdDev": 0,
+      "sampleCount": 24,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.query:UPDATE crypto_exchange",
+      "service": "kx-exchange:pg.query",
+      "operation": "UPDATE crypto_exchange",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 6.24,
+      "stdDev": 8.22,
+      "sampleCount": 113,
+      "thresholds": {
+        "sev5": 1.0867864427043328,
+        "sev4": 3.0094786297233096,
+        "sev3": 3.0094786297233096,
+        "sev2": 8.091392211057439,
+        "sev1": 8.091392211057439
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-exchange:payment_response process",
+      "service": "kx-exchange",
+      "operation": "payment_response process",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 0.31,
+      "stdDev": 0.2,
+      "sampleCount": 36,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.810Z"
+    },
+    {
+      "spanKey": "kx-exchange:publish orders",
+      "service": "kx-exchange",
+      "operation": "publish orders",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 2.48,
+      "stdDev": 1.46,
+      "sampleCount": 36,
+      "thresholds": {
+        "sev5": 2.7012279125538647,
+        "sev4": 2.7012279125538647,
+        "sev3": 2.7012279125538647,
+        "sev2": 2.7012279125538647,
+        "sev1": 2.7012279125538647
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-wallet:order.submit.client",
+      "service": "kx-wallet",
+      "operation": "order.submit.client",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 190.13,
+      "stdDev": 56.39,
+      "sampleCount": 24,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-exchange:publish <default>",
+      "service": "kx-exchange",
+      "operation": "publish <default>",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 0.46,
+      "stdDev": 0.33,
+      "sampleCount": 36,
+      "thresholds": {
+        "sev5": 2.0531317783136873,
+        "sev4": 2.0531317783136873,
+        "sev3": 2.0531317783136873,
+        "sev2": 2.0531317783136873,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-matcher:order.match",
+      "service": "kx-matcher",
+      "operation": "order.match",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 86.92,
+      "stdDev": 4.03,
+      "sampleCount": 36,
+      "thresholds": {
+        "sev5": 1.224301133082817,
+        "sev4": 1.6206134004841883,
+        "sev3": 1.6206134004841883,
+        "sev2": 2,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.query:INSERT crypto_exchange",
+      "service": "kx-exchange:pg.query",
+      "operation": "INSERT crypto_exchange",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 7.1,
+      "stdDev": 5.18,
+      "sampleCount": 41,
+      "thresholds": {
+        "sev5": 1.9430580370090436,
+        "sev4": 1.9430580370090436,
+        "sev3": 1.9430580370090436,
+        "sev2": 2,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "api-gateway:kong",
+      "service": "api-gateway",
+      "operation": "kong",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 468.89,
+      "stdDev": 291.64,
+      "sampleCount": 41,
+      "thresholds": {
+        "sev5": 1.6950640815744942,
+        "sev4": 1.8505367509709179,
+        "sev3": 1.8505367509709179,
+        "sev2": 2,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.access.plugin.cors",
+      "service": "api-gateway",
+      "operation": "kong.access.plugin.cors",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 14.81,
+      "stdDev": 28.67,
+      "sampleCount": 41,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.access.plugin.opentelemetry",
+      "service": "api-gateway",
+      "operation": "kong.access.plugin.opentelemetry",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 100.08,
+      "stdDev": 80.49,
+      "sampleCount": 37,
+      "thresholds": {
+        "sev5": 1.715652129734537,
+        "sev4": 1.715652129734537,
+        "sev3": 1.715652129734537,
+        "sev2": 2,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.header_filter.plugin.opentelemetry",
+      "service": "api-gateway",
+      "operation": "kong.header_filter.plugin.opentelemetry",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 3.22,
+      "stdDev": 4.73,
+      "sampleCount": 41,
+      "thresholds": {
+        "sev5": 2.9105177830496456,
+        "sev4": 2.9105177830496456,
+        "sev3": 2.9105177830496456,
+        "sev2": 2.9105177830496456,
+        "sev1": 2.9105177830496456
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.balancer",
+      "service": "api-gateway",
+      "operation": "kong.balancer",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 251.53,
+      "stdDev": 246.1,
+      "sampleCount": 37,
+      "thresholds": {
+        "sev5": 1.0815667158495736,
+        "sev4": 2.4878483054143725,
+        "sev3": 2.4878483054143725,
+        "sev2": 2.4878483054143725,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.router",
+      "service": "api-gateway",
+      "operation": "kong.router",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 22.94,
+      "stdDev": 31.36,
+      "sampleCount": 41,
+      "thresholds": {
+        "sev5": 2.5764794791610615,
+        "sev4": 2.5764794791610615,
+        "sev3": 2.5764794791610615,
+        "sev2": 2.5764794791610615,
+        "sev1": 2.5764794791610615
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.dns",
+      "service": "api-gateway",
+      "operation": "kong.dns",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 13.59,
+      "stdDev": 17.33,
+      "sampleCount": 37,
+      "thresholds": {
+        "sev5": 2.6066510765627964,
+        "sev4": 2.6066510765627964,
+        "sev3": 2.6066510765627964,
+        "sev2": 2.6066510765627964,
+        "sev1": 2.6066510765627964
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "api-gateway:kong.header_filter.plugin.cors",
+      "service": "api-gateway",
+      "operation": "kong.header_filter.plugin.cors",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 12.02,
+      "stdDev": 9.86,
+      "sampleCount": 41,
+      "thresholds": {
+        "sev5": 0.8486137686700399,
+        "sev4": 2.602971903694039,
+        "sev3": 2.602971903694039,
+        "sev2": 2.602971903694039,
+        "sev1": 2.602971903694039
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-matcher:order.response",
+      "service": "kx-matcher",
+      "operation": "order.response",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 4.78,
+      "stdDev": 0.05,
+      "sampleCount": 6,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-matcher:order.match",
+      "service": "kx-matcher",
+      "operation": "order.match",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 93.64,
+      "stdDev": 4.89,
+      "sampleCount": 6,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-exchange:publish <default>",
+      "service": "kx-exchange",
+      "operation": "publish <default>",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 1.65,
+      "stdDev": 1.61,
+      "sampleCount": 6,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-exchange:publish orders",
+      "service": "kx-exchange",
+      "operation": "publish orders",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 3.82,
+      "stdDev": 1.78,
+      "sampleCount": 6,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-exchange:payment_response process",
+      "service": "kx-exchange",
+      "operation": "payment_response process",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 0.39,
+      "stdDev": 0.24,
+      "sampleCount": 6,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.query:UPDATE crypto_exchange",
+      "service": "kx-exchange:pg.query",
+      "operation": "UPDATE crypto_exchange",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 13.2,
+      "stdDev": 14.26,
+      "sampleCount": 15,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-exchange:pg.query:INSERT crypto_exchange",
+      "service": "kx-exchange:pg.query",
+      "operation": "INSERT crypto_exchange",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 46.14,
+      "stdDev": 43.77,
+      "sampleCount": 6,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "kx-exchange:POST",
+      "service": "kx-exchange",
+      "operation": "POST",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 15489.43,
+      "stdDev": 11491.71,
+      "sampleCount": 21,
+      "thresholds": {
+        "sev5": 0.898295873526698,
+        "sev4": 1,
+        "sev3": 1.9032493518896794,
+        "sev2": 2,
+        "sev1": 2.5
+      },
+      "lastUpdated": "2026-01-26T18:10:28.811Z"
+    },
+    {
+      "spanKey": "jaeger-all-in-one:/api/traces",
+      "service": "jaeger-all-in-one",
+      "operation": "/api/traces",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 88.64,
+      "stdDev": 51.12,
+      "sampleCount": 1125,
+      "thresholds": {
+        "sev5": 1.4007196618769955,
+        "sev4": 2.297751523510615,
+        "sev3": 2.820736473849409,
+        "sev2": 3.930984073016425,
+        "sev1": 4.356515738548671
+      },
+      "lastUpdated": "2026-01-26T18:10:28.812Z"
+    },
+    {
+      "spanKey": "jaeger-all-in-one:/api/traces",
+      "service": "jaeger-all-in-one",
+      "operation": "/api/traces",
+      "dayOfWeek": 1,
+      "hourOfDay": 19,
+      "mean": 142.86,
+      "stdDev": 131.33,
+      "sampleCount": 268,
+      "thresholds": {
+        "sev5": 1.2563016514454628,
+        "sev4": 2.763936069627473,
+        "sev3": 4.187860819904667,
+        "sev2": 7.063951102545555,
+        "sev1": 7.063951102545555
+      },
+      "lastUpdated": "2026-01-26T18:10:28.814Z"
+    },
+    {
+      "spanKey": "kx-matcher:tcp.connect",
+      "service": "kx-matcher",
+      "operation": "tcp.connect",
+      "dayOfWeek": 1,
+      "hourOfDay": 18,
+      "mean": 300.52,
+      "stdDev": 0,
+      "sampleCount": 1,
+      "thresholds": {
+        "sev5": 1.3,
+        "sev4": 1.65,
+        "sev3": 2,
+        "sev2": 2.6,
+        "sev1": 3.3
+      },
+      "lastUpdated": "2026-01-26T18:10:28.814Z"
+    }
+  ]
+}

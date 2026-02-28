@@ -1,0 +1,16 @@
+flowchart TD
+  subgraph "Baseline Calculation (Nightly)"
+    J[Jaeger API] --> Q[Query 30 Days]
+    Q --> B[Group by Day×Hour]
+    B --> S[Calculate Statistics]
+    S --> T[Learn Thresholds]
+    T --> P[(time-baselines.json)]
+  end
+
+  subgraph "Real-Time Detection"
+    R[Incoming Span] --> L[Lookup Baseline]
+    L --> C{Compare Deviation}
+    C --> SEV[Classify SEV 1-5]
+  end
+
+  P --> L

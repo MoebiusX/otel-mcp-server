@@ -1,0 +1,30 @@
+name: Container Image Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan (non-blocking)
+        uses: aquasecurity/trivy-action@master
+        with:
+          format: 'table'
+          exit-code: '0' # non-blocking: don't fail the job on findings
+          severity: 'CRITICAL,HIGH'
+          scan-type: 'fs'
+          cache-dir: /tmp/.trivycache
+
+      - name: Upload Trivy report (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: .trivy-report || .

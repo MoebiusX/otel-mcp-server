@@ -1,0 +1,91 @@
+{
+    "tradeForm": {
+        "title": "Operar",
+        "buy": "Comprar",
+        "sell": "Vender",
+        "amount": "Cantidad",
+        "price": "Precio",
+        "total": "Total",
+        "availableBalance": "Disponible: {{balance}} {{asset}}",
+        "submit": "Ejecutar Orden",
+        "submitting": "Ejecutando orden...",
+        "marketOrder": "Orden de Mercado",
+        "limitOrder": "Orden Límite"
+    },
+    "tradeVerified": {
+        "title": "Operación Verificada ✓",
+        "subtitle": "Tu operación fue ejecutada con total transparencia",
+        "traceId": "ID de Traza",
+        "executionTime": "Tiempo de Ejecución",
+        "viewTrace": "Ver Traza Completa en Jaeger",
+        "viewTraceSubtitle": "Mira exactamente cómo se procesó tu operación",
+        "close": "Cerrar",
+        "tradeAgain": "Operar de Nuevo",
+        "whyMatters": "Por Qué Importa",
+        "whyMattersDesc": "Cada operación en Krystaline genera una traza criptográfica que demuestra exactamente lo que sucedió—sin cajas negras, sin procesos ocultos."
+    },
+    "orderHistory": {
+        "title": "Historial de Órdenes",
+        "noOrders": "Sin órdenes todavía",
+        "status": {
+            "pending": "Pendiente",
+            "filled": "Ejecutada",
+            "cancelled": "Cancelada",
+            "failed": "Fallida"
+        },
+        "side": {
+            "buy": "Compra",
+            "sell": "Venta"
+        }
+    },
+    "assets": {
+        "BTC": "Bitcoin",
+        "ETH": "Ethereum",
+        "USD": "Dólar Estadounidense",
+        "USDT": "Tether",
+        "EUR": "Euro"
+    },
+    "convert": {
+        "title": "Convertir",
+        "instant": "Intercambio instantáneo",
+        "from": "De",
+        "to": "A",
+        "available": "Disponible",
+        "balance": "Saldo",
+        "rate": "Tasa",
+        "fee": "Comisión",
+        "youWillReceive": "Recibirás",
+        "converting": "Convirtiendo...",
+        "gettingQuote": "Obteniendo cotización...",
+        "enterAmount": "Ingresa cantidad a convertir"
+    },
+    "proofOfObservability": {
+        "title": "Prueba de Observabilidad™",
+        "description": "Rastrea tus operaciones y transferencias con total transparencia",
+        "traceExplainer": "Cada transacción tiene un ID de Traza único. Haz clic en \"Ver Traza\" para ver exactamente cómo se procesó tu orden."
+    },
+    "transparency": {
+        "title": "Transparencia del Sistema",
+        "subtitle": "Visibilidad en tiempo real de cómo se procesan tus operaciones",
+        "systemStatus": "Estado del Sistema",
+        "allOperational": "Todos los Sistemas Operacionales",
+        "issuesDetected": "Problemas Detectados",
+        "minorIssues": "Problemas Menores",
+        "checking": "Verificando...",
+        "uptime": "Tiempo de Actividad",
+        "activeServices": "Servicios Activos",
+        "avgResponse": "Respuesta Promedio",
+        "operationsTracked": "Operaciones Rastreadas",
+        "healthyServices": "Servicios Saludables",
+        "serviceHealth": "Salud del Servicio",
+        "response": "Respuesta",
+        "requests": "Solicitudes",
+        "whatWeMonitor": "Lo Que Monitoreamos",
+        "everyTrade": "Cada Operación",
+        "everyTradeDesc": "Cada orden genera un ID de traza único que rastrea su recorrido desde tu clic hasta la ejecución.",
+        "systemPerformance": "Rendimiento del Sistema",
+        "systemPerfDesc": "Medimos continuamente los tiempos de respuesta y detectamos anomalías. Si algo se ralentiza, lo sabemos inmediatamente.",
+        "serviceHealth24": "Salud del Servicio",
+        "serviceHealthDesc": "Todos los microservicios son monitoreados 24/7. Los problemas se detectan y resuelven antes de afectar tu experiencia."
+    }
+}

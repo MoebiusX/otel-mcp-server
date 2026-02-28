@@ -1,0 +1,431 @@
+services:
+  kong-database:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${KONG_PG_USER:-kong}
+      POSTGRES_PASSWORD: ${KONG_PG_PASSWORD:?KONG_PG_PASSWORD is required}
+      POSTGRES_DB: ${KONG_PG_DATABASE:-kong}
+    ports:
+      - "5432:5432"
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+    networks:
+      - kong-net
+    restart: unless-stopped
+    # No dependencies - databases should start immediately
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong -d kong"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  kong-migrations:
+    image: kong/kong-gateway:latest
+    command: kong migrations bootstrap
+    depends_on:
+      kong-database:
+        condition: service_healthy
+      # Removed payment-processor dependency - kong-migrations doesn't need it
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: ${KONG_PG_USER:-kong}
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD:?KONG_PG_PASSWORD is required}
+      KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+    networks:
+      - kong-net
+    restart: on-failure
+
+  kong-gateway:
+    image: kong/kong-gateway:latest
+    depends_on:
+      kong-database:
+        condition: service_healthy
+      kong-migrations:
+        condition: service_completed_successfully
+      # Removed payment-processor dependency - kong-gateway doesn't need it
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: ${KONG_PG_USER:-kong}
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD:?KONG_PG_PASSWORD is required}
+      KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_ADMIN_GUI_URL: http://localhost:8002
+      # OpenTelemetry configuration
+      KONG_TRACING_INSTRUMENTATIONS: all
+      KONG_TRACING_SAMPLING_RATE: 1.0
+    ports:
+      - "0.0.0.0:8000:8000"   # Kong Gateway proxy (bound to all interfaces)
+      - "0.0.0.0:8443:8443"   # Kong Gateway proxy SSL
+      - "0.0.0.0:8001:8001"   # Kong Admin API
+      - "0.0.0.0:8444:8444"   # Kong Admin API SSL
+      - "0.0.0.0:8002:8002"   # Kong Manager (GUI)
+      - "0.0.0.0:8445:8445"   # Kong Manager SSL
+      - "0.0.0.0:8003:8003"   # Kong Dev Portal
+      - "0.0.0.0:8446:8446"   # Kong Dev Portal SSL
+    networks:
+      - kong-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+      - "15692:15692" # Prometheus metrics
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - kong-net
+    restart: unless-stopped
+    # No dependencies - rabbitmq should start immediately
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    # Enable Prometheus plugin on startup
+    command: >
+      bash -c "rabbitmq-plugins enable --offline rabbitmq_prometheus && rabbitmq-server"
+
+  # OpenTelemetry Collector for browser traces (with CORS support)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    depends_on:
+      jaeger:
+        condition: service_healthy
+    volumes:
+      - ./config/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4319:4318"   # OTLP HTTP receiver (browser uses this)
+    networks:
+      - kong-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Loki - Log aggregation for Unified Observability
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+      - ./config/loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - kong-net
+    restart: unless-stopped
+    # Note: Loki image is minimal without wget/curl. Health monitored via startup logs.
+
+  # Promtail - Log shipper for container logs to Loki
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - ./config/promtail-config.yaml:/etc/promtail/config.yaml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      loki:
+        condition: service_started
+    networks:
+      - kong-net
+    restart: unless-stopped
+
+
+  # Jaeger UI for trace visualization (standalone for now)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14350:14250" # Jaeger gRPC (host 14350 -> container 14250)
+      - "4317:4317"   # OTLP gRPC (for server traces)
+      - "4318:4318"   # OTLP HTTP (for server traces) 
+    networks:
+      - kong-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Ollama - Local LLM for trace analysis
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:1b}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Start Ollama server in background
+        /bin/ollama serve &
+        # Wait for Ollama to be ready
+        echo "Waiting for Ollama server to start..."
+        until curl -sf http://localhost:11434/ > /dev/null 2>&1; do
+          sleep 1
+        done
+        echo "Ollama server is ready. Pulling model: $${OLLAMA_MODEL}..."
+        ollama pull $${OLLAMA_MODEL}
+        echo "Model $${OLLAMA_MODEL} pulled successfully. Ollama is ready."
+        # Keep the container running by waiting on the background server
+        wait
+    networks:
+      - kong-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # Prometheus - Metrics collection and storage
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/alerting-rules.yml:/etc/prometheus/alerting-rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - kong-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - alertmanager
+
+  # Alertmanager - Alert routing and notification
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ./config/alertmanager/goalert-token:/etc/alertmanager/goalert-token:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - kong-net
+    restart: unless-stopped
+
+  # Grafana - Unified Observability Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor tempoSearch tempoBackendSearch
+      # SMTP configuration for email alerts via MailDev
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=maildev:1025
+      - GF_SMTP_SKIP_VERIFY=true
+      - GF_SMTP_FROM_ADDRESS=grafana@krystalinex.local
+      - GF_SMTP_FROM_NAME=KrystalineX Grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      jaeger:
+        condition: service_healthy
+    networks:
+      - kong-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # GoAlert Database - Incident management
+  goalert-db:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: goalert
+      POSTGRES_PASSWORD: ${GOALERT_DB_PASSWORD:-goalert_password_change_me}
+      POSTGRES_DB: goalert
+    volumes:
+      - goalert_db_data:/var/lib/postgresql/data
+    networks:
+      - kong-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goalert -d goalert"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # GoAlert - Incident management and on-call scheduling
+  goalert:
+    image: goalert/goalert:latest
+    restart: always
+    depends_on:
+      goalert-db:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      GOALERT_DB_URL: "postgres://goalert:${GOALERT_DB_PASSWORD:-goalert_password_change_me}@goalert-db:5432/goalert?sslmode=disable"
+      GOALERT_PUBLIC_URL: "${GOALERT_PUBLIC_URL:-http://localhost:8081}"
+      GOALERT_DATA_ENCRYPTION_KEY: "${GOALERT_ENCRYPTION_KEY:-replace-this-with-a-random-32-char-string}"
+      GOALERT_LOG_LEVEL: info
+    networks:
+      - kong-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # App Database (PostgreSQL) - User management, wallets, orders
+  app-database:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${DB_USER:-exchange}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_NAME:-crypto_exchange}
+    ports:
+      - "5433:5432"  # Different port to avoid conflict with kong-database
+    volumes:
+      - app_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - kong-net
+    restart: unless-stopped
+    # No dependencies - app-database should start immediately
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exchange -d crypto_exchange"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MailDev - Dev SMTP server with web UI
+  maildev:
+    image: maildev/maildev
+    ports:
+      - "1080:1080"  # Web UI
+      - "1025:1025"  # SMTP
+    networks:
+      - kong-net
+    restart: unless-stopped
+
+  # ============================================
+  # METRICS EXPORTERS
+  # ============================================
+
+  # PostgreSQL Exporter - Metrics for app-database
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${DB_USER:-exchange}:${DB_PASSWORD}@app-database:5432/${DB_NAME:-crypto_exchange}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    networks:
+      - kong-net
+    depends_on:
+      app-database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Kong PostgreSQL Exporter - Metrics for kong-database
+  kong-postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${KONG_PG_USER:-kong}:${KONG_PG_PASSWORD}@kong-database:5432/${KONG_PG_DATABASE:-kong}?sslmode=disable"
+    ports:
+      - "9188:9187"
+    networks:
+      - kong-net
+    depends_on:
+      - kong-database
+    restart: unless-stopped
+
+  # Node Exporter - OS/Host metrics (CPU, memory, disk, network)
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - kong-net
+    restart: unless-stopped
+
+  # NOTE: Node.js services (kx-exchange, payment-processor, frontend) run natively on the host.
+  # Start them with: npm run dev (or individual scripts)
+  # This avoids Docker overhead and enables faster development iteration.
+
+volumes:
+  kong_data:
+  rabbitmq_data:
+  ollama_data:
+  prometheus_data:
+  alertmanager_data:
+  goalert_db_data:
+  app_data:
+  loki_data:
+  grafana_data:
+
+networks:
+  kong-net:
+    driver: bridge

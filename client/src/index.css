@@ -1,0 +1,344 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+
+  /* Professional color palette */
+  --otel-blue: hsl(215, 20%, 30%);
+  --otel-green: hsl(160, 25%, 40%);
+  --otel-amber: hsl(35, 30%, 45%);
+  --trace-bg: hsl(220, 10%, 98%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+
+  /* Professional colors for dark mode */
+  --otel-blue: hsl(215, 30%, 60%);
+  --otel-green: hsl(160, 35%, 55%);
+  --otel-amber: hsl(35, 40%, 60%);
+  --trace-bg: hsl(240, 10%, 3.9%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-size: 16px;
+    /* Base font size - ensures readability */
+    line-height: 1.5;
+  }
+
+  /* Minimum font size floor for accessibility and investor demos */
+  /* Override text-xs to be 13px minimum on screens, keeping 12px for badges only */
+  .text-xs {
+    font-size: 0.8125rem;
+    /* 13px instead of 12px */
+    line-height: 1.25rem;
+  }
+
+  /* Exception: Badges can stay smaller */
+  .badge .text-xs,
+  [class*="Badge"] .text-xs {
+    font-size: 0.75rem;
+    /* Keep 12px for badges */
+  }
+}
+
+@layer components {
+  /* Standardized card variants for visual consistency */
+  .card-primary {
+    @apply bg-gradient-to-r from-cyan-900/30 to-blue-900/30 
+           border border-cyan-500/30 backdrop-blur rounded-xl
+           transition-all duration-300 hover:border-cyan-400/50;
+  }
+  
+  .card-secondary {
+    @apply bg-slate-800/50 border border-slate-700/50 
+           backdrop-blur rounded-xl
+           transition-all duration-300 hover:border-slate-600/80;
+  }
+  
+  .card-highlight {
+    @apply bg-gradient-to-r from-indigo-900/50 via-purple-900/50 to-pink-900/50 
+           border border-purple-500/30 backdrop-blur rounded-xl
+           transition-all duration-300 hover:border-purple-400/50;
+  }
+
+  .card-success {
+    @apply bg-gradient-to-r from-emerald-900/30 to-cyan-900/30
+           border border-emerald-500/30 backdrop-blur rounded-xl
+           transition-all duration-300 hover:border-emerald-400/50;
+  }
+
+  /* Button interactive states for better UX */
+  .btn-interactive {
+    @apply transition-all duration-150 
+           hover:scale-[1.02] active:scale-[0.98]
+           hover:shadow-lg;
+  }
+
+  .btn-primary-glow {
+    @apply bg-gradient-to-r from-cyan-500 to-blue-600 
+           hover:from-cyan-400 hover:to-blue-500 
+           text-white font-semibold
+           shadow-lg shadow-cyan-500/25 hover:shadow-cyan-400/40
+           transition-all duration-300;
+  }
+
+  .btn-success-glow {
+    @apply bg-gradient-to-r from-emerald-500 to-cyan-500
+           hover:from-emerald-400 hover:to-cyan-400
+           text-white font-semibold
+           shadow-lg shadow-emerald-500/25 hover:shadow-emerald-400/40
+           transition-all duration-300;
+  }
+
+  .btn-danger-glow {
+    @apply bg-gradient-to-r from-rose-500 to-pink-500
+           hover:from-rose-400 hover:to-pink-400
+           text-white font-semibold
+           shadow-lg shadow-rose-500/25 hover:shadow-rose-400/40
+           transition-all duration-300;
+  }
+}
+
+@layer utilities {
+  .bg-otel-blue {
+    background-color: var(--otel-blue);
+  }
+
+  .bg-otel-green {
+    background-color: var(--otel-green);
+  }
+
+  .bg-otel-amber {
+    background-color: var(--otel-amber);
+  }
+
+  .bg-trace-bg {
+    background-color: var(--trace-bg);
+  }
+
+  .text-otel-blue {
+    color: var(--otel-blue);
+  }
+
+  .text-otel-green {
+    color: var(--otel-green);
+  }
+
+  .text-otel-amber {
+    color: var(--otel-amber);
+  }
+
+  .border-otel-blue {
+    border-color: var(--otel-blue);
+  }
+
+  .border-otel-green {
+    border-color: var(--otel-green);
+  }
+
+  .border-otel-amber {
+    border-color: var(--otel-amber);
+  }
+
+  /* Custom animations for hero section */
+  @keyframes pulse-slow {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes slide-up {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.6s ease-out;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 640px) {
+    .container {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+
+  /* Animated gradient for hero text */
+  @keyframes gradient-shift {
+
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 4s ease infinite;
+  }
+
+  /* Glow effect for key elements */
+  @keyframes glow-pulse {
+
+    0%,
+    100% {
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+    }
+
+    50% {
+      box-shadow: 0 0 40px rgba(6, 182, 212, 0.5), 0 0 60px rgba(6, 182, 212, 0.2);
+    }
+  }
+
+  .animate-glow {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+
+  /* Floating animation for orbs */
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0px) scale(1);
+    }
+
+    50% {
+      transform: translateY(-20px) scale(1.05);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  /* Trace flow animation */
+  @keyframes trace-flow {
+    0% {
+      transform: translateX(-100%);
+    }
+
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .animate-trace-flow {
+    animation: trace-flow 2s linear infinite;
+  }
+
+  /* Ant swarm animation - dots flowing left to right */
+  @keyframes ant-flow {
+    0% {
+      left: 0%;
+      opacity: 0;
+    }
+
+    5% {
+      opacity: 1;
+    }
+
+    95% {
+      opacity: 1;
+    }
+
+    100% {
+      left: 95%;
+      opacity: 0;
+    }
+  }
+
+  .ant-dot {
+    animation: ant-flow linear infinite;
+  }
+
+  /* Color shift for ants as they pass through different service zones */
+  .ant-dot {
+    background: linear-gradient(90deg, #22d3ee, #10b981, #3b82f6, #818cf8);
+    background-size: 400% 100%;
+    animation: ant-flow linear infinite, ant-color-shift linear infinite;
+  }
+
+  @keyframes ant-color-shift {
+    0% {
+      background-position: 0% 50%;
+    }
+
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+}

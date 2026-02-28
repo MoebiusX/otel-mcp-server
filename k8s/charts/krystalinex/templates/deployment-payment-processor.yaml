@@ -1,0 +1,86 @@
+{{- if .Values.paymentProcessor.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-payment-processor
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: payment-processor
+spec:
+  replicas: {{ .Values.paymentProcessor.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "krystalinex.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: payment-processor
+  template:
+    metadata:
+      labels:
+        {{- include "krystalinex.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: payment-processor
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Wait for RabbitMQ to be ready before starting payment-processor
+      initContainers:
+        - name: wait-for-rabbitmq
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z {{ include "krystalinex.fullname" . }}-rabbitmq 5672; do echo "Waiting for RabbitMQ..."; sleep 2; done; echo "RabbitMQ is ready!"']
+      containers:
+        - name: payment-processor
+          image: "{{ .Values.paymentProcessor.image.repository }}:{{ .Values.paymentProcessor.image.tag }}"
+          imagePullPolicy: {{ .Values.paymentProcessor.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.paymentProcessor.service.port }}
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.paymentProcessor.env.NODE_ENV | quote }}
+            - name: PORT
+              value: {{ .Values.paymentProcessor.env.PORT | quote }}
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: krystalinex-secrets
+                  key: rabbitmq-url
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://{{ include "krystalinex.fullname" . }}-otel-collector:4318"
+          # Payment-processor is a RabbitMQ consumer with no HTTP server
+          # Use exec probe to check if node process is running
+          livenessProbe:
+            exec:
+              command: ["pgrep", "-f", "node"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["pgrep", "-f", "node"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.paymentProcessor.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-payment-processor
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: payment-processor
+spec:
+  type: {{ .Values.paymentProcessor.service.type }}
+  ports:
+    - port: {{ .Values.paymentProcessor.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "krystalinex.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: payment-processor
+{{- end }}

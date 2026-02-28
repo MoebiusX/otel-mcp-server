@@ -1,0 +1,18 @@
+flowchart LR
+  UI[React App]
+  KG[Kong + OTel Plugin]
+  CW["exchange-api (crypto-wallet)"]
+  RMQ[RabbitMQ]
+  OM[order-matcher]
+  OC[OTEL Collector]
+  J[Jaeger]
+
+  UI -->|traceparent| KG
+  KG -->|propagated context| CW
+  CW -->|context in headers| RMQ
+  RMQ -->|extracted context| OM
+
+  KG --> OC
+  CW --> OC
+  OM --> OC
+  OC --> J

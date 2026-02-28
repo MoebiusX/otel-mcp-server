@@ -1,0 +1,62 @@
+{
+    "appName": "Krystaline",
+    "tagline": "Where Trust is Verified, Not Assumed",
+    "nav": {
+        "home": "Home",
+        "portfolio": "Portfolio",
+        "trade": "Trade",
+        "transparency": "Transparency",
+        "profile": "Profile",
+        "activity": "Activity",
+        "convert": "Convert",
+        "logout": "Logout"
+    },
+    "buttons": {
+        "continue": "Continue",
+        "cancel": "Cancel",
+        "save": "Save",
+        "submit": "Submit",
+        "close": "Close",
+        "back": "Back",
+        "next": "Next",
+        "loading": "Loading...",
+        "retry": "Retry",
+        "refresh": "Refresh",
+        "backToHome": "Back to Home",
+        "viewTrace": "View Trace",
+        "makeFirstTrade": "Make Your First Trade",
+        "learnMore": "Learn more"
+    },
+    "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "loading": "Loading",
+        "error": "Error",
+        "success": "Success",
+        "healthy": "Operational",
+        "warning": "Degraded",
+        "critical": "Down",
+        "unknown": "Unknown"
+    },
+    "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "network": "Network error. Please check your connection.",
+        "unauthorized": "Session expired. Please login again.",
+        "notFound": "404 - Page Not Found",
+        "notFoundDescription": "The page you're looking for doesn't exist or has been moved."
+    },
+    "footer": {
+        "copyright": "© {{year}} Krystaline. All rights reserved.",
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Service"
+    },
+    "filters": {
+        "all": "All Activity",
+        "trades": "Trades",
+        "transfers": "Transfers"
+    },
+    "time": {
+        "updated": "Updated {{time}}",
+        "ago": "ago"
+    }
+}

@@ -1,0 +1,59 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: krystalinex
+
+scrape_configs:
+  # Scrape Docker container logs
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Extract container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: container
+      # Extract compose service name
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: service
+      # Extract compose project
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: project
+      # Add static labels
+      - source_labels: []
+        target_label: environment
+        replacement: development
+      - source_labels: []
+        target_label: platform
+        replacement: krystalinex
+    pipeline_stages:
+      # Try to parse JSON logs (Pino format)
+      - json:
+          expressions:
+            level: level
+            component: component
+            msg: msg
+            traceId: traceId
+            spanId: spanId
+            err: err
+      # Add extracted fields as labels
+      - labels:
+          level:
+          component:
+      # Keep traceId as structured metadata for correlation
+      - structured_metadata:
+          traceId:
+          spanId:
+      # Fallback: if not JSON, just use the raw line
+      - match:
+          selector: '{level=""}'
+          stages:
+            - static_labels:
+                level: unknown

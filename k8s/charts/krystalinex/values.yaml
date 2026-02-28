@@ -1,0 +1,389 @@
+# KrystalineX Helm Chart Values
+# Default values for local development (docker-desktop)
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Enable secret creation (for local dev)
+secrets:
+  create: true
+
+# =============================================================================
+# CORE APPLICATION SERVICES
+# =============================================================================
+
+server:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: 192.168.1.32:5000/krystalinex/server
+    tag: v2.0.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 5000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  # Horizontal Pod Autoscaler configuration
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    NODE_ENV: production
+    PORT: "5000"
+  # These will be injected from secrets
+  envFromSecrets:
+    - name: krystalinex-secrets
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 5000
+    initialDelaySeconds: 60
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 5000
+    initialDelaySeconds: 30
+    periodSeconds: 5
+
+paymentProcessor:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: 192.168.1.32:5000/krystalinex/payment-processor
+    tag: v2.0.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3001
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  # Horizontal Pod Autoscaler configuration
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    NODE_ENV: production
+    PORT: "3001"
+  envFromSecrets:
+    - name: krystalinex-secrets
+
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: 192.168.1.32:5000/krystalinex/frontend
+    tag: v2.0.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# =============================================================================
+# INFRASTRUCTURE SERVICES (Bitnami Charts)
+# =============================================================================
+
+postgresql:
+  enabled: true
+  auth:
+    username: exchange
+    database: crypto_exchange
+    existingSecret: krystalinex-db-secrets
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+kongPostgresql:
+  enabled: true
+  auth:
+    username: kong
+    database: kong
+    existingSecret: krystalinex-kong-secrets
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+rabbitmq:
+  enabled: true
+  auth:
+    username: admin
+    existingPasswordSecret: krystalinex-rabbitmq-secrets
+    existingSecretPasswordKey: rabbitmq-password
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  metrics:
+    enabled: true
+
+# =============================================================================
+# OBSERVABILITY STACK
+# =============================================================================
+
+jaeger:
+  enabled: true
+  image:
+    repository: jaegertracing/all-in-one
+    tag: latest
+  service:
+    type: ClusterIP
+    ports:
+      ui: 16686
+      otlpGrpc: 4317
+      otlpHttp: 4318
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 512Mi
+
+otelCollector:
+  enabled: true
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 4318
+  config:
+    # Mounted from ConfigMap
+    existingConfigMap: otel-collector-config
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+prometheus:
+  enabled: true
+  image:
+    repository: prom/prometheus
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 9090
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+loki:
+  enabled: false
+  image:
+    repository: grafana/loki
+    tag: "3.0.0"
+  service:
+    type: ClusterIP
+    port: 3100
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+promtail:
+  enabled: false
+  image:
+    repository: grafana/promtail
+    tag: "3.0.0"
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# =============================================================================
+# GATEWAY
+# =============================================================================
+
+kong:
+  enabled: true
+  image:
+    repository: kong/kong-gateway
+    tag: latest
+  service:
+    type: LoadBalancer  # For external access
+    ports:
+      proxy: 8000
+      proxySSL: 8443
+      admin: 8001
+      manager: 8002
+  env:
+    database: postgres
+    pg_host: "{{ .Release.Name }}-kongdatabase-postgresql"
+    pg_user: kong
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# =============================================================================
+# OPTIONAL / DEV-ONLY SERVICES
+# =============================================================================
+
+grafana:
+  enabled: true
+  image:
+    repository: grafana/grafana
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3000
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+ollama:
+  enabled: false  # Disabled by default, enable for AI trace analysis
+  image:
+    repository: ollama/ollama
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 11434
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 4Gi
+
+maildev:
+  enabled: true  # Dev SMTP server
+  image:
+    repository: maildev/maildev
+    tag: latest
+  service:
+    type: ClusterIP
+    ports:
+      web: 1080
+      smtp: 1025
+
+# =============================================================================
+# NETWORK & SECURITY
+# =============================================================================
+
+networkPolicy:
+  enabled: true
+  # Default deny all ingress, allow specific pod-to-pod communication
+
+ingress:
+  enabled: true
+  className: kong  # or nginx
+  annotations:
+    kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: krystalinex.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: server
+  tls: []
+  #  - secretName: krystalinex-tls
+  #    hosts:
+  #      - krystalinex.local
+
+# =============================================================================
+# SECRETS (Reference only - actual values in sealed secrets or Vault)
+# =============================================================================
+
+secrets:
+  # Set to true to create secrets from values (dev only!)
+  create: false
+  # For production, use external-secrets or sealed-secrets
+  externalSecrets:
+    enabled: false
+    secretStoreRef:
+      name: vault-backend
+      kind: ClusterSecretStore
+  # Secret values - pass via: helm upgrade --set secrets.dbPassword=xxx
+  # Or use a gitignored values-secrets.yaml file
+  # dbPassword: ""
+  # rabbitmqPassword: ""
+  # jwtSecret: ""
+  # kongDbPassword: ""
+  # grafanaAdminPassword: ""
+  # goalertDbPassword: ""
+  # goalertEncryptionKey: ""
+

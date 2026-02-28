@@ -1,0 +1,96 @@
+{{- if .Values.alertmanager.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-alertmanager-config
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alertmanager
+data:
+  alertmanager.yml: |
+    # Alertmanager Configuration for KrystalineX
+    # Routes alerts to GoAlert webhook
+
+    global:
+      resolve_timeout: 5m
+      smtp_smarthost: '{{ include "krystalinex.fullname" . }}-maildev:1025'
+      smtp_from: 'alertmanager@krystalinex.local'
+      smtp_require_tls: false
+
+    # Alert routing tree
+    route:
+      receiver: 'goalert-webhook'
+      group_by: ['alertname', 'severity', 'service']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+
+      routes:
+        # Critical alerts - immediate notification
+        - match:
+            severity: critical
+          receiver: 'goalert-critical'
+          group_wait: 10s
+          repeat_interval: 1h
+          continue: true
+
+        - match:
+            severity: critical
+          receiver: 'ntfy-critical'
+          group_wait: 10s
+          repeat_interval: 1h
+
+        # Warning alerts - batch notifications
+        - match:
+            severity: warning
+          receiver: 'goalert-webhook'
+          group_wait: 1m
+          repeat_interval: 4h
+
+        # Security alerts - immediate
+        - match:
+            service: security
+          receiver: 'goalert-security'
+          group_wait: 10s
+
+    # Inhibition rules
+    inhibit_rules:
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'service']
+
+      - source_match:
+          alertname: 'ServiceDown'
+        target_match_re:
+          alertname: '.+'
+        equal: ['service']
+
+    # Notification receivers
+    receivers:
+      - name: 'goalert-webhook'
+        webhook_configs:
+          - url: 'http://{{ include "krystalinex.fullname" . }}-goalert:8081/goalert/api/v2/prometheusalertmanager/incoming?token=7376077e-012b-482d-b018-05cfb631e22d'
+            send_resolved: true
+
+      - name: 'goalert-critical'
+        webhook_configs:
+          - url: 'http://{{ include "krystalinex.fullname" . }}-goalert:8081/goalert/api/v2/prometheusalertmanager/incoming?token=7376077e-012b-482d-b018-05cfb631e22d'
+            send_resolved: true
+        email_configs:
+          - to: 'carlos@krystaline.io'
+            send_resolved: true
+            headers:
+              Subject: '{{ "{{" }} .GroupLabels.alertname {{ "}}" }} - KrystalineX CRITICAL'
+
+      - name: 'goalert-security'
+        webhook_configs:
+          - url: 'http://{{ include "krystalinex.fullname" . }}-goalert:8081/goalert/api/v2/generic/incoming'
+            send_resolved: true
+
+      - name: 'ntfy-critical'
+        webhook_configs:
+          - url: 'https://ntfy.sh/krystalinex-alerts?priority=urgent&tags=rotating_light,critical&title=CRITICAL+Alert'
+            send_resolved: true
+{{- end }}

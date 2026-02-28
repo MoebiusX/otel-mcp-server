@@ -1,0 +1,44 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-grafana-datasources
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://{{ include "krystalinex.fullname" . }}-prometheus:9090/prometheus
+        isDefault: true
+        jsonData:
+          httpMethod: POST
+          prometheusType: Prometheus
+      - name: Jaeger
+        type: jaeger
+        uid: jaeger
+        access: proxy
+        url: http://{{ include "krystalinex.fullname" . }}-jaeger:16686/jaeger
+        isDefault: false
+      {{- if .Values.loki }}
+      {{- if .Values.loki.enabled }}
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://{{ include "krystalinex.fullname" . }}-loki:3100
+        isDefault: false
+        jsonData:
+          derivedFields:
+            - datasourceUid: jaeger
+              matcherRegex: "traceId=(\\w+)"
+              name: TraceID
+              url: "$${__value.raw}"
+      {{- end }}
+      {{- end }}
+{{- end }}

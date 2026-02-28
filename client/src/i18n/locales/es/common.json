@@ -1,0 +1,62 @@
+{
+    "appName": "Krystaline",
+    "tagline": "Donde la Confianza se Verifica, No se Asume",
+    "nav": {
+        "home": "Inicio",
+        "portfolio": "Portafolio",
+        "trade": "Operar",
+        "transparency": "Transparencia",
+        "profile": "Perfil",
+        "activity": "Actividad",
+        "convert": "Convertir",
+        "logout": "Cerrar sesión"
+    },
+    "buttons": {
+        "continue": "Continuar",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "submit": "Enviar",
+        "close": "Cerrar",
+        "back": "Atrás",
+        "next": "Siguiente",
+        "loading": "Cargando...",
+        "retry": "Reintentar",
+        "refresh": "Actualizar",
+        "backToHome": "Volver al Inicio",
+        "viewTrace": "Ver Traza",
+        "makeFirstTrade": "Haz tu Primera Operación",
+        "learnMore": "Más información"
+    },
+    "status": {
+        "online": "En línea",
+        "offline": "Fuera de línea",
+        "loading": "Cargando",
+        "error": "Error",
+        "success": "Éxito",
+        "healthy": "Operacional",
+        "warning": "Degradado",
+        "critical": "Caído",
+        "unknown": "Desconocido"
+    },
+    "errors": {
+        "generic": "Algo salió mal. Por favor, inténtalo de nuevo.",
+        "network": "Error de red. Por favor, verifica tu conexión.",
+        "unauthorized": "Sesión expirada. Por favor, inicia sesión de nuevo.",
+        "notFound": "404 - Página No Encontrada",
+        "notFoundDescription": "La página que buscas no existe o ha sido movida."
+    },
+    "footer": {
+        "copyright": "© {{year}} Krystaline. Todos los derechos reservados.",
+        "privacy": "Política de Privacidad",
+        "terms": "Términos de Servicio"
+    },
+    "filters": {
+        "all": "Toda la Actividad",
+        "trades": "Operaciones",
+        "transfers": "Transferencias"
+    },
+    "time": {
+        "updated": "Actualizado {{time}}",
+        "ago": "hace"
+    }
+}

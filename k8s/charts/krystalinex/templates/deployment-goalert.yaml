@@ -1,0 +1,174 @@
+{{- if .Values.goalert.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-goalert-db
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: goalert-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "krystalinex.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: goalert-db
+  template:
+    metadata:
+      labels:
+        {{- include "krystalinex.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: goalert-db
+    spec:
+      containers:
+        - name: postgres
+          image: "postgres:17-alpine"
+          env:
+            - name: POSTGRES_USER
+              value: "goalert"
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.secrets.goalertDbPassword | default "CHANGE_ME" | quote }}
+            - name: POSTGRES_DB
+              value: "goalert"
+          ports:
+            - name: postgres
+              containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "goalert", "-d", "goalert"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "goalert", "-d", "goalert"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+      volumes:
+        - name: data
+          {{- if .Values.goalert.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "krystalinex.fullname" . }}-goalert-db
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-goalert-db
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: goalert-db
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: postgres
+      name: postgres
+  selector:
+    {{- include "krystalinex.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: goalert-db
+{{- if .Values.goalert.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-goalert-db
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: goalert-db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.global.storageClass }}
+  storageClassName: {{ .Values.global.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.goalert.persistence.size }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-goalert
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: goalert
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "krystalinex.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: goalert
+  template:
+    metadata:
+      labels:
+        {{- include "krystalinex.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: goalert
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: "postgres:17-alpine"
+          command: ['sh', '-c', 'until pg_isready -h {{ include "krystalinex.fullname" . }}-goalert-db -p 5432 -U goalert; do echo waiting for goalert-db; sleep 2; done']
+      containers:
+        - name: goalert
+          image: "{{ .Values.goalert.image.repository }}:{{ .Values.goalert.image.tag }}"
+          env:
+            - name: GOALERT_DB_URL
+              value: {{ printf "postgres://goalert:%s@%s-goalert-db:5432/goalert?sslmode=disable" (.Values.secrets.goalertDbPassword | default "CHANGE_ME") (include "krystalinex.fullname" .) | quote }}
+            - name: GOALERT_PUBLIC_URL
+              value: "https://www.krystaline.io/goalert"
+            - name: GOALERT_DATA_ENCRYPTION_KEY
+              value: {{ .Values.secrets.goalertEncryptionKey | default "CHANGE_ME_GENERATE_KEY" | quote }}
+            - name: GOALERT_LOG_LEVEL
+              value: "info"
+            - name: GOALERT_DISABLE_HTTPS_REDIRECT
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /goalert/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /goalert/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.goalert.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-goalert
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: goalert
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: http
+      name: http
+  selector:
+    {{- include "krystalinex.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: goalert
+{{- end }}

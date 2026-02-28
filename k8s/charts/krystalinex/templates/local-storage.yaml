@@ -1,0 +1,146 @@
+{{- if eq .Values.global.storageClass "local-storage" }}
+# StorageClass for local volumes (bare-metal / on-prem)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+# PV: PostgreSQL (10Gi)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-postgresql-pv
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  capacity:
+    storage: {{ .Values.postgresql.primary.persistence.size }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/krystalinex/postgresql
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - kube
+---
+# PV: RabbitMQ (5Gi)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-rabbitmq-pv
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
+spec:
+  capacity:
+    storage: {{ .Values.rabbitmq.persistence.size }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/krystalinex/rabbitmq
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - kube
+---
+# PV: Prometheus (10Gi)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-prometheus-pv
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  capacity:
+    storage: {{ .Values.prometheus.persistence.size }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/krystalinex/prometheus
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - kube
+---
+# PV: Grafana (5Gi)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-grafana-pv
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  capacity:
+    storage: {{ .Values.grafana.persistence.size }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/krystalinex/grafana
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - kube
+---
+# PV: Ollama (20Gi) — on worker1 to distribute load
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "krystalinex.fullname" . }}-ollama-pv
+  labels:
+    {{- include "krystalinex.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  capacity:
+    storage: {{ .Values.ollama.persistence.size }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/krystalinex/ollama
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - worker1
+{{- end }}

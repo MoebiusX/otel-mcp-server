@@ -1,0 +1,494 @@
+# KrystalineX Prometheus Alerting Rules
+# Configure Alertmanager to route these alerts to GoAlert webhook
+
+groups:
+  # ============================================
+  # APPLICATION ALERTS
+  # ============================================
+  - name: krystalinex.application
+    rules:
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) 
+            / 
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: krystalinex
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#62-high-latency"
+
+      # High Latency P99
+      - alert: HighLatencyP99
+        expr: |
+          histogram_quantile(0.99, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: krystalinex
+        annotations:
+          summary: "High P99 latency detected"
+          description: "P99 latency is {{ $value | humanizeDuration }} (threshold: 2s)"
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#62-high-latency"
+
+      # High Latency P99 Critical
+      - alert: HighLatencyP99Critical
+        expr: |
+          histogram_quantile(0.99, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: krystalinex
+        annotations:
+          summary: "Critical P99 latency"
+          description: "P99 latency is {{ $value | humanizeDuration }} (threshold: 5s)"
+
+      # Service Down
+      - alert: ServiceDown
+        expr: up{job=~"krystaline-exchange|order-matcher"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: krystalinex
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "The {{ $labels.job }} service has been unreachable for more than 1 minute"
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#61-service-wont-start"
+
+      # No Traffic (potential issue)
+      - alert: NoTraffic
+        expr: |
+          sum(rate(http_requests_total[5m])) == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: krystalinex
+        annotations:
+          summary: "No traffic detected"
+          description: "No HTTP requests received in the last 10 minutes. Check if this is expected."
+
+  # ============================================
+  # TRADING SYSTEM ALERTS
+  # ============================================
+  - name: krystalinex.trading
+    rules:
+      # Order Processing Failures
+      - alert: OrderProcessingFailures
+        expr: |
+          sum(rate(orders_failed_total[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: trading
+        annotations:
+          summary: "Order processing failures detected"
+          description: "{{ $value }} orders/sec are failing"
+
+      # Order Queue Backup
+      - alert: OrderQueueBackup
+        expr: |
+          rabbitmq_queue_messages{queue="orders"} > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: trading
+        annotations:
+          summary: "Order queue is backing up"
+          description: "{{ $value }} orders waiting in queue (threshold: 100)"
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#63-rabbitmq-queue-backup"
+
+      # Order Queue Critical
+      - alert: OrderQueueCritical
+        expr: |
+          rabbitmq_queue_messages{queue="orders"} > 500
+        for: 2m
+        labels:
+          severity: critical
+          service: trading
+        annotations:
+          summary: "Order queue critically backed up"
+          description: "{{ $value }} orders waiting in queue (threshold: 500)"
+
+      # Price Feed Unavailable
+      - alert: PriceFeedUnavailable
+        expr: |
+          absent(price_feed_last_update_timestamp) or 
+          (time() - price_feed_last_update_timestamp) > 60
+        for: 2m
+        labels:
+          severity: critical
+          service: trading
+        annotations:
+          summary: "Price feed is stale or unavailable"
+          description: "No price updates received in the last 60 seconds"
+
+  # ============================================
+  # DATABASE ALERTS
+  # ============================================
+  - name: krystalinex.database
+    rules:
+      # Database Down
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is not responding"
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#61-service-wont-start"
+
+      # High Connection Usage
+      - alert: DatabaseConnectionsHigh
+        expr: |
+          pg_stat_activity_count / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of connections in use"
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#64-database-connection-exhausted"
+
+      # Database Connection Critical
+      - alert: DatabaseConnectionsCritical
+        expr: |
+          pg_stat_activity_count / pg_settings_max_connections * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connections nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of connections in use - action required immediately"
+
+      # Slow Queries
+      - alert: SlowQueries
+        expr: |
+          rate(pg_stat_statements_mean_time_seconds[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query time is {{ $value | humanizeDuration }}"
+
+      # Database Storage Low
+      - alert: DatabaseStorageLow
+        expr: |
+          (pg_database_size_bytes / 1024 / 1024 / 1024) > 50
+        for: 10m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Database size exceeding 50GB"
+          description: "Database size is {{ $value | humanize }}GB"
+
+  # ============================================
+  # MESSAGE QUEUE ALERTS
+  # ============================================
+  - name: krystalinex.rabbitmq
+    rules:
+      # RabbitMQ Down
+      - alert: RabbitMQDown
+        expr: rabbitmq_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "RabbitMQ server is not responding"
+
+      # High Memory Usage
+      - alert: RabbitMQHighMemory
+        expr: |
+          rabbitmq_process_resident_memory_bytes / rabbitmq_resident_memory_limit_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ high memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      # No Consumers
+      - alert: RabbitMQNoConsumers
+        expr: |
+          rabbitmq_queue_consumers{queue="orders"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: rabbitmq
+        annotations:
+          summary: "No consumers for orders queue"
+          description: "Orders queue has no active consumers - payment processor may be down"
+
+      # Consumer Lag
+      - alert: RabbitMQConsumerLag
+        expr: |
+          rabbitmq_queue_messages_ready{queue="orders"} > 50
+        for: 5m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: "Consumer lag detected"
+          description: "{{ $value }} messages waiting to be consumed"
+
+  # ============================================
+  # INFRASTRUCTURE ALERTS
+  # ============================================
+  - name: krystalinex.infrastructure
+    rules:
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#65-out-of-memory"
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 15
+        for: 10m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining on {{ $labels.mountpoint }}"
+
+      # Disk Space Critical
+      - alert: DiskSpaceCritical
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 5
+        for: 5m
+        labels:
+          severity: critical
+          service: infrastructure
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+
+  # ============================================
+  # CIRCUIT BREAKER ALERTS
+  # ============================================
+  - name: krystalinex.resilience
+    rules:
+      # Circuit Breaker Open
+      - alert: CircuitBreakerOpen
+        expr: |
+          circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: resilience
+        annotations:
+          summary: "Circuit breaker {{ $labels.name }} is OPEN"
+          description: "The {{ $labels.name }} circuit breaker has opened due to failures. Requests will fail fast."
+
+      # Circuit Breaker Half-Open
+      - alert: CircuitBreakerHalfOpen
+        expr: |
+          circuit_breaker_state{state="half_open"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          service: resilience
+        annotations:
+          summary: "Circuit breaker {{ $labels.name }} is half-open"
+          description: "The {{ $labels.name }} circuit breaker is testing recovery"
+
+  # ============================================
+  # SECURITY ALERTS
+  # ============================================
+  - name: krystalinex.security
+    rules:
+      # High Rate of Auth Failures
+      - alert: AuthenticationFailures
+        expr: |
+          sum(rate(auth_failures_total[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "High rate of authentication failures"
+          description: "{{ $value }} auth failures/sec - possible brute force attack"
+
+      # Rate Limit Triggered
+      - alert: RateLimitExceeded
+        expr: |
+          sum(rate(http_requests_total{status="429"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Rate limiting is being triggered"
+          description: "{{ $value }} requests/sec are being rate limited"
+
+      # ===========================================
+      # NEW: HIGH-IMPACT SECURITY EVENT ALERTS
+      # ===========================================
+
+      # Brute Force Attack Detection - Critical
+      - alert: BruteForceAttack
+        expr: |
+          sum(increase(kx_security_events_total{event_type="login_failed"}[5m])) > 20
+        for: 1m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "🚨 Potential brute force attack detected"
+          description: "{{ $value }} failed login attempts in the last 5 minutes. Immediate investigation required."
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#security-brute-force"
+
+      # Credential Stuffing / Account Takeover
+      - alert: CredentialStuffingAttack
+        expr: |
+          sum(increase(kx_security_events_total{event_type="login_failed"}[15m])) > 100
+        for: 2m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "🔥 Credential stuffing attack in progress"
+          description: "{{ $value }} failed logins in 15 minutes. This pattern indicates automated credential testing."
+          runbook_url: "https://github.com/KrystalineX/docs/RUNBOOK.md#security-credential-stuffing"
+
+      # 2FA Bypass Attempts
+      - alert: TwoFactorAuthBypass
+        expr: |
+          sum(increase(kx_security_events_total{event_type="2fa_failed"}[10m])) > 10
+        for: 1m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "🔐 Multiple 2FA failures detected"
+          description: "{{ $value }} 2FA failures in 10 minutes. Possible account compromise attempt."
+
+      # Mass Rate Limit Abuse (DDoS pattern)
+      - alert: RateLimitAbuse
+        expr: |
+          sum(increase(kx_security_events_total{event_type=~".*rate_limit.*"}[5m])) > 50
+        for: 2m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "⚠️ Aggressive rate limit abuse"
+          description: "{{ $value }} rate limit triggers in 5 minutes. Possible DDoS or automated abuse pattern."
+
+      # Auth Rate Limit (targeted attack on auth endpoints)
+      - alert: AuthEndpointAbuse
+        expr: |
+          sum(increase(kx_security_events_total{event_type="auth_rate_limit_exceeded"}[5m])) > 20
+        for: 1m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "🔒 Auth endpoint under attack"
+          description: "{{ $value }} auth rate limits in 5 minutes. Authentication endpoints are being targeted."
+
+      # Sensitive Operations Rate Limit (high-value target)
+      - alert: SensitiveOperationAbuse
+        expr: |
+          sum(increase(kx_security_events_total{event_type="sensitive_rate_limit_exceeded"}[5m])) > 5
+        for: 1m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "💰 Sensitive operation abuse detected"
+          description: "{{ $value }} rate limits on sensitive endpoints. Financial operations may be targeted."
+
+      # Invalid Token Flood (token enumeration)
+      - alert: TokenEnumerationAttack
+        expr: |
+          sum(increase(kx_security_events_total{event_type=~"invalid_token|token_expired"}[5m])) > 30
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "🎫 Token validation flood"
+          description: "{{ $value }} invalid token attempts. Possible token enumeration or replay attack."
+
+      # High Severity Security Events Spike
+      - alert: HighSeveritySecurityEvents
+        expr: |
+          sum(increase(kx_security_events_total{severity=~"high|critical"}[10m])) > 25
+        for: 2m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "🆘 Security incident in progress"
+          description: "{{ $value }} high/critical security events in 10 minutes. Multiple attack vectors may be active."
+
+  # ============================================
+  # SLA ALERTS
+  # ============================================
+  - name: krystalinex.sla
+    rules:
+      # Availability SLA
+      - alert: AvailabilitySLABreach
+        expr: |
+          (1 - (sum(rate(http_requests_total{status=~"5.."}[1h])) / sum(rate(http_requests_total[1h])))) < 0.999999
+        for: 5m
+        labels:
+          severity: critical
+          service: sla
+        annotations:
+          summary: "Availability SLA at risk"
+          description: "Current availability is {{ $value | humanizePercentage }} (SLA: 99.9%)"
+
+      # Latency SLA
+      - alert: LatencySLABreach
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1h])) by (le)) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: sla
+        annotations:
+          summary: "Latency SLA at risk"
+          description: "P95 latency is {{ $value | humanizeDuration }} (SLA: 500ms)"

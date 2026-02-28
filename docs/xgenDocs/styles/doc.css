@@ -1,0 +1,34 @@
+/* Medium-like article styles (simple, readable, print-friendly) */
+:root{
+  --page-width: 760px;
+  --accent: #2d3748;
+  --muted: #6b7280;
+  --bg: #ffffff;
+  --text: #0f172a;
+}
+body{
+  background: #fff;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  line-height: 1.7;
+  padding: 48px 16px;
+}
+.article-wrapper{max-width: var(--page-width);margin: 0 auto;}
+header.article-header{margin-bottom: 28px;border-bottom: 1px solid #e6e6e6;padding-bottom: 16px}
+h1{font-size: 34px;margin: 0 0 8px;line-height:1.15}
+.lede{color:var(--muted);font-size:15px;margin-bottom: 12px}
+hr{border: none;border-top:1px solid #eee;margin:28px 0}
+figure{margin:22px 0;text-align:center;page-break-inside:avoid}
+figure img{display:block;margin:0 auto;width:100%;max-width:680px;height:auto;border-radius:6px;box-shadow:0 1px 0 rgba(0,0,0,0.03);object-fit:contain}
+/* Force large SVG/PNG to scale down and avoid overflow */
+img{max-width:100%;height:auto;display:block}
+p img{margin:18px auto}
+figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+h2{font-size:20px;color:var(--accent);margin-top:28px}
+ul{margin-left:20px}
+code, pre{font-family: SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;background:#f7f7f7;border-radius:4px}
+code{padding:0.2em 0.4em}
+pre{padding:16px;overflow-x:auto;font-size:13px;line-height:1.45;max-width:100%;white-space:pre;word-wrap:normal}
+.block-note{background:#f9fafb;border-left:4px solid #e6e6e6;padding:10px 14px;margin:14px 0;color:var(--muted)}
+.footer{margin-top:36px;border-top:1px solid #eee;padding-top:16px;color:var(--muted);font-size:13px}
+@media print{body{padding:24px} .article-wrapper{box-shadow:none;}}

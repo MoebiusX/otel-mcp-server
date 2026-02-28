@@ -1,0 +1,87 @@
+{
+    "hero": {
+        "badge": "All Systems Operational",
+        "title": "Proof of Observability",
+        "subtitle": "Track every trade. Verify every transaction. Trust nothing blindly.",
+        "cta": "Start Trading",
+        "ctaSecondary": "View Live Metrics"
+    },
+    "metrics": {
+        "uptime": "Uptime",
+        "totalTrades": "Total Trades",
+        "avgExecutionTime": "Avg Execution",
+        "servicesOnline": "Services Online",
+        "traceFlow": "Live Trace Flow"
+    },
+    "transparency": {
+        "title": "Transparency Dashboard",
+        "subtitle": "Real-time system health and performance metrics",
+        "serviceHealth": "Service Health",
+        "recentTrades": "Recent Trades",
+        "viewAllTrades": "View All Trades",
+        "systemMetrics": "System Metrics",
+        "lastUpdated": "Last updated: {{time}}"
+    },
+    "services": {
+        "apiGateway": "API Gateway",
+        "orderService": "Order Service",
+        "paymentProcessor": "Payment Processor",
+        "database": "Database",
+        "cache": "Cache",
+        "messageQueue": "Message Queue"
+    },
+    "welcome": {
+        "step1Title": "Welcome to Krystaline",
+        "step1Subtitle": "The transparent trading platform where trust is verified, not assumed.",
+        "step2Title": "Proof of Observability",
+        "step2Subtitle": "Every trade generates a cryptographic trace you can inspect in real-time.",
+        "step3Title": "Ready to Trade",
+        "step3Subtitle": "Start with your demo balance and see transparency in action.",
+        "getStarted": "Get Started",
+        "skipTour": "Skip Tour",
+        "welcomeBannerTitle": "Welcome to Krystaline! 🎉",
+        "demoBalance": "You have $10,000 demo balance to explore.",
+        "makeFirstTrade": "Make your first trade below and watch it get traced in real-time on the right.",
+        "accountVerified": "Account verified",
+        "readyToTrade": "Ready to trade",
+        "tradeExecutedTitle": "Trade Executed! 🚀",
+        "tradeExecutedDesc": "Your trade was captured with full observability. Check the Trace Viewer on the right to see every step.",
+        "firstTradeComplete": "First trade complete",
+        "tracesAvailable": "Traces available"
+    },
+    "portfolio": {
+        "title": "Portfolio",
+        "yourPortfolio": "Your Portfolio",
+        "totalBalance": "Total Balance",
+        "totalBalanceUSD": "Total Balance (USD)",
+        "yourAssets": "Your Assets",
+        "quickActions": "Quick Actions",
+        "deposit": "Deposit",
+        "withdraw": "Withdraw",
+        "convert": "Convert",
+        "trade": "Trade",
+        "available": "Available",
+        "loadingBalances": "Loading balances...",
+        "firstTrade": {
+            "title": "Make Your First Trade",
+            "subtitle": "Experience transparent trading with full observability",
+            "cta": "Start Trading"
+        }
+    },
+    "journey": {
+        "accountCreated": "Account Created",
+        "makeFirstTrade": "Make First Trade",
+        "viewTraceProof": "View Trace Proof"
+    },
+    "activity": {
+        "recentActivity": "Recent Activity",
+        "readyToStart": "Ready to Start Trading",
+        "useFormLeft": "Use the form on the left to make your first trade. Each transaction is traced with OpenTelemetry.",
+        "tracesRealtime": "Traces will appear in real-time",
+        "transfer": "Transfer"
+    },
+    "tabs": {
+        "tradeBTC": "Trade BTC",
+        "transferBTC": "Transfer BTC"
+    }
+}

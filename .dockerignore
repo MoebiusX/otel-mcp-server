@@ -1,0 +1,22 @@
+# Docker build context
+# Exclude non-essential files
+
+# Exclude all node_modules (build uses npm ci)
+node_modules/
+client/node_modules/
+
+# Exclude non-essential directories
+docs/
+k8s/
+scripts/
+.git/
+.github/
+.vscode/
+coverage/
+playwright-report/
+test-results/
+*.md
+*.log
+.DS_Store
+.env
+.env.*

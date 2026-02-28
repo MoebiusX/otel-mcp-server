@@ -1,0 +1,87 @@
+{
+    "hero": {
+        "badge": "Todos los Sistemas Operacionales",
+        "title": "Prueba de Observabilidad",
+        "subtitle": "Rastrea cada operación. Verifica cada transacción. No confíes ciegamente.",
+        "cta": "Empezar a Operar",
+        "ctaSecondary": "Ver Métricas en Vivo"
+    },
+    "metrics": {
+        "uptime": "Tiempo Activo",
+        "totalTrades": "Operaciones Totales",
+        "avgExecutionTime": "Ejecución Promedio",
+        "servicesOnline": "Servicios en Línea",
+        "traceFlow": "Flujo de Trazas en Vivo"
+    },
+    "transparency": {
+        "title": "Panel de Transparencia",
+        "subtitle": "Métricas de salud y rendimiento del sistema en tiempo real",
+        "serviceHealth": "Salud del Servicio",
+        "recentTrades": "Operaciones Recientes",
+        "viewAllTrades": "Ver Todas las Operaciones",
+        "systemMetrics": "Métricas del Sistema",
+        "lastUpdated": "Última actualización: {{time}}"
+    },
+    "services": {
+        "apiGateway": "API Gateway",
+        "orderService": "Servicio de Órdenes",
+        "paymentProcessor": "Procesador de Pagos",
+        "database": "Base de Datos",
+        "cache": "Caché",
+        "messageQueue": "Cola de Mensajes"
+    },
+    "welcome": {
+        "step1Title": "Bienvenido a Krystaline",
+        "step1Subtitle": "La plataforma de trading transparente donde la confianza se verifica, no se asume.",
+        "step2Title": "Prueba de Observabilidad",
+        "step2Subtitle": "Cada operación genera una traza criptográfica que puedes inspeccionar en tiempo real.",
+        "step3Title": "Listo para Operar",
+        "step3Subtitle": "Comienza con tu saldo de demostración y ve la transparencia en acción.",
+        "getStarted": "Comenzar",
+        "skipTour": "Saltar Tour",
+        "welcomeBannerTitle": "¡Bienvenido a Krystaline! 🎉",
+        "demoBalance": "Tienes $10,000 de saldo demo para explorar.",
+        "makeFirstTrade": "Haz tu primera operación abajo y mírala ser rastreada en tiempo real a la derecha.",
+        "accountVerified": "Cuenta verificada",
+        "readyToTrade": "Listo para operar",
+        "tradeExecutedTitle": "¡Operación Ejecutada! 🚀",
+        "tradeExecutedDesc": "Tu operación fue capturada con observabilidad completa. Revisa el Visor de Trazas a la derecha para ver cada paso.",
+        "firstTradeComplete": "Primera operación completada",
+        "tracesAvailable": "Trazas disponibles"
+    },
+    "portfolio": {
+        "title": "Portafolio",
+        "yourPortfolio": "Tu Portafolio",
+        "totalBalance": "Saldo Total",
+        "totalBalanceUSD": "Saldo Total (USD)",
+        "yourAssets": "Tus Activos",
+        "quickActions": "Acciones Rápidas",
+        "deposit": "Depositar",
+        "withdraw": "Retirar",
+        "convert": "Convertir",
+        "trade": "Operar",
+        "available": "Disponible",
+        "loadingBalances": "Cargando saldos...",
+        "firstTrade": {
+            "title": "Haz Tu Primera Operación",
+            "subtitle": "Experimenta el trading transparente con observabilidad completa",
+            "cta": "Empezar a Operar"
+        }
+    },
+    "journey": {
+        "accountCreated": "Cuenta Creada",
+        "makeFirstTrade": "Hacer Primera Operación",
+        "viewTraceProof": "Ver Prueba de Traza"
+    },
+    "activity": {
+        "recentActivity": "Actividad Reciente",
+        "readyToStart": "Listo para Empezar a Operar",
+        "useFormLeft": "Usa el formulario de la izquierda para hacer tu primera operación. Cada transacción se rastrea con OpenTelemetry.",
+        "tracesRealtime": "Las trazas aparecerán en tiempo real",
+        "transfer": "Transferencia"
+    },
+    "tabs": {
+        "tradeBTC": "Operar BTC",
+        "transferBTC": "Transferir BTC"
+    }
+}
