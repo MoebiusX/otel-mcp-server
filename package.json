@@ -41,6 +41,8 @@
     "start:http": "node dist/index.js --http 3001",
     "dev": "tsx src/index.ts",
     "dev:http": "tsx src/index.ts --http 3001",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build"
@@ -52,7 +54,8 @@
   "devDependencies": {
     "@types/node": "^20.16.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.1"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -6,8 +6,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export function registerResources(server: McpServer): void {
   server.resource(
+    'platform-overview',
     'otel://overview',
-    'OpenTelemetry stack overview — architecture, backends, and available telemetry signals',
     async () => ({
       contents: [{
         uri: 'otel://overview',
