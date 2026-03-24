@@ -21,6 +21,10 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ![MCP server exploring a local observability stack — showing Jaeger, Prometheus, and Loki backend status, active alerts, and key findings](docs/sample.png)
 
+> *"Tell me what happened to order ORD-1774382223417-7"* — full distributed trace across 4 services, 40 spans, with ZK proof verification:
+
+![Order tracing across gateway, exchange, matcher, and wallet services — showing timeline, fill price, latency breakdown, and Groth16 ZK proof verification](docs/sample2.png)
+
 ## Features
 
 - **32 tools** across 7 skills — traces, metrics, logs, Elasticsearch, Alertmanager, ZK proofs, system health
