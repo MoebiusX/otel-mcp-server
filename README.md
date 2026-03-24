@@ -25,6 +25,10 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ![Order tracing across gateway, exchange, matcher, and wallet services — showing timeline, fill price, latency breakdown, and Groth16 ZK proof verification](docs/sample2.png)
 
+> *"What about the k8s cluster?"* 
+
+![Health check across the cluster](docs/sample3.png)
+
 ## Features
 
 - **32 tools** across 7 skills — traces, metrics, logs, Elasticsearch, Alertmanager, ZK proofs, system health
