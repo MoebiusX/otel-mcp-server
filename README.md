@@ -503,6 +503,109 @@ npm test
 npx vitest run tests/auth.test.ts
 ```
 
+## Appendix: Live Cluster Analysis
+
+The following analysis was generated entirely by an AI agent (GitHub Copilot CLI) using this MCP server to query a production KrystalineX cluster — 27 tool calls across 6 skills, zero manual commands. This is what "Proof of Observability" looks like in practice.
+
+> **Cluster**: KrystalineX crypto exchange · 3-node K8s (1 control-plane, 2 workers) · Helm-managed  
+> **MCP Server**: v1.2.1 · 6/7 skills active (Elasticsearch disabled) · session-based HTTP transport  
+> **Date**: 2026-03-24T19:30 UTC
+
+---
+
+### Infrastructure
+
+| Node | Role | CPU | Memory | Disk | Status |
+|------|------|-----|--------|------|--------|
+| kube (192.168.1.32) | control-plane | 13.4% | 29.7% | 62.3% | ✅ Ready |
+| worker1 (192.168.1.34) | worker | 10.0% | 28.6% | 51.2% | ✅ Ready |
+| worker2 (192.168.1.35) | worker | — | — | — | 🔴 NotReady (hardware) |
+
+### Prometheus Targets — 12/12 UP
+
+All scrape targets healthy with zero errors:
+
+krystalinex-server · payment-processor · Kong · Grafana · Jaeger · OTEL Collector · Prometheus · RabbitMQ · Redis · kube-state-metrics · node-exporter ×2
+
+### Application Services
+
+| Service | Avg Latency | Traced Spans | Anomalies | Status |
+|---------|------------|--------------|-----------|--------|
+| kx-exchange | 491 ms | 19 | 0 | ✅ Healthy |
+| kx-wallet | 156 ms | 6 | 0 | ✅ Healthy |
+| kx-matcher | 29 ms | 3 | 0 | ✅ Healthy |
+| kx-gateway | — | *(traced)* | 0 | ✅ Healthy |
+
+### Performance Snapshot
+
+| Metric | Value | Threshold | Verdict |
+|--------|-------|-----------|---------|
+| P50 latency | **4.1 ms** | — | 🟢 Excellent |
+| P99 latency | **424 ms** | 2 s | 🟢 Well within budget |
+| Error rate (5xx) | **0%** | 5% | 🟢 Clean |
+| Request throughput | 0.21 req/s | — | Idle / low traffic |
+| RabbitMQ backlog | **0 messages** | — | 🟢 No queuing |
+| Pod restarts | **0** | — | 🟢 Stable |
+
+### SLO Error Budgets
+
+| SLO | Budget Remaining | Status |
+|-----|-----------------|--------|
+| **Availability** (99.9% target) | **100%** | 🟢 Full |
+| **Latency** (P99 < 2s target) | **14.2%** | 🟡 Predictive alert firing |
+
+The latency SLO budget is being consumed faster than expected. A `predict_linear` rule forecasts exhaustion within 24 hours. Worth investigating tail latency in kx-exchange.
+
+### Active Alerts — 3
+
+| Alert | Severity | Detail |
+|-------|----------|--------|
+| PodNotReady | ⚠️ warning | `server-df98765f9-pcxxv` — stale pod from rollout, auto-resolving |
+| PodNotReady | ⚠️ warning | `payment-processor-f4f8b8d78-wxszp` — stale pod, auto-resolving |
+| LatencyBudgetExhaustion | ⚠️ warning | Predictive: latency error budget depleting within 24h |
+
+All critical rules — HighErrorRate, ServiceDown, ContainerCrashLooping, OOMKilled — are **inactive**.
+
+### Service Dependency Graph
+
+```
+kx-gateway ──(99 calls)──► kx-exchange ──(5 calls)──► kx-matcher
+                                │
+                                └──(94 calls)──► jaeger (OTEL export)
+
+kx-wallet  ──(23 calls)──► kx-exchange
+kx-wallet  ──(14 calls)──► kx-gateway
+```
+
+### Logs & Traces
+
+| Signal | Window | Count | Finding |
+|--------|--------|-------|---------|
+| Error logs | 1 h | **0** | Clean |
+| Warning logs | 1 h | **0** | Clean |
+| OOM logs | 6 h | **0** | No memory pressure |
+| Error traces | 1 h | **3** | Transient tcp.connect / dns.lookup — network hiccups |
+| Slow traces (>2s) | 1 h | **0** | No significant slow requests |
+
+### Tools Used
+
+This analysis invoked 27 MCP tool calls:
+
+| Skill | Tools Called |
+|-------|-------------|
+| **Traces** | `traces_services`, `traces_search` ×2, `traces_dependencies`, `system_health` |
+| **Metrics** | `metrics_query` ×12 (up, latency, errors, CPU, memory, disk, SLO budgets, RabbitMQ), `metrics_targets`, `metrics_alerts` |
+| **Logs** | `logs_query` ×3 (errors, warnings, OOM) |
+| **Alertmanager** | `alertmanager_alerts`, `alertmanager_groups`, `alertmanager_status` |
+| **ZK Proofs** | `zk_stats` |
+| **System** | `anomalies_active`, `anomalies_baselines` |
+
+### Verdict
+
+The cluster is **healthy and stable** with generous headroom on both active nodes. The main items to watch are the **latency SLO budget trend** and **kube node disk usage at 62%**. The offline worker2 node is a known hardware issue. No action required on the PodNotReady alerts — they are ephemeral artifacts of recent deployments.
+
+---
+
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).
