@@ -35,7 +35,6 @@ async function main(): Promise<void> {
     options.tools = toolNames.filter(t => validIds.includes(t));
   }
 
-  const server = createServer(options);
   const enabledIds = new Set(options.tools || validIds);
 
   // Parse --http flag
@@ -57,71 +56,97 @@ async function main(): Promise<void> {
     );
     const http = await import('node:http');
 
-    const httpServer = http.createServer(async (req, res) => {
-      // Health check — always open
-      if (req.method === 'GET' && req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          status: 'ok',
-          server: 'otel-mcp-server',
-          version: VERSION,
-          auth: authEnabled ? 'enabled' : 'disabled',
-          skills: allSkills
-            .filter(s => enabledIds.has(s.id))
-            .map(s => ({ id: s.id, available: s.isAvailable(), tools: s.tools })),
-        }));
-        return;
-      }
+      // ── Session-based MCP transport ──────────────────────────────
+      // Each MCP session gets its own McpServer + Transport pair.
+      // The init request creates a new session; subsequent requests
+      // reuse the same pair via the Mcp-Session-Id header.
+      const { randomUUID } = await import('node:crypto');
+      const sessions = new Map<string, { transport: InstanceType<typeof StreamableHTTPServerTransport>; server: ReturnType<typeof createServer> }>();
 
-      // Prometheus metrics — always open
-      if (req.method === 'GET' && req.url === '/metrics') {
-        res.writeHead(200, {
-          'Content-Type': 'text/plain; version=0.0.4; charset=utf-8',
-        });
-        res.end(serializeMetrics());
-        return;
-      }
-
-      // CORS preflight — always open
-      if (req.method === 'OPTIONS') {
-        res.writeHead(204, {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
-        });
-        res.end();
-        return;
-      }
-
-      // Client authentication
-      if (authEnabled) {
-        const authHeader = req.headers['authorization'] as string | undefined;
-        const apiKeyHeader = req.headers['x-api-key'] as string | undefined;
-        const clientKey = validateClientKey(clientKeys, authHeader, apiKeyHeader);
-
-        if (!clientKey) {
-          metrics.authAttempts.inc({ result: 'rejected' });
-          res.writeHead(401, { 'Content-Type': 'application/json' });
+      const httpServer = http.createServer(async (req, res) => {
+        // Health check — always open
+        if (req.method === 'GET' && req.url === '/health') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
-            error: 'Unauthorized',
-            message: 'Valid API key required. Pass via Authorization: Bearer <key> or X-API-Key header.',
+            status: 'ok',
+            server: 'otel-mcp-server',
+            version: VERSION,
+            auth: authEnabled ? 'enabled' : 'disabled',
+            skills: allSkills
+              .filter(s => enabledIds.has(s.id))
+              .map(s => ({ id: s.id, available: s.isAvailable(), tools: s.tools })),
           }));
           return;
         }
-        metrics.authAttempts.inc({ result: 'accepted' });
-      }
 
-      // Track active sessions
-      metrics.activeSessions.inc();
+        // Prometheus metrics — always open
+        if (req.method === 'GET' && req.url === '/metrics') {
+          res.writeHead(200, {
+            'Content-Type': 'text/plain; version=0.0.4; charset=utf-8',
+          });
+          res.end(serializeMetrics());
+          return;
+        }
 
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-      res.on('close', () => {
-        metrics.activeSessions.dec();
-        transport.close();
+        // CORS preflight — always open
+        if (req.method === 'OPTIONS') {
+          res.writeHead(204, {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers':
+              'Content-Type, Authorization, X-API-Key, Mcp-Session-Id',
+          });
+          res.end();
+          return;
+        }
+
+        // Client authentication
+        if (authEnabled) {
+          const authHeader = req.headers['authorization'] as string | undefined;
+          const apiKeyHeader = req.headers['x-api-key'] as string | undefined;
+          const clientKey = validateClientKey(clientKeys, authHeader, apiKeyHeader);
+
+          if (!clientKey) {
+            metrics.authAttempts.inc({ result: 'rejected' });
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              error: 'Unauthorized',
+              message: 'Valid API key required. Pass via Authorization: Bearer <key> or X-API-Key header.',
+            }));
+            return;
+          }
+          metrics.authAttempts.inc({ result: 'accepted' });
+        }
+
+        // Look up existing session
+        const sessionId = req.headers['mcp-session-id'] as string | undefined;
+        if (sessionId && sessions.has(sessionId)) {
+          const session = sessions.get(sessionId)!;
+          await session.transport.handleRequest(req, res);
+          return;
+        }
+
+        // New session (initialize request)
+        metrics.activeSessions.inc();
+        const mcpServer = createServer(options);
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+        });
+
+        transport.onclose = () => {
+          const sid = transport.sessionId;
+          if (sid) sessions.delete(sid);
+          metrics.activeSessions.dec();
+          mcpServer.close();
+        };
+
+        await mcpServer.connect(transport);
+        await transport.handleRequest(req, res);
+
+        if (transport.sessionId) {
+          sessions.set(transport.sessionId, { transport, server: mcpServer });
+        }
       });
-      await server.connect(transport);
-      await transport.handleRequest(req, res);
-    });
 
     httpServer.listen(port, () => {
       console.error(`✓ otel-mcp-server v${VERSION} listening on http://0.0.0.0:${port}`);
@@ -140,6 +165,7 @@ async function main(): Promise<void> {
     });
   } else {
     // ── stdio transport (default) ─────────────────────────────────────────
+    const server = createServer(options);
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error(`✓ otel-mcp-server v${VERSION} running on stdio`);
