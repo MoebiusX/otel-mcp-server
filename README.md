@@ -6,12 +6,12 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ```
 ┌─────────────────┐     MCP (stdio/HTTP)     ┌──────────────────┐
-│  Claude Desktop  │ ◄──────────────────────► │                  │
-│  GitHub Copilot  │                          │  otel-mcp-server │──► Jaeger   (traces)
-│  Custom Agent    │                          │                  │──► Prometheus (metrics)
-└─────────────────┘                           │   23 tools       │──► Loki     (logs)
-                                              │   authenticated  │──► App API  (ZK proofs)
-                                              └──────────────────┘
+│  Claude Desktop │ ◄──────────────────────► │                  │
+│  GitHub Copilot │                          │  otel-mcp-server │──► Jaeger   (traces)
+│  Custom Agent   │                          │                  │──► Prometheus (metrics)
+└─────────────────┘                          │   23 tools       │──► Loki     (logs)
+                                             │   authenticated  │──► App API  (ZK proofs)
+                                             └──────────────────┘
 ```
 
 ## Features
