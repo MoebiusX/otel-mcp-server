@@ -19,8 +19,8 @@ import { createFetcher, textResult, errorResult } from '../helpers.js';
 
 export function registerSystemTools(server: McpServer, config: Config): void {
   const { appApiUrl, jaegerUrl } = config;
-  const fetchApp = createFetcher(config.timeoutMs, config.auth.appApi);
-  const fetchJaeger = createFetcher(config.timeoutMs, config.auth.jaeger);
+  const fetchApp = createFetcher(config.timeoutMs, config.auth.appApi, 'app-api');
+  const fetchJaeger = createFetcher(config.timeoutMs, config.auth.jaeger, 'jaeger');
 
   // ── anomalies_active ──────────────────────────────────────────────────────
 

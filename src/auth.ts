@@ -27,6 +27,8 @@ export interface BackendAuthConfig {
   prometheus: BackendAuth;
   loki: BackendAuth;
   appApi: BackendAuth;
+  elasticsearch: BackendAuth;
+  alertmanager: BackendAuth;
 }
 
 /**
@@ -44,6 +46,8 @@ export function loadBackendAuth(): BackendAuthConfig {
     prometheus: buildAuth('PROMETHEUS'),
     loki: buildLokiAuth(),
     appApi: buildAuth('APP_API'),
+    elasticsearch: buildAuth('ELASTICSEARCH'),
+    alertmanager: buildAuth('ALERTMANAGER'),
   };
 }
 

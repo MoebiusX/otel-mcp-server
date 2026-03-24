@@ -4,7 +4,8 @@
  * OpenTelemetry MCP Server
  *
  * Exposes traces (Jaeger), metrics (Prometheus), logs (Loki),
- * and optionally ZK proofs as MCP tools for AI agents.
+ * Elasticsearch, Alertmanager, and optionally ZK proofs as MCP
+ * tools for AI agents.
  *
  * Transports:
  *   stdio   — Default. For Claude Desktop, GitHub Copilot, etc.
@@ -18,9 +19,10 @@
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadConfig } from './config.js';
-import { createServer, VERSION } from './server.js';
+import { createServer, VERSION, ALL_TOOL_GROUPS } from './server.js';
+import type { ToolGroup, ServerOptions } from './server.js';
 import { loadClientKeys, validateClientKey } from './auth.js';
-import type { ServerOptions } from './server.js';
+import { metrics, serializeMetrics } from './metrics.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -30,12 +32,12 @@ async function main(): Promise<void> {
   const options: ServerOptions = {};
   if (toolsIndex !== -1 && args[toolsIndex + 1]) {
     const toolNames = args[toolsIndex + 1]!.split(',').map(t => t.trim());
-    const valid = ['traces', 'metrics', 'logs', 'zk-proofs', 'system'] as const;
-    options.tools = toolNames.filter(t => (valid as readonly string[]).includes(t)) as typeof valid[number][];
+    options.tools = toolNames.filter(t => (ALL_TOOL_GROUPS as readonly string[]).includes(t)) as ToolGroup[];
   }
 
   const config = loadConfig();
   const server = createServer(config, options);
+  const enabledTools = options.tools || ALL_TOOL_GROUPS;
 
   // Parse --http flag
   const httpIndex = args.indexOf('--http');
@@ -65,8 +67,17 @@ async function main(): Promise<void> {
           server: 'otel-mcp-server',
           version: VERSION,
           auth: authEnabled ? 'enabled' : 'disabled',
-          tools: options.tools || ['traces', 'metrics', 'logs', 'zk-proofs', 'system'],
+          tools: enabledTools,
         }));
+        return;
+      }
+
+      // Prometheus metrics — always open
+      if (req.method === 'GET' && req.url === '/metrics') {
+        res.writeHead(200, {
+          'Content-Type': 'text/plain; version=0.0.4; charset=utf-8',
+        });
+        res.end(serializeMetrics());
         return;
       }
 
@@ -88,6 +99,7 @@ async function main(): Promise<void> {
         const clientKey = validateClientKey(clientKeys, authHeader, apiKeyHeader);
 
         if (!clientKey) {
+          metrics.authAttempts.inc({ result: 'rejected' });
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
             error: 'Unauthorized',
@@ -95,10 +107,17 @@ async function main(): Promise<void> {
           }));
           return;
         }
+        metrics.authAttempts.inc({ result: 'accepted' });
       }
 
+      // Track active sessions
+      metrics.activeSessions.inc();
+
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-      res.on('close', () => transport.close());
+      res.on('close', () => {
+        metrics.activeSessions.dec();
+        transport.close();
+      });
       await server.connect(transport);
       await transport.handleRequest(req, res);
     });
@@ -106,9 +125,12 @@ async function main(): Promise<void> {
     httpServer.listen(port, () => {
       console.error(`✓ otel-mcp-server v${VERSION} listening on http://0.0.0.0:${port}`);
       console.error(`  Health:  http://localhost:${port}/health`);
+      console.error(`  Metrics: http://localhost:${port}/metrics`);
       console.error(`  Jaeger:  ${config.jaegerUrl}`);
       console.error(`  Prom:    ${config.prometheusUrl}${config.prometheusPathPrefix}`);
       console.error(`  Loki:    ${config.lokiUrl}`);
+      if (config.elasticsearchUrl) console.error(`  ES:      ${config.elasticsearchUrl}`);
+      if (config.alertmanagerUrl)  console.error(`  AM:      ${config.alertmanagerUrl}`);
       if (options.tools) {
         console.error(`  Tools:   ${options.tools.join(', ')}`);
       }

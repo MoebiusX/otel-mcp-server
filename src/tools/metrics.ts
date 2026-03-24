@@ -17,7 +17,7 @@ import { createFetcher, textResult, errorResult } from '../helpers.js';
 
 export function registerMetricsTools(server: McpServer, config: Config): void {
   const promUrl = `${config.prometheusUrl}${config.prometheusPathPrefix}`;
-  const fetchJSON = createFetcher(config.timeoutMs, config.auth.prometheus);
+  const fetchJSON = createFetcher(config.timeoutMs, config.auth.prometheus, 'prometheus');
 
   // ── metrics_query ─────────────────────────────────────────────────────────
 

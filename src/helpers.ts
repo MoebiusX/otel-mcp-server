@@ -4,14 +4,32 @@
 
 import type { BackendAuth } from './auth.js';
 import { backendHeaders } from './auth.js';
+import { instrumentFetcher } from './metrics.js';
+
+/** Extra fetch options beyond the standard auth/timeout. */
+export interface FetchOptions {
+  method?: string;
+  body?: string;
+}
 
 /** Fetch JSON with timeout, error handling, and optional auth headers. */
-export async function fetchJSON(url: string, timeoutMs = 15_000, auth?: BackendAuth): Promise<any> {
+export async function fetchJSON(
+  url: string,
+  timeoutMs = 15_000,
+  auth?: BackendAuth,
+  options?: FetchOptions,
+): Promise<any> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const headers: Record<string, string> = auth ? backendHeaders(auth) : {};
-    const res = await fetch(url, { signal: controller.signal, headers });
+    if (options?.body) headers['Content-Type'] = 'application/json';
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers,
+      method: options?.method || 'GET',
+      body: options?.body,
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText} — ${url}`);
     return await res.json();
   } finally {
@@ -22,10 +40,13 @@ export async function fetchJSON(url: string, timeoutMs = 15_000, auth?: BackendA
 /**
  * Create a backend-specific fetcher with pre-baked auth headers.
  * Tools call `fetcher(url)` without needing to know about auth.
+ *
+ * @param backend - Optional backend name for metrics instrumentation
  */
-export function createFetcher(timeoutMs: number, auth: BackendAuth) {
-  return (url: string, overrideTimeout?: number) =>
-    fetchJSON(url, overrideTimeout ?? timeoutMs, auth);
+export function createFetcher(timeoutMs: number, auth: BackendAuth, backend?: string) {
+  const baseFetcher = (url: string, overrideTimeout?: number, options?: FetchOptions) =>
+    fetchJSON(url, overrideTimeout ?? timeoutMs, auth, options);
+  return backend ? instrumentFetcher(baseFetcher, backend) : baseFetcher;
 }
 
 /** Wrap arbitrary data into an MCP text content result. */

@@ -18,6 +18,10 @@ export interface Config {
   prometheusPathPrefix: string;
   /** Optional application API URL (for ZK proofs, anomaly detection, system health) */
   appApiUrl: string;
+  /** Optional Elasticsearch / OpenSearch URL */
+  elasticsearchUrl: string;
+  /** Optional Alertmanager URL */
+  alertmanagerUrl: string;
   /** Default HTTP timeout for backend queries (ms) */
   timeoutMs: number;
   /** Backend authentication credentials */
@@ -31,6 +35,8 @@ export function loadConfig(): Config {
     lokiUrl: env('LOKI_URL', 'http://localhost:3100'),
     prometheusPathPrefix: env('PROMETHEUS_PATH_PREFIX', ''),
     appApiUrl: env('APP_API_URL', 'http://localhost:5000'),
+    elasticsearchUrl: env('ELASTICSEARCH_URL', ''),
+    alertmanagerUrl: env('ALERTMANAGER_URL', ''),
     timeoutMs: parseInt(env('MCP_TIMEOUT_MS', '15000'), 10),
     auth: loadBackendAuth(),
   };

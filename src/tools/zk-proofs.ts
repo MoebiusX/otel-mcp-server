@@ -18,7 +18,7 @@ import { createFetcher, textResult, errorResult } from '../helpers.js';
 
 export function registerZKTools(server: McpServer, config: Config): void {
   const { appApiUrl } = config;
-  const fetchJSON = createFetcher(config.timeoutMs, config.auth.appApi);
+  const fetchJSON = createFetcher(config.timeoutMs, config.auth.appApi, 'app-api');
 
   // ── zk_proof_get ──────────────────────────────────────────────────────────
 

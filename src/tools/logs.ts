@@ -26,7 +26,7 @@ function parseLokiStreams(streams: any[]): any[] {
 export function registerLogTools(server: McpServer, config: Config): void {
   const { lokiUrl } = config;
   const lokiTimeout = Math.max(config.timeoutMs, 30_000); // logs can be slow
-  const fetchJSON = createFetcher(lokiTimeout, config.auth.loki);
+  const fetchJSON = createFetcher(lokiTimeout, config.auth.loki, 'loki');
 
   // ── logs_query ────────────────────────────────────────────────────────────
 

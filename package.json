@@ -1,7 +1,7 @@
 {
   "name": "otel-mcp-server",
-  "version": "1.0.0",
-  "description": "OpenTelemetry MCP Server — expose traces, metrics, logs, and ZK proofs to AI agents via the Model Context Protocol",
+  "version": "1.1.0",
+  "description": "OpenTelemetry MCP Server — expose traces, metrics, logs, Elasticsearch, Alertmanager, and ZK proofs to AI agents via the Model Context Protocol",
   "type": "module",
   "license": "Apache-2.0",
   "author": "KrystalineX",
@@ -22,6 +22,8 @@
     "prometheus",
     "loki",
     "grafana",
+    "elasticsearch",
+    "alertmanager",
     "zk-proofs",
     "ai-agents",
     "llm-tools"

@@ -16,7 +16,7 @@ import { createFetcher, textResult, errorResult, parseDuration } from '../helper
 
 export function registerTraceTools(server: McpServer, config: Config): void {
   const { jaegerUrl } = config;
-  const fetchJSON = createFetcher(config.timeoutMs, config.auth.jaeger);
+  const fetchJSON = createFetcher(config.timeoutMs, config.auth.jaeger, 'jaeger');
 
   // ── traces_search ─────────────────────────────────────────────────────────
 
