@@ -1,26 +1,19 @@
 /**
- * System health & anomaly detection tools.
+ * System skill — health checks, anomaly detection, and service topology.
  *
- * These tools are optional and require an application API that exposes
- * health/monitoring endpoints. They work well with any application
- * that provides similar REST APIs.
- *
- * Tools:
- *   anomalies_active    — Get active anomalies
- *   anomalies_baselines — Get anomaly detection baselines
- *   system_health       — Full system health check
- *   system_topology     — Live service dependency topology
+ * Tools: anomalies_active, anomalies_baselines, system_health, system_topology
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Config } from '../config.js';
-import { createFetcher, textResult, errorResult } from '../helpers.js';
+import type { Skill, SkillHelpers } from '../skill.js';
+import { textResult, errorResult } from '../helpers.js';
 
-export function registerSystemTools(server: McpServer, config: Config): void {
-  const { appApiUrl, jaegerUrl } = config;
-  const fetchApp = createFetcher(config.timeoutMs, config.auth.appApi, 'app-api');
-  const fetchJaeger = createFetcher(config.timeoutMs, config.auth.jaeger, 'jaeger');
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const appApiUrl = helpers.env('APP_API_URL', 'http://localhost:5000');
+  const jaegerUrl = helpers.env('JAEGER_URL', 'http://localhost:16686');
+  const fetchApp = helpers.createFetcher('APP_API', 'app-api');
+  const fetchJaeger = helpers.createFetcher('JAEGER', 'jaeger');
 
   // ── anomalies_active ──────────────────────────────────────────────────────
 
@@ -98,3 +91,13 @@ export function registerSystemTools(server: McpServer, config: Config): void {
     },
   );
 }
+
+export const skill: Skill = {
+  id: 'system',
+  name: 'System Health',
+  description: 'Health checks, anomaly detection, and live service topology',
+  tools: 4,
+  backends: ['App API', 'Jaeger'],
+  isAvailable: () => true,
+  register: registerTools,
+};

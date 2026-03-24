@@ -5,6 +5,50 @@ All notable changes to otel-mcp-server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-24
+
+### Added
+
+- **Skill plugin architecture** — each telemetry backend is now a self-contained `Skill` object
+  that self-configures from environment variables, declares its own availability, and registers
+  MCP tools independently. Adding a new backend is now a single file + one registry line.
+- `src/skill.ts` — `Skill` interface, `SkillHelpers` abstraction, `createSkillHelpers()` factory
+- `src/skills.ts` — central skill registry (import + array)
+- Skill-aware startup display showing ✓/✗ per skill with tool counts and backend names
+- Health endpoint now returns per-skill availability status
+- `buildAuth(prefix)` exported from auth.ts for use by skill helpers
+- Overview resource auto-generates from active skill metadata
+
+### Changed
+
+- `createServer(config, options)` → `createServer(options)` — skills self-configure from env vars
+- Config module stripped to `env()` helper — no more shared `Config` object
+- Removed `loadBackendAuth()`, `BackendAuthConfig`, `buildLokiAuth()` from auth.ts (superseded by `buildAuth()`)
+- Removed `ToolGroup` type, `ALL_TOOL_GROUPS` — replaced by `allSkills` registry
+- Loki tenant ID (`LOKI_TENANT_ID`) now handled by the logs skill via `CreateFetcherOptions.extraHeaders`
+  instead of special-cased auth logic
+- Version bumped to 1.2.0
+- Test count: 98 → 99
+
+### How to add a new skill
+
+```typescript
+// 1. Create src/tools/tempo.ts
+export const skill: Skill = {
+  id: 'tempo',
+  name: 'Grafana Tempo',
+  description: 'Query traces via the Grafana Tempo API',
+  tools: 3,
+  backends: ['Tempo'],
+  isAvailable: () => !!process.env.TEMPO_URL,
+  register: registerTools,
+};
+
+// 2. Add to src/skills.ts
+import { skill as tempo } from './tools/tempo.js';
+export const allSkills: Skill[] = [..., tempo];
+```
+
 ## [1.1.0] - 2026-03-24
 
 ### Added

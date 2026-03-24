@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../src/server.js';
-import { loadConfig } from '../src/config.js';
 
 /**
  * Integration tests — creates a real MCP server + client connected
@@ -21,9 +20,8 @@ function mockFetch(responses: Record<string, any>) {
   });
 }
 
-async function createTestClient(tools?: Array<'traces' | 'metrics' | 'logs' | 'zk-proofs' | 'system'>) {
-  const config = loadConfig();
-  const server = createServer(config, tools ? { tools } : undefined);
+async function createTestClient(tools?: string[]) {
+  const server = createServer(tools ? { tools } : undefined);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 

@@ -1,25 +1,19 @@
 /**
- * Elasticsearch / OpenSearch tools — search documents, inspect indices,
- * and monitor cluster health.
+ * Elasticsearch skill — search documents, inspect indices, and monitor cluster health.
  *
- * Tools:
- *   es_search          — Full-text search across indices
- *   es_cluster_health  — Cluster health (green/yellow/red), node/shard counts
- *   es_indices         — List indices with doc counts, size, health
- *   es_index_mapping   — Get field mappings for an index
- *   es_cat_nodes       — Node resource usage overview
+ * Tools: es_search, es_cluster_health, es_indices, es_index_mapping, es_cat_nodes
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Config } from '../config.js';
-import { createFetcher, textResult, errorResult } from '../helpers.js';
+import type { Skill, SkillHelpers } from '../skill.js';
+import { textResult, errorResult } from '../helpers.js';
 
-export function registerElasticsearchTools(server: McpServer, config: Config): void {
-  const esUrl = config.elasticsearchUrl;
-  if (!esUrl) return; // skip if not configured
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const esUrl = helpers.env('ELASTICSEARCH_URL');
+  if (!esUrl) return;
 
-  const fetchJSON = createFetcher(config.timeoutMs, config.auth.elasticsearch, 'elasticsearch');
+  const fetchJSON = helpers.createFetcher('ELASTICSEARCH', 'elasticsearch');
 
   // ── es_search ─────────────────────────────────────────────────────────────
 
@@ -188,3 +182,13 @@ export function registerElasticsearchTools(server: McpServer, config: Config): v
     },
   );
 }
+
+export const skill: Skill = {
+  id: 'elasticsearch',
+  name: 'Elasticsearch',
+  description: 'Full-text search, cluster health, and index management via Elasticsearch',
+  tools: 5,
+  backends: ['Elasticsearch'],
+  isAvailable: () => !!process.env['ELASTICSEARCH_URL'],
+  register: registerTools,
+};

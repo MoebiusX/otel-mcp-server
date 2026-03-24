@@ -1,17 +1,13 @@
 /**
- * Log tools — query structured logs via the Loki HTTP API.
+ * Logs skill — query structured logs via the Loki HTTP API.
  *
- * Tools:
- *   logs_query        — LogQL query for log lines
- *   logs_labels       — List all label names
- *   logs_label_values — Get values for a label
- *   logs_tail_context — Find logs correlated with a trace ID
+ * Tools: logs_query, logs_labels, logs_label_values, logs_tail_context
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Config } from '../config.js';
-import { createFetcher, textResult, errorResult, tryParseJSON } from '../helpers.js';
+import type { Skill, SkillHelpers } from '../skill.js';
+import { textResult, errorResult, tryParseJSON } from '../helpers.js';
 
 function parseLokiStreams(streams: any[]): any[] {
   return streams.flatMap((s: any) =>
@@ -23,10 +19,13 @@ function parseLokiStreams(streams: any[]): any[] {
   );
 }
 
-export function registerLogTools(server: McpServer, config: Config): void {
-  const { lokiUrl } = config;
-  const lokiTimeout = Math.max(config.timeoutMs, 30_000); // logs can be slow
-  const fetchJSON = createFetcher(lokiTimeout, config.auth.loki, 'loki');
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const lokiUrl = helpers.env('LOKI_URL', 'http://localhost:3100');
+  const tenantId = helpers.env('LOKI_TENANT_ID');
+  const fetchJSON = helpers.createFetcher('LOKI', 'loki', {
+    timeoutMs: Math.max(helpers.timeoutMs, 30_000),
+    extraHeaders: tenantId ? { 'X-Scope-OrgID': tenantId } : undefined,
+  });
 
   // ── logs_query ────────────────────────────────────────────────────────────
 
@@ -121,3 +120,13 @@ export function registerLogTools(server: McpServer, config: Config): void {
     },
   );
 }
+
+export const skill: Skill = {
+  id: 'logs',
+  name: 'Structured Logs',
+  description: 'Query structured logs via the Loki HTTP API',
+  tools: 4,
+  backends: ['Loki'],
+  isAvailable: () => true,
+  register: registerTools,
+};

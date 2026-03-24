@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../src/server.js';
-import type { Config } from '../src/config.js';
 
 function mockFetch(responses: Record<string, any>) {
   return vi.fn(async (url: string | URL | Request, init?: any) => {
@@ -16,59 +15,8 @@ function mockFetch(responses: Record<string, any>) {
   });
 }
 
-function configWithES(): Config {
-  return {
-    jaegerUrl: 'http://jaeger:16686',
-    prometheusUrl: 'http://prom:9090',
-    lokiUrl: 'http://loki:3100',
-    prometheusPathPrefix: '',
-    appApiUrl: 'http://app:5000',
-    elasticsearchUrl: 'http://es:9200',
-    alertmanagerUrl: '',
-    timeoutMs: 5000,
-    auth: {
-      jaeger: {}, prometheus: {}, loki: {}, appApi: {},
-      elasticsearch: {}, alertmanager: {},
-    },
-  };
-}
-
-function configWithAM(): Config {
-  return {
-    jaegerUrl: 'http://jaeger:16686',
-    prometheusUrl: 'http://prom:9090',
-    lokiUrl: 'http://loki:3100',
-    prometheusPathPrefix: '',
-    appApiUrl: 'http://app:5000',
-    elasticsearchUrl: '',
-    alertmanagerUrl: 'http://am:9093',
-    timeoutMs: 5000,
-    auth: {
-      jaeger: {}, prometheus: {}, loki: {}, appApi: {},
-      elasticsearch: {}, alertmanager: {},
-    },
-  };
-}
-
-function configWithBoth(): Config {
-  return {
-    jaegerUrl: 'http://jaeger:16686',
-    prometheusUrl: 'http://prom:9090',
-    lokiUrl: 'http://loki:3100',
-    prometheusPathPrefix: '',
-    appApiUrl: 'http://app:5000',
-    elasticsearchUrl: 'http://es:9200',
-    alertmanagerUrl: 'http://am:9093',
-    timeoutMs: 5000,
-    auth: {
-      jaeger: {}, prometheus: {}, loki: {}, appApi: {},
-      elasticsearch: {}, alertmanager: {},
-    },
-  };
-}
-
-async function createTestClient(config: Config, tools?: any[]) {
-  const server = createServer(config, tools ? { tools } : undefined);
+async function createTestClient(tools?: string[]) {
+  const server = createServer(tools ? { tools } : undefined);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test-client', version: '1.0.0' });
   await server.connect(serverTransport);
@@ -81,7 +29,11 @@ async function createTestClient(config: Config, tools?: any[]) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('elasticsearch tools', () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
+    process.env = { ...originalEnv };
+    process.env.ELASTICSEARCH_URL = 'http://es:9200';
     vi.stubGlobal('fetch', mockFetch({
       '/_search': {
         hits: {
@@ -126,11 +78,12 @@ describe('elasticsearch tools', () => {
   });
 
   afterEach(() => {
+    process.env = originalEnv;
     vi.unstubAllGlobals();
   });
 
   it('registers 5 ES tools when URL is configured', async () => {
-    const { client } = await createTestClient(configWithES(), ['elasticsearch']);
+    const { client } = await createTestClient(['elasticsearch']);
     const result = await client.listTools();
     expect(result.tools.length).toBe(5);
     const names = result.tools.map(t => t.name);
@@ -142,8 +95,8 @@ describe('elasticsearch tools', () => {
   });
 
   it('registers 0 ES tools when URL is empty', async () => {
-    const config = configWithAM(); // ES URL is empty in this config
-    const server = createServer(config, { tools: ['elasticsearch'] });
+    delete process.env.ELASTICSEARCH_URL;
+    const server = createServer({ tools: ['elasticsearch'] });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 'test-client', version: '1.0.0' });
     await server.connect(serverTransport);
@@ -153,7 +106,7 @@ describe('elasticsearch tools', () => {
   });
 
   it('es_search returns formatted hits', async () => {
-    const { client } = await createTestClient(configWithES(), ['elasticsearch']);
+    const { client } = await createTestClient(['elasticsearch']);
     const result = await client.callTool({
       name: 'es_search',
       arguments: { query: 'level:error', index: 'logs-*' },
@@ -166,7 +119,7 @@ describe('elasticsearch tools', () => {
   });
 
   it('es_cluster_health returns cluster info', async () => {
-    const { client } = await createTestClient(configWithES(), ['elasticsearch']);
+    const { client } = await createTestClient(['elasticsearch']);
     const result = await client.callTool({
       name: 'es_cluster_health',
       arguments: {},
@@ -178,7 +131,7 @@ describe('elasticsearch tools', () => {
   });
 
   it('es_indices returns index list', async () => {
-    const { client } = await createTestClient(configWithES(), ['elasticsearch']);
+    const { client } = await createTestClient(['elasticsearch']);
     const result = await client.callTool({
       name: 'es_indices',
       arguments: {},
@@ -189,7 +142,7 @@ describe('elasticsearch tools', () => {
   });
 
   it('es_index_mapping returns field mappings', async () => {
-    const { client } = await createTestClient(configWithES(), ['elasticsearch']);
+    const { client } = await createTestClient(['elasticsearch']);
     const result = await client.callTool({
       name: 'es_index_mapping',
       arguments: { index: 'logs-2026.03' },
@@ -200,7 +153,7 @@ describe('elasticsearch tools', () => {
   });
 
   it('es_cat_nodes returns node info', async () => {
-    const { client } = await createTestClient(configWithES(), ['elasticsearch']);
+    const { client } = await createTestClient(['elasticsearch']);
     const result = await client.callTool({
       name: 'es_cat_nodes',
       arguments: {},
@@ -217,7 +170,11 @@ describe('elasticsearch tools', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('alertmanager tools', () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
+    process.env = { ...originalEnv };
+    process.env.ALERTMANAGER_URL = 'http://am:9093';
     vi.stubGlobal('fetch', mockFetch({
       '/api/v2/alerts?': [
         {
@@ -275,11 +232,12 @@ describe('alertmanager tools', () => {
   });
 
   afterEach(() => {
+    process.env = originalEnv;
     vi.unstubAllGlobals();
   });
 
   it('registers 4 AM tools when URL is configured', async () => {
-    const { client } = await createTestClient(configWithAM(), ['alertmanager']);
+    const { client } = await createTestClient(['alertmanager']);
     const result = await client.listTools();
     expect(result.tools.length).toBe(4);
     const names = result.tools.map(t => t.name);
@@ -290,8 +248,8 @@ describe('alertmanager tools', () => {
   });
 
   it('registers 0 AM tools when URL is empty', async () => {
-    const config = configWithES(); // AM URL is empty in this config
-    const server = createServer(config, { tools: ['alertmanager'] });
+    delete process.env.ALERTMANAGER_URL;
+    const server = createServer({ tools: ['alertmanager'] });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 'test-client', version: '1.0.0' });
     await server.connect(serverTransport);
@@ -301,7 +259,7 @@ describe('alertmanager tools', () => {
   });
 
   it('alertmanager_alerts returns active alerts', async () => {
-    const { client } = await createTestClient(configWithAM(), ['alertmanager']);
+    const { client } = await createTestClient(['alertmanager']);
     const result = await client.callTool({
       name: 'alertmanager_alerts',
       arguments: {},
@@ -314,7 +272,7 @@ describe('alertmanager tools', () => {
   });
 
   it('alertmanager_silences filters by state', async () => {
-    const { client } = await createTestClient(configWithAM(), ['alertmanager']);
+    const { client } = await createTestClient(['alertmanager']);
     const result = await client.callTool({
       name: 'alertmanager_silences',
       arguments: { state: 'active' },
@@ -326,7 +284,7 @@ describe('alertmanager tools', () => {
   });
 
   it('alertmanager_silences returns all when state=all', async () => {
-    const { client } = await createTestClient(configWithAM(), ['alertmanager']);
+    const { client } = await createTestClient(['alertmanager']);
     const result = await client.callTool({
       name: 'alertmanager_silences',
       arguments: { state: 'all' },
@@ -336,7 +294,7 @@ describe('alertmanager tools', () => {
   });
 
   it('alertmanager_groups returns alert groups', async () => {
-    const { client } = await createTestClient(configWithAM(), ['alertmanager']);
+    const { client } = await createTestClient(['alertmanager']);
     const result = await client.callTool({
       name: 'alertmanager_groups',
       arguments: {},
@@ -348,7 +306,7 @@ describe('alertmanager tools', () => {
   });
 
   it('alertmanager_status returns cluster info', async () => {
-    const { client } = await createTestClient(configWithAM(), ['alertmanager']);
+    const { client } = await createTestClient(['alertmanager']);
     const result = await client.callTool({
       name: 'alertmanager_status',
       arguments: {},
@@ -365,18 +323,29 @@ describe('alertmanager tools', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('combined tool registration', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   it('registers 32 tools when all groups enabled with all backends', async () => {
-    const { client } = await createTestClient(configWithBoth());
+    process.env.ELASTICSEARCH_URL = 'http://es:9200';
+    process.env.ALERTMANAGER_URL = 'http://am:9093';
+    const { client } = await createTestClient();
     const result = await client.listTools();
     // 5 traces + 6 metrics + 4 logs + 4 zk + 4 system + 5 es + 4 am = 32
     expect(result.tools.length).toBe(32);
   });
 
   it('registers 23 tools when ES/AM URLs are empty', async () => {
-    const config = configWithBoth();
-    config.elasticsearchUrl = '';
-    config.alertmanagerUrl = '';
-    const { client } = await createTestClient(config);
+    delete process.env.ELASTICSEARCH_URL;
+    delete process.env.ALERTMANAGER_URL;
+    const { client } = await createTestClient();
     const result = await client.listTools();
     expect(result.tools.length).toBe(23);
   });

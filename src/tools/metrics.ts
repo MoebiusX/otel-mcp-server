@@ -1,23 +1,19 @@
 /**
- * Metrics tools — query Prometheus for metrics, alerts, and metadata.
+ * Metrics skill — query Prometheus for metrics, alerts, and metadata.
  *
- * Tools:
- *   metrics_query        — Instant PromQL query
- *   metrics_query_range  — Range PromQL query (time series)
- *   metrics_targets      — List scrape targets and health
- *   metrics_alerts       — Active alerting rules
- *   metrics_metadata     — Metric type/help/unit lookup
- *   metrics_label_values — List values for a label
+ * Tools: metrics_query, metrics_query_range, metrics_targets, metrics_alerts,
+ *        metrics_metadata, metrics_label_values
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Config } from '../config.js';
-import { createFetcher, textResult, errorResult } from '../helpers.js';
+import type { Skill, SkillHelpers } from '../skill.js';
+import { textResult, errorResult } from '../helpers.js';
 
-export function registerMetricsTools(server: McpServer, config: Config): void {
-  const promUrl = `${config.prometheusUrl}${config.prometheusPathPrefix}`;
-  const fetchJSON = createFetcher(config.timeoutMs, config.auth.prometheus, 'prometheus');
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const promUrl = helpers.env('PROMETHEUS_URL', 'http://localhost:9090')
+                + helpers.env('PROMETHEUS_PATH_PREFIX', '');
+  const fetchJSON = helpers.createFetcher('PROMETHEUS', 'prometheus');
 
   // ── metrics_query ─────────────────────────────────────────────────────────
 
@@ -166,3 +162,13 @@ export function registerMetricsTools(server: McpServer, config: Config): void {
     },
   );
 }
+
+export const skill: Skill = {
+  id: 'metrics',
+  name: 'Prometheus Metrics',
+  description: 'Query metrics, alerts, and metadata via the Prometheus API',
+  tools: 6,
+  backends: ['Prometheus'],
+  isAvailable: () => true,
+  register: registerTools,
+};

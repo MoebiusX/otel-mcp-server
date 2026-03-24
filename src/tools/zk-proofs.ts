@@ -1,24 +1,17 @@
 /**
- * ZK proof tools — query zero-knowledge proof APIs.
+ * ZK Proofs skill — query zero-knowledge proof APIs.
  *
- * These tools are optional and require an application API that exposes
- * ZK proof endpoints (e.g. KrystalineX's /api/public/zk/* routes).
- *
- * Tools:
- *   zk_proof_get    — Retrieve a ZK-SNARK proof for a specific trade
- *   zk_proof_verify — Verify a ZK-SNARK proof server-side
- *   zk_solvency     — Get the latest solvency proof
- *   zk_stats         — Aggregate ZK proof statistics
+ * Tools: zk_proof_get, zk_proof_verify, zk_solvency, zk_stats
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Config } from '../config.js';
-import { createFetcher, textResult, errorResult } from '../helpers.js';
+import type { Skill, SkillHelpers } from '../skill.js';
+import { textResult, errorResult } from '../helpers.js';
 
-export function registerZKTools(server: McpServer, config: Config): void {
-  const { appApiUrl } = config;
-  const fetchJSON = createFetcher(config.timeoutMs, config.auth.appApi, 'app-api');
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const appApiUrl = helpers.env('APP_API_URL', 'http://localhost:5000');
+  const fetchJSON = helpers.createFetcher('APP_API', 'app-api');
 
   // ── zk_proof_get ──────────────────────────────────────────────────────────
 
@@ -92,3 +85,13 @@ export function registerZKTools(server: McpServer, config: Config): void {
     },
   );
 }
+
+export const skill: Skill = {
+  id: 'zk-proofs',
+  name: 'ZK Proofs',
+  description: 'Query zero-knowledge proof APIs for trade proofs and solvency verification',
+  tools: 4,
+  backends: ['App API'],
+  isAvailable: () => true,
+  register: registerTools,
+};

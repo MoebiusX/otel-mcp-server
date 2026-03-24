@@ -1,22 +1,17 @@
 /**
- * Trace tools — query distributed traces via the Jaeger Query API.
+ * Traces skill — query distributed traces via the Jaeger Query API.
  *
- * Tools:
- *   traces_search       — Search traces by service, operation, tags, duration
- *   trace_get            — Get full trace detail (all spans)
- *   traces_services      — List all reporting services
- *   traces_operations    — List operations for a service
- *   traces_dependencies  — Service dependency graph
+ * Tools: traces_search, trace_get, traces_services, traces_operations, traces_dependencies
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Config } from '../config.js';
-import { createFetcher, textResult, errorResult, parseDuration } from '../helpers.js';
+import type { Skill, SkillHelpers } from '../skill.js';
+import { textResult, errorResult, parseDuration } from '../helpers.js';
 
-export function registerTraceTools(server: McpServer, config: Config): void {
-  const { jaegerUrl } = config;
-  const fetchJSON = createFetcher(config.timeoutMs, config.auth.jaeger, 'jaeger');
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const jaegerUrl = helpers.env('JAEGER_URL', 'http://localhost:16686');
+  const fetchJSON = helpers.createFetcher('JAEGER', 'jaeger');
 
   // ── traces_search ─────────────────────────────────────────────────────────
 
@@ -168,3 +163,13 @@ export function registerTraceTools(server: McpServer, config: Config): void {
     },
   );
 }
+
+export const skill: Skill = {
+  id: 'traces',
+  name: 'Distributed Traces',
+  description: 'Search and analyze distributed traces via the Jaeger Query API',
+  tools: 5,
+  backends: ['Jaeger'],
+  isAvailable: () => true,
+  register: registerTools,
+};

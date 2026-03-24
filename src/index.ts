@@ -3,41 +3,40 @@
 /**
  * OpenTelemetry MCP Server
  *
- * Exposes traces (Jaeger), metrics (Prometheus), logs (Loki),
- * Elasticsearch, Alertmanager, and optionally ZK proofs as MCP
- * tools for AI agents.
+ * Exposes telemetry backends as MCP tools for AI agents.
+ * Each backend is a "skill" — a self-contained plugin that
+ * self-configures from environment variables.
  *
  * Transports:
  *   stdio   — Default. For Claude Desktop, GitHub Copilot, etc.
  *   HTTP    — Use --http <port> for remote / multi-client access.
  *
  * Usage:
- *   otel-mcp-server                  # stdio mode
- *   otel-mcp-server --http 3001      # HTTP mode on port 3001
- *   otel-mcp-server --tools traces,metrics,logs   # only core OTEL tools
+ *   otel-mcp-server                                # stdio mode
+ *   otel-mcp-server --http 3001                    # HTTP mode
+ *   otel-mcp-server --tools traces,metrics,logs    # only core OTEL tools
  */
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadConfig } from './config.js';
-import { createServer, VERSION, ALL_TOOL_GROUPS } from './server.js';
-import type { ToolGroup, ServerOptions } from './server.js';
+import { createServer, VERSION, allSkills } from './server.js';
+import type { ServerOptions } from './server.js';
 import { loadClientKeys, validateClientKey } from './auth.js';
 import { metrics, serializeMetrics } from './metrics.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  const validIds = allSkills.map(s => s.id);
 
   // Parse --tools flag
   const toolsIndex = args.indexOf('--tools');
   const options: ServerOptions = {};
   if (toolsIndex !== -1 && args[toolsIndex + 1]) {
     const toolNames = args[toolsIndex + 1]!.split(',').map(t => t.trim());
-    options.tools = toolNames.filter(t => (ALL_TOOL_GROUPS as readonly string[]).includes(t)) as ToolGroup[];
+    options.tools = toolNames.filter(t => validIds.includes(t));
   }
 
-  const config = loadConfig();
-  const server = createServer(config, options);
-  const enabledTools = options.tools || ALL_TOOL_GROUPS;
+  const server = createServer(options);
+  const enabledIds = new Set(options.tools || validIds);
 
   // Parse --http flag
   const httpIndex = args.indexOf('--http');
@@ -67,7 +66,9 @@ async function main(): Promise<void> {
           server: 'otel-mcp-server',
           version: VERSION,
           auth: authEnabled ? 'enabled' : 'disabled',
-          tools: enabledTools,
+          skills: allSkills
+            .filter(s => enabledIds.has(s.id))
+            .map(s => ({ id: s.id, available: s.isAvailable(), tools: s.tools })),
         }));
         return;
       }
@@ -126,13 +127,15 @@ async function main(): Promise<void> {
       console.error(`✓ otel-mcp-server v${VERSION} listening on http://0.0.0.0:${port}`);
       console.error(`  Health:  http://localhost:${port}/health`);
       console.error(`  Metrics: http://localhost:${port}/metrics`);
-      console.error(`  Jaeger:  ${config.jaegerUrl}`);
-      console.error(`  Prom:    ${config.prometheusUrl}${config.prometheusPathPrefix}`);
-      console.error(`  Loki:    ${config.lokiUrl}`);
-      if (config.elasticsearchUrl) console.error(`  ES:      ${config.elasticsearchUrl}`);
-      if (config.alertmanagerUrl)  console.error(`  AM:      ${config.alertmanagerUrl}`);
-      if (options.tools) {
-        console.error(`  Tools:   ${options.tools.join(', ')}`);
+      console.error(`  Skills:`);
+      for (const skill of allSkills) {
+        if (!enabledIds.has(skill.id)) continue;
+        const available = skill.isAvailable();
+        const icon = available ? '✓' : '✗';
+        const detail = available
+          ? `${skill.name} (${skill.tools} tools) [${skill.backends.join(', ')}]`
+          : 'not configured';
+        console.error(`    ${icon} ${skill.id.padEnd(14)} — ${detail}`);
       }
     });
   } else {

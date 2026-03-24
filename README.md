@@ -1,6 +1,6 @@
 # otel-mcp-server
 
-An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemetry** observability stack — traces, metrics, logs, and optionally ZK proofs — as tools for AI agents.
+An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemetry** observability stack — traces, metrics, logs, and more — as tools for AI agents. Built on a **Skill** plugin architecture for easy extensibility.
 
 > Give any LLM agent the ability to query your Jaeger traces, run PromQL, search Loki logs, and investigate production issues — through a standard protocol.
 
@@ -9,17 +9,26 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 │  Claude Desktop │ ◄──────────────────────► │                  │
 │  GitHub Copilot │                          │  otel-mcp-server │──► Jaeger   (traces)
 │  Custom Agent   │                          │                  │──► Prometheus (metrics)
-└─────────────────┘                          │   23 tools       │──► Loki     (logs)
-                                             │   authenticated  │──► App API  (ZK proofs)
-                                             └──────────────────┘
+└─────────────────┘                          │   7 skills       │──► Loki     (logs)
+                                             │   32 tools       │──► Elasticsearch
+                                             │   authenticated  │──► Alertmanager
+                                             └──────────────────┘──► App API  (ZK/system)
 ```
+
+## Example
+
+> *"What's running, what's healthy, and what needs attention?"* — answered in seconds by an AI agent using this MCP server against a local Docker Compose stack:
+
+![MCP server exploring a local observability stack — showing Jaeger, Prometheus, and Loki backend status, active alerts, and key findings](docs/sample.png)
 
 ## Features
 
-- **23 tools** across 5 domains — traces, metrics, logs, ZK proofs, system health
+- **32 tools** across 7 skills — traces, metrics, logs, Elasticsearch, Alertmanager, ZK proofs, system health
+- **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
-- **Selective tool groups** — enable only the tools you need (`--tools traces,metrics,logs`)
+- **Selective skills** — enable only the skills you need (`--tools traces,metrics,logs`)
+- **Self-metrics** — `GET /metrics` endpoint with tool call counts, backend latencies, auth attempts
 - **Container-native** — env-var config, K8s Secret mounting, multi-stage Dockerfile
 - **Zero dependencies** beyond the MCP SDK and Zod
 
@@ -28,7 +37,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 ### Install
 
 ```bash
-git clone https://github.com/KrystalineX/otel-mcp-server.git
+git clone https://github.com/MoebiusX/otel-mcp-server.git
 cd otel-mcp-server
 npm install
 npm run build
@@ -49,7 +58,13 @@ node dist/index.js
 
 ```bash
 node dist/index.js --http 3001
-# ✓ otel-mcp-server v1.0.0 listening on http://0.0.0.0:3001
+# ✓ otel-mcp-server v1.2.0 listening on http://0.0.0.0:3001
+#   Skills:
+#     ✓ traces         — Distributed Traces (5 tools) [Jaeger]
+#     ✓ metrics        — Prometheus Metrics (6 tools) [Prometheus]
+#     ✓ logs           — Structured Logs (4 tools) [Loki]
+#     ✓ zk-proofs      — ZK Proofs (4 tools) [App API]
+#     ✓ system         — System Health (4 tools) [App API, Jaeger]
 ```
 
 ### Docker
@@ -60,6 +75,8 @@ docker run -p 3001:3001 \
   -e JAEGER_URL=http://jaeger:16686 \
   -e PROMETHEUS_URL=http://prometheus:9090 \
   -e LOKI_URL=http://loki:3100 \
+  -e ELASTICSEARCH_URL=http://elasticsearch:9200 \
+  -e ALERTMANAGER_URL=http://alertmanager:9093 \
   -e MCP_AUTH_KEYS='{"keys":[{"id":"agent-1","key":"sk-my-secret-key"}]}' \
   otel-mcp-server
 ```
@@ -77,11 +94,13 @@ All configuration is via environment variables. See [`.env.example`](.env.exampl
 | `LOKI_URL` | `http://localhost:3100` | Loki API |
 | `PROMETHEUS_PATH_PREFIX` | _(empty)_ | Path prefix (e.g. `/prometheus`) |
 | `APP_API_URL` | `http://localhost:5000` | Application API (for ZK/system tools) |
+| `ELASTICSEARCH_URL` | _(disabled)_ | Elasticsearch / OpenSearch API |
+| `ALERTMANAGER_URL` | _(disabled)_ | Alertmanager API |
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
 
 ### Backend Authentication
 
-The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`), you can set:
+The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`), you can set:
 
 | Suffix | Effect |
 |--------|--------|
@@ -176,6 +195,11 @@ spec:
               value: "http://prometheus.observability:9090"
             - name: LOKI_URL
               value: "http://loki.observability:3100"
+            # Optional: uncomment to enable Elasticsearch / Alertmanager skills
+            # - name: ELASTICSEARCH_URL
+            #   value: "http://elasticsearch.observability:9200"
+            # - name: ALERTMANAGER_URL
+            #   value: "http://alertmanager.observability:9093"
             - name: PROMETHEUS_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -222,9 +246,13 @@ spec:
                 path: auth-keys.json
 ```
 
-## Tools
+## Skills
 
-### Traces (Jaeger) — 5 tools
+Each telemetry backend is a **skill** — an independent plugin. Skills with configured backends
+are auto-discovered on startup; unconfigured ones (like Elasticsearch without `ELASTICSEARCH_URL`)
+are silently skipped.
+
+### Traces (Jaeger) — `traces` — 5 tools
 
 | Tool | Description |
 |------|-------------|
@@ -234,7 +262,7 @@ spec:
 | `traces_operations` | List operations for a service |
 | `traces_dependencies` | Service dependency graph |
 
-### Metrics (Prometheus) — 6 tools
+### Metrics (Prometheus) — `metrics` — 6 tools
 
 | Tool | Description |
 |------|-------------|
@@ -245,7 +273,7 @@ spec:
 | `metrics_metadata` | Metric type, help, unit lookup |
 | `metrics_label_values` | Label value enumeration |
 
-### Logs (Loki) — 4 tools
+### Logs (Loki) — `logs` — 4 tools
 
 | Tool | Description |
 |------|-------------|
@@ -254,7 +282,30 @@ spec:
 | `logs_label_values` | Values for a label |
 | `logs_tail_context` | Logs correlated with a trace ID |
 
-### ZK Proofs — 4 tools (optional)
+### Elasticsearch / OpenSearch — `elasticsearch` — 5 tools
+
+> Enabled when `ELASTICSEARCH_URL` is set.
+
+| Tool | Description |
+|------|-------------|
+| `es_search` | Full-text search across indices with Lucene query syntax |
+| `es_cluster_health` | Cluster health (green/yellow/red), node and shard counts |
+| `es_indices` | List indices with doc counts, storage size, and health |
+| `es_index_mapping` | Field mappings, types, and analyzers for an index |
+| `es_cat_nodes` | Node resource usage (CPU, heap, disk, load) |
+
+### Alertmanager — `alertmanager` — 4 tools
+
+> Enabled when `ALERTMANAGER_URL` is set.
+
+| Tool | Description |
+|------|-------------|
+| `alertmanager_alerts` | Active alerts with labels, annotations, and routing status |
+| `alertmanager_silences` | List active/pending/expired silences with matchers |
+| `alertmanager_groups` | Alert groups by routing rules and receivers |
+| `alertmanager_status` | Cluster status, version, peer count, and live config |
+
+### ZK Proofs — `zk-proofs` — 4 tools
 
 | Tool | Description |
 |------|-------------|
@@ -263,7 +314,7 @@ spec:
 | `zk_solvency` | Latest solvency proof |
 | `zk_stats` | Aggregate proof statistics |
 
-### System — 4 tools (optional)
+### System — `system` — 4 tools
 
 | Tool | Description |
 |------|-------------|
@@ -272,16 +323,40 @@ spec:
 | `system_health` | Full health check |
 | `system_topology` | Service dependency topology |
 
-### Selective Tool Groups
+### Selective Skills
 
-Only load the tools you need:
+Only load the skills you need:
 
 ```bash
 # Core OTEL only (no ZK / system health)
 node dist/index.js --tools traces,metrics,logs
 
-# Traces + metrics only
-node dist/index.js --http 3001 --tools traces,metrics
+# Traces + metrics + alertmanager
+node dist/index.js --http 3001 --tools traces,metrics,alertmanager
+```
+
+## Self-Metrics
+
+In HTTP mode, `GET /metrics` exposes Prometheus-format metrics about the MCP server itself:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `mcp_tool_calls_total{tool,status}` | Counter | Tool invocation count |
+| `mcp_tool_duration_seconds{tool}` | Histogram | Tool call latency |
+| `mcp_backend_requests_total{backend,status}` | Counter | Outbound backend HTTP requests |
+| `mcp_backend_duration_seconds{backend}` | Histogram | Backend request latency |
+| `mcp_auth_attempts_total{result}` | Counter | Client auth attempts (accepted/rejected) |
+| `mcp_active_sessions` | Gauge | Currently connected MCP sessions |
+| `mcp_uptime_seconds` | Gauge | Server uptime |
+| `mcp_server_info{version}` | Info | Server version metadata |
+
+Scrape with Prometheus:
+
+```yaml
+scrape_configs:
+  - job_name: 'otel-mcp-server'
+    static_configs:
+      - targets: ['otel-mcp-server:3001']
 ```
 
 ## Client Integration
@@ -341,21 +416,60 @@ curl -X POST http://localhost:3001/mcp \
 
 ## Architecture
 
+Each telemetry backend is a **Skill** — a self-contained plugin that declares its tools,
+self-configures from env vars, and registers MCP tools on the server.
+
 ```
 src/
 ├── index.ts              # CLI entry point (stdio / HTTP transport)
-├── server.ts             # MCP server factory (tool registration)
-├── config.ts             # Environment-based configuration
+├── server.ts             # MCP server factory (iterates skills)
+├── skill.ts              # Skill interface + SkillHelpers factory
+├── skills.ts             # Skill registry (one import per backend)
+├── config.ts             # env() helper
 ├── auth.ts               # Backend + client authentication
 ├── helpers.ts            # fetchJSON, createFetcher, utilities
+├── metrics.ts            # Self-metrics (Prometheus format)
 ├── tools/
-│   ├── traces.ts         # Jaeger trace tools
-│   ├── metrics.ts        # Prometheus metrics tools
-│   ├── logs.ts           # Loki log tools
-│   ├── zk-proofs.ts      # ZK proof tools (optional)
-│   └── system.ts         # System health tools (optional)
+│   ├── traces.ts         # Jaeger traces skill (5 tools)
+│   ├── metrics.ts        # Prometheus metrics skill (6 tools)
+│   ├── logs.ts           # Loki logs skill (4 tools)
+│   ├── elasticsearch.ts  # ES/OpenSearch skill (5 tools)
+│   ├── alertmanager.ts   # Alertmanager skill (4 tools)
+│   ├── zk-proofs.ts      # ZK proof skill (4 tools)
+│   └── system.ts         # System health skill (4 tools)
 └── resources/
-    └── overview.ts       # MCP resource: platform overview
+    └── overview.ts       # MCP resource: auto-generated overview
+```
+
+### Adding a new skill
+
+```typescript
+// 1. Create src/tools/tempo.ts
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Skill, SkillHelpers } from '../skill.js';
+
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const tempoUrl = helpers.env('TEMPO_URL');
+  const fetchJSON = helpers.createFetcher('TEMPO', 'tempo');
+
+  server.tool('tempo_search', 'Search traces in Tempo', { ... }, async (params) => {
+    // ...
+  });
+}
+
+export const skill: Skill = {
+  id: 'tempo',
+  name: 'Grafana Tempo',
+  description: 'Query traces via the Grafana Tempo API',
+  tools: 1,
+  backends: ['Tempo'],
+  isAvailable: () => !!process.env.TEMPO_URL,
+  register: registerTools,
+};
+
+// 2. Add to src/skills.ts
+import { skill as tempo } from './tools/tempo.js';
+export const allSkills: Skill[] = [...existingSkills, tempo];
 ```
 
 ### Auth Flow
@@ -381,6 +495,12 @@ npm run lint
 
 # Build
 npm run build
+
+# Tests (99 tests across 7 suites)
+npm test
+
+# Run a single test file
+npx vitest run tests/auth.test.ts
 ```
 
 ## License

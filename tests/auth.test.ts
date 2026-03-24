@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  loadBackendAuth,
+  buildAuth,
   loadClientKeys,
   validateClientKey,
   backendHeaders,
@@ -37,9 +37,9 @@ describe('backendHeaders', () => {
   });
 });
 
-// ─── loadBackendAuth ────────────────────────────────────────────────────────
+// ─── buildAuth ──────────────────────────────────────────────────────────────
 
-describe('loadBackendAuth', () => {
+describe('buildAuth', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -51,59 +51,40 @@ describe('loadBackendAuth', () => {
   });
 
   it('returns empty auth when no env vars set', () => {
-    const auth = loadBackendAuth();
-    expect(auth.jaeger).toEqual({});
-    expect(auth.prometheus).toEqual({});
-    expect(auth.loki).toEqual({});
-    expect(auth.appApi).toEqual({});
+    const auth = buildAuth('JAEGER');
+    expect(auth).toEqual({});
   });
 
-  it('reads Bearer tokens from _AUTH_TOKEN', () => {
+  it('reads Bearer token from _AUTH_TOKEN', () => {
     process.env.JAEGER_AUTH_TOKEN = 'jaeger-token';
-    process.env.PROMETHEUS_AUTH_TOKEN = 'prom-token';
-
-    const auth = loadBackendAuth();
-    expect(auth.jaeger.authorization).toBe('Bearer jaeger-token');
-    expect(auth.prometheus.authorization).toBe('Bearer prom-token');
+    const auth = buildAuth('JAEGER');
+    expect(auth.authorization).toBe('Bearer jaeger-token');
   });
 
   it('reads Basic auth from _AUTH_BASIC', () => {
     process.env.LOKI_AUTH_BASIC = 'admin:secret';
-
-    const auth = loadBackendAuth();
+    const auth = buildAuth('LOKI');
     const expected = `Basic ${Buffer.from('admin:secret').toString('base64')}`;
-    expect(auth.loki.authorization).toBe(expected);
+    expect(auth.authorization).toBe(expected);
   });
 
   it('_AUTH_HEADER overrides _AUTH_TOKEN', () => {
     process.env.JAEGER_AUTH_TOKEN = 'should-be-ignored';
     process.env.JAEGER_AUTH_HEADER = 'Custom my-raw-header';
-
-    const auth = loadBackendAuth();
-    expect(auth.jaeger.authorization).toBe('Custom my-raw-header');
+    const auth = buildAuth('JAEGER');
+    expect(auth.authorization).toBe('Custom my-raw-header');
   });
 
-  it('reads LOKI_TENANT_ID as X-Scope-OrgID', () => {
-    process.env.LOKI_TENANT_ID = 'my-tenant';
-
-    const auth = loadBackendAuth();
-    expect(auth.loki.extraHeaders).toEqual({ 'X-Scope-OrgID': 'my-tenant' });
-  });
-
-  it('combines Loki token and tenant ID', () => {
-    process.env.LOKI_AUTH_TOKEN = 'loki-token';
-    process.env.LOKI_TENANT_ID = 'tenant-1';
-
-    const auth = loadBackendAuth();
-    expect(auth.loki.authorization).toBe('Bearer loki-token');
-    expect(auth.loki.extraHeaders).toEqual({ 'X-Scope-OrgID': 'tenant-1' });
-  });
-
-  it('reads APP_API_AUTH_TOKEN', () => {
+  it('reads APP_API auth token', () => {
     process.env.APP_API_AUTH_TOKEN = 'app-token';
+    const auth = buildAuth('APP_API');
+    expect(auth.authorization).toBe('Bearer app-token');
+  });
 
-    const auth = loadBackendAuth();
-    expect(auth.appApi.authorization).toBe('Bearer app-token');
+  it('reads PROMETHEUS auth token', () => {
+    process.env.PROMETHEUS_AUTH_TOKEN = 'prom-token';
+    const auth = buildAuth('PROMETHEUS');
+    expect(auth.authorization).toBe('Bearer prom-token');
   });
 });
 

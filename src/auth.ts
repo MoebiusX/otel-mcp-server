@@ -2,7 +2,8 @@
  * Authentication for both sides of the MCP server:
  *
  * 1. **Backend auth** — credentials the MCP server uses when calling
- *    Jaeger, Prometheus, Loki, and the application API.
+ *    telemetry backends (Jaeger, Prometheus, Loki, etc.).
+ *    Each skill resolves its own auth via `buildAuth(envPrefix)`.
  *
  * 2. **Client auth** — API keys that clients must present to use
  *    the MCP server (HTTP transport only; stdio is inherently local).
@@ -22,36 +23,15 @@ export interface BackendAuth {
   extraHeaders?: Record<string, string>;
 }
 
-export interface BackendAuthConfig {
-  jaeger: BackendAuth;
-  prometheus: BackendAuth;
-  loki: BackendAuth;
-  appApi: BackendAuth;
-  elasticsearch: BackendAuth;
-  alertmanager: BackendAuth;
-}
-
 /**
- * Build backend auth config from environment variables.
+ * Build backend auth from environment variables for a given prefix.
  *
- * Supported env vars per backend (JAEGER_, PROMETHEUS_, LOKI_, APP_API_):
- *   *_AUTH_TOKEN    — Bearer token (sets Authorization: Bearer <token>)
- *   *_AUTH_BASIC    — Basic auth in user:password format
- *   *_AUTH_HEADER   — Raw Authorization header value (overrides token/basic)
- *   LOKI_TENANT_ID — Sets X-Scope-OrgID header for multi-tenant Loki
+ * Supported env vars (replace PREFIX with e.g. JAEGER, PROMETHEUS, LOKI):
+ *   PREFIX_AUTH_TOKEN   — Bearer token (sets Authorization: Bearer <token>)
+ *   PREFIX_AUTH_BASIC   — Basic auth in user:password format
+ *   PREFIX_AUTH_HEADER  — Raw Authorization header value (overrides token/basic)
  */
-export function loadBackendAuth(): BackendAuthConfig {
-  return {
-    jaeger: buildAuth('JAEGER'),
-    prometheus: buildAuth('PROMETHEUS'),
-    loki: buildLokiAuth(),
-    appApi: buildAuth('APP_API'),
-    elasticsearch: buildAuth('ELASTICSEARCH'),
-    alertmanager: buildAuth('ALERTMANAGER'),
-  };
-}
-
-function buildAuth(prefix: string): BackendAuth {
+export function buildAuth(prefix: string): BackendAuth {
   const header = process.env[`${prefix}_AUTH_HEADER`];
   if (header) return { authorization: header };
 
@@ -65,15 +45,6 @@ function buildAuth(prefix: string): BackendAuth {
   }
 
   return {};
-}
-
-function buildLokiAuth(): BackendAuth {
-  const auth = buildAuth('LOKI');
-  const tenantId = process.env['LOKI_TENANT_ID'];
-  if (tenantId) {
-    auth.extraHeaders = { ...auth.extraHeaders, 'X-Scope-OrgID': tenantId };
-  }
-  return auth;
 }
 
 /**

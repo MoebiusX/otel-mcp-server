@@ -1,26 +1,19 @@
 /**
- * Alertmanager tools — query active alerts, silences, and alert groups.
+ * Alertmanager skill — query active alerts, silences, and alert groups.
  *
- * While Prometheus provides alert *rules*, Alertmanager manages the live
- * alert lifecycle: routing, grouping, silencing, and inhibition.
- *
- * Tools:
- *   alertmanager_alerts   — Active alerts with labels and annotations
- *   alertmanager_silences — List active and expired silences
- *   alertmanager_groups   — Alert groups (how alerts are grouped by routing)
- *   alertmanager_status   — Alertmanager cluster and config status
+ * Tools: alertmanager_alerts, alertmanager_silences, alertmanager_groups, alertmanager_status
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Config } from '../config.js';
-import { createFetcher, textResult, errorResult } from '../helpers.js';
+import type { Skill, SkillHelpers } from '../skill.js';
+import { textResult, errorResult } from '../helpers.js';
 
-export function registerAlertmanagerTools(server: McpServer, config: Config): void {
-  const amUrl = config.alertmanagerUrl;
-  if (!amUrl) return; // skip if not configured
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const amUrl = helpers.env('ALERTMANAGER_URL');
+  if (!amUrl) return;
 
-  const fetchJSON = createFetcher(config.timeoutMs, config.auth.alertmanager, 'alertmanager');
+  const fetchJSON = helpers.createFetcher('ALERTMANAGER', 'alertmanager');
 
   // ── alertmanager_alerts ───────────────────────────────────────────────────
 
@@ -149,3 +142,13 @@ export function registerAlertmanagerTools(server: McpServer, config: Config): vo
     },
   );
 }
+
+export const skill: Skill = {
+  id: 'alertmanager',
+  name: 'Alertmanager',
+  description: 'Query active alerts, silences, and alert groups via the Alertmanager v2 API',
+  tools: 4,
+  backends: ['Alertmanager'],
+  isAvailable: () => !!process.env['ALERTMANAGER_URL'],
+  register: registerTools,
+};
