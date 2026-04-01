@@ -192,6 +192,10 @@ goalert:
   persistence:
     enabled: true
     size: 5Gi
+  provision:
+    enabled: true
+    adminPassword: "KrystalineX2026!"
+    carlosPassword: "KrystalineX2026!"
 
 alertmanager:
   enabled: true
