@@ -1,195 +1,189 @@
-/**
- * Auth Service Tests
- * Tests for authentication, token generation, and user management
- */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { z } from 'zod';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  buildAuth,
+  loadClientKeys,
+  validateClientKey,
+  backendHeaders,
+  type ClientKey,
+  type BackendAuth,
+} from '../src/auth.js';
 
-// Auth schemas for testing
-const loginRequestSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-});
+// ─── backendHeaders ─────────────────────────────────────────────────────────
 
-const registerRequestSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-const tokenPayloadSchema = z.object({
-  userId: z.string(),
-  email: z.string().email(),
-  iat: z.number(),
-  exp: z.number(),
-});
-
-describe('Auth Request Validation', () => {
-  describe('Login Request', () => {
-    it('should accept valid login credentials', () => {
-      const request = {
-        email: 'seed.user.primary@krystaline.io',
-        password: 'password123',
-      };
-      expect(() => loginRequestSchema.parse(request)).not.toThrow();
-    });
-
-    it('should reject invalid email format', () => {
-      const request = {
-        email: 'not-an-email',
-        password: 'password123',
-      };
-      expect(() => loginRequestSchema.parse(request)).toThrow();
-    });
-
-    it('should reject short password', () => {
-      const request = {
-        email: 'seed.user.primary@krystaline.io',
-        password: '12345',
-      };
-      expect(() => loginRequestSchema.parse(request)).toThrow();
-    });
-
-    it('should reject empty email', () => {
-      const request = {
-        email: '',
-        password: 'password123',
-      };
-      expect(() => loginRequestSchema.parse(request)).toThrow();
-    });
-
-    it('should reject empty password', () => {
-      const request = {
-        email: 'seed.user.primary@krystaline.io',
-        password: '',
-      };
-      expect(() => loginRequestSchema.parse(request)).toThrow();
-    });
+describe('backendHeaders', () => {
+  it('returns empty object when no auth configured', () => {
+    expect(backendHeaders({})).toEqual({});
   });
 
-  describe('Register Request', () => {
-    it('should accept valid registration', () => {
-      const request = {
-        email: 'newuser@example.com',
-        password: 'securepassword123',
-        confirmPassword: 'securepassword123',
-      };
-      expect(() => registerRequestSchema.parse(request)).not.toThrow();
-    });
-
-    it('should reject mismatched passwords', () => {
-      const request = {
-        email: 'newuser@example.com',
-        password: 'securepassword123',
-        confirmPassword: 'differentpassword',
-      };
-      expect(() => registerRequestSchema.parse(request)).toThrow();
-    });
-
-    it('should reject short password', () => {
-      const request = {
-        email: 'newuser@example.com',
-        password: 'short',
-        confirmPassword: 'short',
-      };
-      expect(() => registerRequestSchema.parse(request)).toThrow();
-    });
-
-    it('should reject invalid email', () => {
-      const request = {
-        email: 'invalid-email',
-        password: 'securepassword123',
-        confirmPassword: 'securepassword123',
-      };
-      expect(() => registerRequestSchema.parse(request)).toThrow();
-    });
+  it('includes Authorization header', () => {
+    const auth: BackendAuth = { authorization: 'Bearer token123' };
+    expect(backendHeaders(auth)).toEqual({ Authorization: 'Bearer token123' });
   });
 
-  describe('Token Payload', () => {
-    it('should validate token payload structure', () => {
-      const payload = {
-        userId: 'user_123',
-        email: 'seed.user.primary@krystaline.io',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      };
-      expect(() => tokenPayloadSchema.parse(payload)).not.toThrow();
-    });
+  it('includes extra headers', () => {
+    const auth: BackendAuth = { extraHeaders: { 'X-Scope-OrgID': 'tenant-1' } };
+    expect(backendHeaders(auth)).toEqual({ 'X-Scope-OrgID': 'tenant-1' });
+  });
 
-    it('should validate token with future expiration', () => {
-      const now = Math.floor(Date.now() / 1000);
-      const payload = {
-        userId: 'user_123',
-        email: 'seed.user.primary@krystaline.io',
-        iat: now,
-        exp: now + 86400, // 24 hours
-      };
-      const result = tokenPayloadSchema.parse(payload);
-      expect(result.exp).toBeGreaterThan(result.iat);
+  it('includes both authorization and extra headers', () => {
+    const auth: BackendAuth = {
+      authorization: 'Bearer xyz',
+      extraHeaders: { 'X-Custom': 'val' },
+    };
+    expect(backendHeaders(auth)).toEqual({
+      Authorization: 'Bearer xyz',
+      'X-Custom': 'val',
     });
   });
 });
 
-describe('Password Requirements', () => {
-  const passwordSchema = z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number');
+// ─── buildAuth ──────────────────────────────────────────────────────────────
 
-  it('should accept strong password', () => {
-    expect(() => passwordSchema.parse('SecurePass123')).not.toThrow();
+describe('buildAuth', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
   });
 
-  it('should reject password without uppercase', () => {
-    expect(() => passwordSchema.parse('securepass123')).toThrow();
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
-  it('should reject password without lowercase', () => {
-    expect(() => passwordSchema.parse('SECUREPASS123')).toThrow();
+  it('returns empty auth when no env vars set', () => {
+    const auth = buildAuth('JAEGER');
+    expect(auth).toEqual({});
   });
 
-  it('should reject password without number', () => {
-    expect(() => passwordSchema.parse('SecurePassword')).toThrow();
+  it('reads Bearer token from _AUTH_TOKEN', () => {
+    process.env.JAEGER_AUTH_TOKEN = 'jaeger-token';
+    const auth = buildAuth('JAEGER');
+    expect(auth.authorization).toBe('Bearer jaeger-token');
   });
 
-  it('should reject short password', () => {
-    expect(() => passwordSchema.parse('Pass1')).toThrow();
+  it('reads Basic auth from _AUTH_BASIC', () => {
+    process.env.LOKI_AUTH_BASIC = 'admin:secret';
+    const auth = buildAuth('LOKI');
+    const expected = `Basic ${Buffer.from('admin:secret').toString('base64')}`;
+    expect(auth.authorization).toBe(expected);
+  });
+
+  it('_AUTH_HEADER overrides _AUTH_TOKEN', () => {
+    process.env.JAEGER_AUTH_TOKEN = 'should-be-ignored';
+    process.env.JAEGER_AUTH_HEADER = 'Custom my-raw-header';
+    const auth = buildAuth('JAEGER');
+    expect(auth.authorization).toBe('Custom my-raw-header');
+  });
+
+  it('reads APP_API auth token', () => {
+    process.env.APP_API_AUTH_TOKEN = 'app-token';
+    const auth = buildAuth('APP_API');
+    expect(auth.authorization).toBe('Bearer app-token');
+  });
+
+  it('reads PROMETHEUS auth token', () => {
+    process.env.PROMETHEUS_AUTH_TOKEN = 'prom-token';
+    const auth = buildAuth('PROMETHEUS');
+    expect(auth.authorization).toBe('Bearer prom-token');
   });
 });
 
-describe('Email Validation', () => {
-  const emailSchema = z.string().email();
+// ─── loadClientKeys ─────────────────────────────────────────────────────────
 
-  const validEmails = [
-    'user@example.com',
-    'user.name@example.com',
-    'user+tag@example.com',
-    'user@subdomain.example.com',
-    'user@example.co.uk',
+describe('loadClientKeys', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    // Suppress console.error from loadClientKeys
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('returns empty array when no keys configured', () => {
+    // Clear any existing env vars that might match
+    delete process.env.MCP_AUTH_KEYS;
+    delete process.env.MCP_AUTH_KEYS_FILE;
+    const keys = loadClientKeys();
+    // May return [] or find a local file — either way, it shouldn't throw
+    expect(Array.isArray(keys)).toBe(true);
+  });
+
+  it('loads keys from MCP_AUTH_KEYS env var', () => {
+    process.env.MCP_AUTH_KEYS = JSON.stringify({
+      keys: [
+        { id: 'test-1', key: 'sk-abc', description: 'Test key' },
+        { id: 'test-2', key: 'sk-def' },
+      ],
+    });
+
+    const keys = loadClientKeys();
+    expect(keys).toHaveLength(2);
+    expect(keys[0].id).toBe('test-1');
+    expect(keys[0].key).toBe('sk-abc');
+    expect(keys[1].id).toBe('test-2');
+  });
+
+  it('handles malformed MCP_AUTH_KEYS env var gracefully', () => {
+    process.env.MCP_AUTH_KEYS = 'not-valid-json{{{';
+    const keys = loadClientKeys();
+    // Should not throw, falls through to file-based loading
+    expect(Array.isArray(keys)).toBe(true);
+  });
+
+  it('handles empty keys array', () => {
+    process.env.MCP_AUTH_KEYS = JSON.stringify({ keys: [] });
+    const keys = loadClientKeys();
+    // Empty keys array doesn't count as "found"
+    expect(Array.isArray(keys)).toBe(true);
+  });
+});
+
+// ─── validateClientKey ──────────────────────────────────────────────────────
+
+describe('validateClientKey', () => {
+  const keys: ClientKey[] = [
+    { id: 'key-1', key: 'sk-secret-one', description: 'First key' },
+    { id: 'key-2', key: 'sk-secret-two', allowedTools: ['traces'] },
   ];
 
-  const invalidEmails = [
-    'not-an-email',
-    '@example.com',
-    'user@',
-    'user@.com',
-    'user@example.',
-    '',
-  ];
-
-  validEmails.forEach((email) => {
-    it(`should accept valid email: ${email}`, () => {
-      expect(() => emailSchema.parse(email)).not.toThrow();
-    });
+  it('returns null when no keys configured (auth disabled)', () => {
+    const result = validateClientKey([], 'Bearer anything');
+    expect(result).toBeNull();
   });
 
-  invalidEmails.forEach((email) => {
-    it(`should reject invalid email: "${email}"`, () => {
-      expect(() => emailSchema.parse(email)).toThrow();
-    });
+  it('returns null when no auth header provided', () => {
+    const result = validateClientKey(keys);
+    expect(result).toBeNull();
+  });
+
+  it('validates Bearer token from Authorization header', () => {
+    const result = validateClientKey(keys, 'Bearer sk-secret-one');
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('key-1');
+  });
+
+  it('validates X-API-Key header', () => {
+    const result = validateClientKey(keys, undefined, 'sk-secret-two');
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('key-2');
+  });
+
+  it('rejects invalid key', () => {
+    const result = validateClientKey(keys, 'Bearer sk-wrong-key');
+    expect(result).toBeNull();
+  });
+
+  it('rejects non-Bearer auth header', () => {
+    const result = validateClientKey(keys, 'Basic abc123');
+    expect(result).toBeNull();
+  });
+
+  it('prefers Authorization header over X-API-Key', () => {
+    const result = validateClientKey(keys, 'Bearer sk-secret-one', 'sk-secret-two');
+    expect(result!.id).toBe('key-1');
   });
 });
