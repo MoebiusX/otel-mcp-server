@@ -9,9 +9,10 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 │  Claude Desktop │ ◄──────────────────────► │                  │
 │  GitHub Copilot │                          │  otel-mcp-server │──► Jaeger   (traces)
 │  Custom Agent   │                          │                  │──► Prometheus (metrics)
-└─────────────────┘                          │   7 skills       │──► Loki     (logs)
-                                             │   32 tools       │──► Elasticsearch
+└─────────────────┘                          │   8 skills       │──► Loki     (logs)
+                                             │   42 tools       │──► Elasticsearch
                                              │   authenticated  │──► Alertmanager
+                                             │                  │──► Grafana
                                              └──────────────────┘──► App API  (ZK/system)
 ```
 
@@ -31,7 +32,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **32 tools** across 7 skills — traces, metrics, logs, Elasticsearch, Alertmanager, ZK proofs, system health
+- **42 tools** across 8 skills — traces, metrics, logs, Elasticsearch, Alertmanager, Grafana, ZK proofs, system health
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
@@ -39,6 +40,8 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 - **Self-metrics** — `GET /metrics` endpoint with tool call counts, backend latencies, auth attempts
 - **Container-native** — env-var config, K8s Secret mounting, multi-stage Dockerfile
 - **Zero dependencies** beyond the MCP SDK and Zod
+
+For role-based Studio workflows, see [docs/studio-user-journeys.md](docs/studio-user-journeys.md).
 
 ## Quick Start
 
@@ -85,6 +88,8 @@ docker run -p 3001:3001 \
   -e LOKI_URL=http://loki:3100 \
   -e ELASTICSEARCH_URL=http://elasticsearch:9200 \
   -e ALERTMANAGER_URL=http://alertmanager:9093 \
+  -e GRAFANA_URL=http://grafana:3000 \
+  -e GRAFANA_AUTH_TOKEN=glsa_xxx \
   -e MCP_AUTH_KEYS='{"keys":[{"id":"agent-1","key":"sk-my-secret-key"}]}' \
   otel-mcp-server
 ```
@@ -104,11 +109,14 @@ All configuration is via environment variables. See [`.env.example`](.env.exampl
 | `APP_API_URL` | `http://localhost:5000` | Application API (for ZK/system tools) |
 | `ELASTICSEARCH_URL` | _(disabled)_ | Elasticsearch / OpenSearch API |
 | `ALERTMANAGER_URL` | _(disabled)_ | Alertmanager API |
+| `GRAFANA_URL` | _(disabled)_ | Grafana API |
+| `GRAFANA_DEFAULT_FROM` | `now-1h` | Default Grafana query range start |
+| `GRAFANA_MAX_ITEMS` | `50` | Default Grafana list/search limit |
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
 
 ### Backend Authentication
 
-The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`), you can set:
+The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`), you can set:
 
 | Suffix | Effect |
 |--------|--------|
@@ -121,6 +129,7 @@ Special:
 | Variable | Effect |
 |----------|--------|
 | `LOKI_TENANT_ID` | Sets `X-Scope-OrgID` header for multi-tenant Loki |
+| `GRAFANA_ORG_ID` | Sets `X-Grafana-Org-Id` header for multi-org Grafana |
 
 **Example — Prometheus behind OAuth proxy + multi-tenant Loki:**
 
@@ -203,11 +212,18 @@ spec:
               value: "http://prometheus.observability:9090"
             - name: LOKI_URL
               value: "http://loki.observability:3100"
-            # Optional: uncomment to enable Elasticsearch / Alertmanager skills
+            # Optional: uncomment to enable Elasticsearch / Alertmanager / Grafana skills
             # - name: ELASTICSEARCH_URL
             #   value: "http://elasticsearch.observability:9200"
             # - name: ALERTMANAGER_URL
             #   value: "http://alertmanager.observability:9093"
+            # - name: GRAFANA_URL
+            #   value: "http://grafana.observability:3000"
+            # - name: GRAFANA_AUTH_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: otel-mcp-auth
+            #       key: GRAFANA_AUTH_TOKEN
             - name: PROMETHEUS_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -312,6 +328,23 @@ are silently skipped.
 | `alertmanager_silences` | List active/pending/expired silences with matchers |
 | `alertmanager_groups` | Alert groups by routing rules and receivers |
 | `alertmanager_status` | Cluster status, version, peer count, and live config |
+
+### Grafana — `grafana` — 10 tools
+
+> Enabled when `GRAFANA_URL` is set. All Grafana tools are read-only and intended for verification/interrogation workflows.
+
+| Tool | Description |
+|------|-------------|
+| `grafana_health` | Grafana health, version, commit, and database status |
+| `grafana_datasources` | List data sources with safe metadata |
+| `grafana_datasource_health` | Check one data source by UID |
+| `grafana_datasource_query` | Run read-only queries through Grafana's unified data source query API |
+| `grafana_dashboards_search` | Search dashboards and folders by text, tag, folder, type, or starred status |
+| `grafana_dashboard_get` | Get dashboard structure, panels, variables, data source references, and panel queries |
+| `grafana_folders` | List folders with UID, title, URL, and metadata |
+| `grafana_alert_rules` | List Grafana-managed alert rules and query references |
+| `grafana_alerts` | List active Grafana Alertmanager alert instances |
+| `grafana_contact_points` | List alert contact points or receivers with safe integration status metadata |
 
 ### ZK Proofs — `zk-proofs` — 4 tools
 
@@ -443,6 +476,7 @@ src/
 │   ├── logs.ts           # Loki logs skill (4 tools)
 │   ├── elasticsearch.ts  # ES/OpenSearch skill (5 tools)
 │   ├── alertmanager.ts   # Alertmanager skill (4 tools)
+│   ├── grafana.ts        # Grafana read-only skill (10 tools)
 │   ├── zk-proofs.ts      # ZK proof skill (4 tools)
 │   └── system.ts         # System health skill (4 tools)
 └── resources/
@@ -504,7 +538,7 @@ npm run lint
 # Build
 npm run build
 
-# Tests (99 tests across 7 suites)
+# Tests (106 tests across 8 suites)
 npm test
 
 # Run a single test file

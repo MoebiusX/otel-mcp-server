@@ -1,3 +1,5 @@
+import type { FetchOptions } from './helpers.js';
+
 /**
  * Self-metrics — lightweight Prometheus-format metrics for the MCP server itself.
  *
@@ -204,7 +206,7 @@ export function serializeMetrics(): string {
 }
 
 // Set server info label
-metrics.serverInfo.set({ version: '1.1.0' }, 1);
+metrics.serverInfo.set({ version: '1.2.0' }, 1);
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Instrumented fetch wrapper
@@ -215,14 +217,14 @@ metrics.serverInfo.set({ version: '1.1.0' }, 1);
  * Tracks request count and duration per backend.
  */
 export function instrumentFetcher(
-  fetcher: (url: string, overrideTimeout?: number) => Promise<any>,
+  fetcher: (url: string, overrideTimeout?: number, options?: FetchOptions) => Promise<any>,
   backend: string,
-): (url: string, overrideTimeout?: number) => Promise<any> {
-  return async (url: string, overrideTimeout?: number) => {
+): (url: string, overrideTimeout?: number, options?: FetchOptions) => Promise<any> {
+  return async (url: string, overrideTimeout?: number, options?: FetchOptions) => {
     const start = performance.now();
     const labels = { backend };
     try {
-      const result = await fetcher(url, overrideTimeout);
+      const result = await fetcher(url, overrideTimeout, options);
       metrics.backendRequests.inc({ ...labels, status: 'success' });
       return result;
     } catch (err) {
