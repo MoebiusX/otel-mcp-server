@@ -11,6 +11,7 @@ import { skill as metrics } from './tools/metrics.js';
 import { skill as logs } from './tools/logs.js';
 import { skill as elasticsearch } from './tools/elasticsearch.js';
 import { skill as alertmanager } from './tools/alertmanager.js';
+import { skill as grafana } from './tools/grafana.js';
 import { skill as zkProofs } from './tools/zk-proofs.js';
 import { skill as system } from './tools/system.js';
 import type { Skill } from './skill.js';
@@ -21,6 +22,7 @@ export const allSkills: Skill[] = [
   logs,
   elasticsearch,
   alertmanager,
+  grafana,
   zkProofs,
   system,
 ];

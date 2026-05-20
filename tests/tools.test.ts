@@ -39,6 +39,9 @@ async function createTestClient(tools?: string[]) {
 
 describe('tool listing', () => {
   it('lists all 23 tools when all groups enabled', async () => {
+    delete process.env.ELASTICSEARCH_URL;
+    delete process.env.ALERTMANAGER_URL;
+    delete process.env.GRAFANA_URL;
     const { client } = await createTestClient();
     const result = await client.listTools();
     expect(result.tools.length).toBe(23);

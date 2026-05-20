@@ -5,6 +5,32 @@ All notable changes to otel-mcp-server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Grafana** read-only skill (10 tools):
+  - `grafana_health` — Health, version, commit, and database status
+  - `grafana_datasources` — Data source inventory with safe metadata
+  - `grafana_datasource_health` — Data source health by UID
+  - `grafana_datasource_query` — Read-only queries through Grafana's unified data source query API
+  - `grafana_dashboards_search` — Dashboard and folder search
+  - `grafana_dashboard_get` — Dashboard structure, panels, variables, data source references, and panel queries
+  - `grafana_folders` — Folder inventory
+  - `grafana_alert_rules` — Grafana-managed alert rules
+  - `grafana_alerts` — Active Grafana Alertmanager alert instances
+  - `grafana_contact_points` — Contact point / receiver status metadata
+
+### Fixed
+
+- Instrumented backend fetchers now forward request method/body options, which is required for `POST /api/ds/query` and Elasticsearch searches.
+- `mcp_server_info{version}` now reports `1.2.0` instead of stale `1.1.0` metadata.
+
+### Changed
+
+- Fully configured tool count: 32 → 42.
+- Test count: 99 → 106.
+
 ## [1.2.0] - 2026-03-24
 
 ### Added

@@ -43,7 +43,7 @@ describe('metrics registry', () => {
 
   it('includes server info', () => {
     const output = serializeMetrics();
-    expect(output).toContain('mcp_server_info{version="1.1.0"} 1');
+    expect(output).toContain('mcp_server_info{version="1.2.0"} 1');
   });
 
   it('gauge increments and decrements', () => {
@@ -96,5 +96,23 @@ describe('instrumentFetcher', () => {
 
     const output = serializeMetrics();
     expect(output).toContain('mcp_backend_requests_total{backend="failing-backend",status="error"}');
+  });
+
+  it('forwards request options to the wrapped fetcher', async () => {
+    const mockFetcher = async (url: string, overrideTimeout?: number, options?: { method?: string; body?: string }) => ({
+      url,
+      overrideTimeout,
+      options,
+    });
+    const instrumented = instrumentFetcher(mockFetcher, 'grafana');
+
+    const result = await instrumented('http://grafana:3000/api/ds/query', 30_000, {
+      method: 'POST',
+      body: '{"queries":[]}',
+    });
+
+    expect(result.options.method).toBe('POST');
+    expect(result.options.body).toBe('{"queries":[]}');
+    expect(result.overrideTimeout).toBe(30_000);
   });
 });
