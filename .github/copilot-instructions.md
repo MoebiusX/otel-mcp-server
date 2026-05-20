@@ -11,10 +11,9 @@
 
 ## Validation Before Push or PR
 
-- Run the repository's standard checks before pushing code changes. For this TypeScript project, use:
-  - `npm run lint`
-  - `npm test`
-  - `npm run build`
+- Run the repository's standard checks before pushing code changes.
+- Prefer validation commands documented in the repository's README, contributor guide, package scripts, Makefile, task runner, or CI configuration.
+- If standard checks are not obvious, inspect the repo and run the smallest reliable validation set for the changed files.
 - For documentation-only changes, a full test run is optional unless the user asks for it or the docs affect generated/tested content.
 - If any validation cannot be run, state that clearly in the final summary.
 
