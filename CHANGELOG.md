@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fully configured tool count: 32 → 42 → 111.
 - Skill count: 8 → 25.
-- Test count: 99 → 106 → 148. Added a registry-integrity guard (declared-vs-actual tool counts, unique skill ids and tool names) and behavioral tests for all skills added this cycle.
+- Test count: 99 → 106 → 155. Added a registry-integrity guard (declared-vs-actual tool counts, unique skill ids and tool names), behavioral tests for all skills added this cycle, and node:http-mocked tests for the kubernetes skill's request path.
 
 ## [1.2.0] - 2026-03-24
 
