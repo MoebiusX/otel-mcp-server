@@ -62,5 +62,38 @@ The server exposes its own metrics at \`GET /metrics\` (HTTP mode):
 1. \`es_cluster_health\` to verify cluster status
 2. \`es_indices\` to find relevant indices
 3. \`es_search\` with Lucene query for full-text log search
+
+### Inspect eBPF networking (Cilium)
+1. \`cilium_health\` to confirm the agent and datapath are healthy
+2. \`cilium_endpoints\` to map pods to security identities and state
+3. \`cilium_services\` for eBPF load-balancer programming
+4. \`cilium_policy\` to see the enforced network policy
+
+### Inspect control-plane state via Kubernetes CRDs
+1. \`k8s_api_resources\` to discover which products/CRDs are installed
+2. \`k8s_list\` with the group/version/plural (e.g. group="argoproj.io" plural="rollouts")
+3. \`k8s_get\` for a single object's full status
+4. \`k8s_events\` with \`type: "Warning"\` to see what's failing
+
+### Search logs in ClickHouse
+1. \`clickhouse_tables\` to find the log table
+2. \`clickhouse_table_schema\` to confirm the time/message/level columns
+3. \`clickhouse_logs_search\` (or \`clickhouse_query\` for custom SQL) to retrieve lines
+
+### Find a CPU/memory hotspot (Pyroscope)
+1. \`pyroscope_profile_types\` to see available profiles
+2. \`pyroscope_label_values\` with \`label: "service_name"\` to find your service
+3. \`pyroscope_render\` to get the heaviest functions by self time
+
+### Check policy decisions (OPA)
+1. \`opa_policies\` to see loaded modules
+2. \`opa_query\` with \`q: "data.<pkg>.deny[msg]"\` to enumerate violations
+3. \`opa_data\` to fetch a specific decision document
+
+### Debug service-mesh routing
+1. \`consul_checks\` or \`traefik_services\` to find unhealthy targets
+2. \`envoy_clusters\` to see which upstream endpoints are failing health checks
+3. \`kong_routes\` / \`traefik_routers\` to confirm how requests are routed
+4. \`envoy_stats\` with a \`filter\` like "upstream_rq_5xx" for error counts
 `;
 }

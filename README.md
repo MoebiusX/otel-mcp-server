@@ -5,15 +5,15 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 > Give any LLM agent the ability to query your Jaeger traces, run PromQL, search Loki logs, and investigate production issues — through a standard protocol.
 
 ```
-┌─────────────────┐     MCP (stdio/HTTP)     ┌──────────────────┐
-│  Claude Desktop │ ◄──────────────────────► │                  │
-│  GitHub Copilot │                          │  otel-mcp-server │──► Jaeger   (traces)
-│  Custom Agent   │                          │                  │──► Prometheus (metrics)
-└─────────────────┘                          │   8 skills       │──► Loki     (logs)
-                                             │   42 tools       │──► Elasticsearch
-                                             │   authenticated  │──► Alertmanager
-                                             │                  │──► Grafana
-                                             └──────────────────┘──► App API  (ZK/system)
+┌─────────────────┐     MCP (stdio/HTTP)     ┌──────────────────┐──► Jaeger · Zipkin · Tempo · SkyWalking · Pinpoint
+│  Claude Desktop │ ◄──────────────────────► │                  │──► Prometheus · InfluxDB · OpenTSDB
+│  GitHub Copilot │                          │  otel-mcp-server │──► Loki · ClickHouse · Graylog (logs)
+│  Custom Agent   │                          │                  │──► Elasticsearch · Alertmanager
+└─────────────────┘                          │   25 skills      │──► Grafana · Pyroscope · OPA
+                                             │   111 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
+                                             │   authenticated  │──► Envoy · Consul · Kong · Traefik
+                                             └──────────────────┘──► Fluent Bit · Beats · Vector · Alloy
+                                                                  └─► App API    (ZK/system)
 ```
 
 ## Example
@@ -32,7 +32,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **42 tools** across 8 skills — traces, metrics, logs, Elasticsearch, Alertmanager, Grafana, ZK proofs, system health
+- **111 tools** across 25 skills — traces (Jaeger/Zipkin/Tempo/SkyWalking/Pinpoint), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), ZK proofs, system health
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
@@ -110,13 +110,33 @@ All configuration is via environment variables. See [`.env.example`](.env.exampl
 | `ELASTICSEARCH_URL` | _(disabled)_ | Elasticsearch / OpenSearch API |
 | `ALERTMANAGER_URL` | _(disabled)_ | Alertmanager API |
 | `GRAFANA_URL` | _(disabled)_ | Grafana API |
+| `CILIUM_URL` | _(disabled)_ | Cilium agent REST API (eBPF networking) |
+| `KUBERNETES_URL` | _(in-cluster)_ | kube-apiserver; auto-detected in-cluster via the ServiceAccount mount |
+| `CLICKHOUSE_URL` | _(disabled)_ | ClickHouse HTTP interface |
+| `PYROSCOPE_URL` | _(disabled)_ | Pyroscope HTTP API (continuous profiling) |
+| `OPA_URL` | _(disabled)_ | Open Policy Agent REST API |
+| `ZIPKIN_URL` | _(disabled)_ | Zipkin API v2 |
+| `ENVOY_ADMIN_URL` | _(disabled)_ | Envoy admin API |
+| `CONSUL_URL` | _(disabled)_ | Consul HTTP API |
+| `KONG_ADMIN_URL` | _(disabled)_ | Kong Admin API |
+| `TRAEFIK_URL` | _(disabled)_ | Traefik API |
+| `INFLUX_URL` | _(disabled)_ | InfluxDB HTTP API (InfluxQL) |
+| `OPENTSDB_URL` | _(disabled)_ | OpenTSDB HTTP API |
+| `GRAYLOG_URL` | _(disabled)_ | Graylog REST API |
+| `TEMPO_URL` | _(disabled)_ | Grafana Tempo native TraceQL API |
+| `SKYWALKING_URL` | _(disabled)_ | Apache SkyWalking OAP GraphQL API |
+| `PINPOINT_URL` | _(disabled)_ | Pinpoint web API |
+| `FLUENTBIT_URL` | _(disabled)_ | Fluent Bit HTTP monitoring server |
+| `BEATS_URL` | _(disabled)_ | Beats HTTP monitoring endpoint |
+| `VECTOR_URL` | _(disabled)_ | Vector API (GraphQL + health) |
+| `ALLOY_URL` | _(disabled)_ | Grafana Alloy |
 | `GRAFANA_DEFAULT_FROM` | `now-1h` | Default Grafana query range start |
 | `GRAFANA_MAX_ITEMS` | `50` | Default Grafana list/search limit |
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
 
 ### Backend Authentication
 
-The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`), you can set:
+The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ZIPKIN_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `TEMPO_`, `SKYWALKING_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`), you can set:
 
 | Suffix | Effect |
 |--------|--------|
@@ -130,6 +150,8 @@ Special:
 |----------|--------|
 | `LOKI_TENANT_ID` | Sets `X-Scope-OrgID` header for multi-tenant Loki |
 | `GRAFANA_ORG_ID` | Sets `X-Grafana-Org-Id` header for multi-org Grafana |
+
+> **Kubernetes** uses its own credential scheme rather than the prefix above: it presents a ServiceAccount bearer token (auto-loaded from the in-cluster mount, or `KUBERNETES_TOKEN` / `KUBERNETES_TOKEN_FILE`) and validates TLS against the cluster CA (`KUBERNETES_CA_FILE`, or the in-cluster mount). See [`.env.example`](.env.example).
 
 **Example — Prometheus behind OAuth proxy + multi-tenant Loki:**
 
@@ -272,9 +294,12 @@ spec:
 
 ## Skills
 
-Each telemetry backend is a **skill** — an independent plugin. Skills with configured backends
-are auto-discovered on startup; unconfigured ones (like Elasticsearch without `ELASTICSEARCH_URL`)
-are silently skipped.
+Each telemetry backend is a **skill** — an independent plugin. The core OTel skills
+(`traces`, `metrics`, `logs`) and the app skills (`system`, `zk-proofs`) are **always active**,
+defaulting to `localhost` backends so the server works out of the box. Every other skill is
+**opt-in**: it activates only when its backend URL is set (e.g. `ELASTICSEARCH_URL`, `CILIUM_URL`,
+`CLICKHOUSE_URL`), and is silently skipped otherwise. Use `--tools` to restrict which skills load
+regardless of configuration.
 
 ### Traces (Jaeger) — `traces` — 5 tools
 
@@ -345,6 +370,202 @@ are silently skipped.
 | `grafana_alert_rules` | List Grafana-managed alert rules and query references |
 | `grafana_alerts` | List active Grafana Alertmanager alert instances |
 | `grafana_contact_points` | List alert contact points or receivers with safe integration status metadata |
+
+### Cilium (eBPF networking) — `cilium` — 6 tools
+
+> Enabled when `CILIUM_URL` is set. Targets the cilium-agent REST API. This is the agent
+> control-plane surface; L3/L7 flow observability (Hubble) is gRPC and not yet wired.
+
+| Tool | Description |
+|------|-------------|
+| `cilium_health` | Agent datapath/controller status, kube-apiserver and kvstore connectivity |
+| `cilium_endpoints` | Managed endpoints (pods) with security identity, state, and addressing |
+| `cilium_identities` | Security identities — the numeric identity each label set maps to |
+| `cilium_policy` | Network policy currently enforced, with revision |
+| `cilium_services` | eBPF load-balancing services and their backends |
+| `cilium_nodes` | Nodes known to the agent (incl. cluster-mesh peers) |
+
+### Kubernetes (CRD reader) — `kubernetes` — 5 tools
+
+> Auto-enabled in-cluster (ServiceAccount mount), or set `KUBERNETES_URL` + token out-of-cluster.
+> Read-only (GET only). The generic `k8s_list`/`k8s_get` work for any built-in resource or CRD, so
+> the whole control-plane tier (Argo Rollouts, Flagger, Kyverno, Gatekeeper, KEDA, Chaos Mesh,
+> Cilium policies, Inspektor Gadget, …) is queryable without a bespoke skill per product.
+
+| Tool | Description |
+|------|-------------|
+| `k8s_health` | kube-apiserver connectivity — server version and readiness |
+| `k8s_api_resources` | Discover installed API groups / CRD kinds (find what's installed) |
+| `k8s_list` | List objects of any resource or CRD, with curated status |
+| `k8s_get` | Get a single object by name, with full status and optional spec |
+| `k8s_events` | Recent cluster events, filtered by namespace and type |
+
+### ClickHouse Logs — `clickhouse` — 5 tools
+
+> Enabled when `CLICKHOUSE_URL` is set. Uses ClickHouse's HTTP GET query path, which the engine
+> forces to be **read-only** — writes are rejected by ClickHouse itself.
+
+| Tool | Description |
+|------|-------------|
+| `clickhouse_query` | Run a read-only SQL query (SELECT/SHOW/DESCRIBE) with column types |
+| `clickhouse_databases` | List databases |
+| `clickhouse_tables` | List tables with engine and approximate row/byte counts |
+| `clickhouse_table_schema` | Describe a table — columns, types, codecs |
+| `clickhouse_logs_search` | Convenience log search — time window, message ILIKE, level, newest first |
+
+### Pyroscope (continuous profiling) — `pyroscope` — 4 tools
+
+> Enabled when `PYROSCOPE_URL` is set. Works against OSS Pyroscope and Grafana Pyroscope.
+
+| Tool | Description |
+|------|-------------|
+| `pyroscope_profile_types` | List available profile/application names |
+| `pyroscope_labels` | Label names available for a profile type |
+| `pyroscope_label_values` | Values for a given label |
+| `pyroscope_render` | Render a profile and return the heaviest functions by self time |
+
+### Open Policy Agent — `opa` — 4 tools
+
+> Enabled when `OPA_URL` is set. Read-only (GET against the Data/Query APIs).
+
+| Tool | Description |
+|------|-------------|
+| `opa_health` | OPA health, including bundle activation |
+| `opa_policies` | Loaded policy modules with package paths |
+| `opa_data` | Fetch/evaluate a document at a data path, with optional input |
+| `opa_query` | Ad-hoc Rego query — e.g. enumerate violations across packages |
+
+### Zipkin — `zipkin` — 5 tools
+
+> Enabled when `ZIPKIN_URL` is set. Mirrors the Jaeger traces skill's shape.
+
+| Tool | Description |
+|------|-------------|
+| `zipkin_services` | List services reporting spans |
+| `zipkin_spans` | Span (operation) names for a service |
+| `zipkin_traces_search` | Search traces by service, span, duration, or tags |
+| `zipkin_trace_get` | Full trace detail — all spans with timing and tags |
+| `zipkin_dependencies` | Service dependency graph |
+
+### Envoy — `envoy` — 4 tools
+
+> Enabled when `ENVOY_ADMIN_URL` is set. Works for standalone Envoy and mesh sidecar proxies.
+
+| Tool | Description |
+|------|-------------|
+| `envoy_server_info` | Version, serving state, and uptime |
+| `envoy_clusters` | Upstream clusters and per-endpoint health |
+| `envoy_listeners` | Configured listeners and bind addresses |
+| `envoy_stats` | Counters/gauges, optionally filtered by name regex |
+
+### Consul — `consul` — 5 tools
+
+> Enabled when `CONSUL_URL` is set. Set `CONSUL_AUTH_TOKEN` for an ACL token.
+
+| Tool | Description |
+|------|-------------|
+| `consul_health` | Agent datacenter, node, version, role, and current leader |
+| `consul_services` | Registered services with tags |
+| `consul_service_instances` | Instances of a service with address, port, and health |
+| `consul_checks` | Health checks in a given state (defaults to critical) |
+| `consul_members` | Cluster members and gossip status |
+
+### Kong Gateway — `kong` — 4 tools
+
+> Enabled when `KONG_ADMIN_URL` is set.
+
+| Tool | Description |
+|------|-------------|
+| `kong_status` | Node version, database reachability, connection stats |
+| `kong_services` | Configured services (upstream targets) |
+| `kong_routes` | Routes and the services they map to |
+| `kong_plugins` | Enabled plugins and their scope |
+
+### Traefik — `traefik` — 4 tools
+
+> Enabled when `TRAEFIK_URL` is set.
+
+| Tool | Description |
+|------|-------------|
+| `traefik_overview` | Version and router/service/middleware counts and features |
+| `traefik_routers` | HTTP routers — rules, target service, status, entry points |
+| `traefik_services` | HTTP services — type, status, load-balancer server health |
+| `traefik_entrypoints` | Configured entry points and bind addresses |
+
+### InfluxDB — `influx` — 3 tools
+
+> Enabled when `INFLUX_URL` is set. Uses the InfluxQL `/query` endpoint (1.x and 2.x compatible).
+
+| Tool | Description |
+|------|-------------|
+| `influx_health` | Health, status, and version |
+| `influx_databases` | List databases / DBRP-mapped buckets |
+| `influx_query` | Run a read-only InfluxQL query and return series |
+
+### OpenTSDB — `opentsdb` — 3 tools
+
+> Enabled when `OPENTSDB_URL` is set.
+
+| Tool | Description |
+|------|-------------|
+| `opentsdb_version` | Version and build info |
+| `opentsdb_suggest` | Autocomplete metric names, tag keys, or tag values |
+| `opentsdb_query` | Query a metric over a range with aggregator, downsampling, and tag filters |
+
+### Graylog — `graylog` — 3 tools
+
+> Enabled when `GRAYLOG_URL` is set.
+
+| Tool | Description |
+|------|-------------|
+| `graylog_system` | Node version, lifecycle state, hostname, start time |
+| `graylog_streams` | Streams (message routing rules) |
+| `graylog_search` | Search messages over a relative time window (Graylog query syntax) |
+
+### Grafana Tempo (TraceQL) — `tempo` — 4 tools
+
+> Enabled when `TEMPO_URL` is set. The native TraceQL surface — distinct from pointing
+> `JAEGER_URL` at Tempo's Jaeger-compatible API (which the `traces` skill handles).
+
+| Tool | Description |
+|------|-------------|
+| `tempo_search` | Search traces with TraceQL |
+| `tempo_trace_get` | Full trace by ID — spans with service, timing, attributes |
+| `tempo_tags` | Searchable tag names |
+| `tempo_tag_values` | Values for a tag |
+
+### Apache SkyWalking — `skywalking` — 3 tools
+
+> Enabled when `SKYWALKING_URL` is set. Queries the OAP GraphQL API at `/graphql`.
+
+| Tool | Description |
+|------|-------------|
+| `skywalking_services` | Services known over a time window |
+| `skywalking_traces_search` | Search traces by window, service, state, min duration |
+| `skywalking_trace_get` | Spans of a trace by trace ID |
+
+### Pinpoint — `pinpoint` — 3 tools
+
+> Enabled when `PINPOINT_URL` is set. The API varies by Pinpoint version, so a read-only GET
+> passthrough is provided for version-specific endpoints.
+
+| Tool | Description |
+|------|-------------|
+| `pinpoint_applications` | Monitored applications and service types |
+| `pinpoint_server_time` | Current server time (for building time ranges) |
+| `pinpoint_get` | Read-only GET against any Pinpoint API path |
+
+### Collection Pipelines — `pipeline` — 4 tools
+
+> Enabled when any of `FLUENTBIT_URL` / `BEATS_URL` / `VECTOR_URL` / `ALLOY_URL` is set.
+> Each tool errors clearly if its agent isn't configured.
+
+| Tool | Description |
+|------|-------------|
+| `pipeline_fluentbit` | Fluent Bit per-input/output records, bytes, retries, drops |
+| `pipeline_beats` | Beats output event throughput and write errors |
+| `pipeline_vector` | Vector health and configured components |
+| `pipeline_alloy` | Grafana Alloy components and their health |
 
 ### ZK Proofs — `zk-proofs` — 4 tools
 
@@ -477,6 +698,23 @@ src/
 │   ├── elasticsearch.ts  # ES/OpenSearch skill (5 tools)
 │   ├── alertmanager.ts   # Alertmanager skill (4 tools)
 │   ├── grafana.ts        # Grafana read-only skill (10 tools)
+│   ├── cilium.ts         # Cilium eBPF networking skill (6 tools)
+│   ├── kubernetes.ts     # Kubernetes CRD reader skill (5 tools)
+│   ├── clickhouse.ts     # ClickHouse logs skill (5 tools)
+│   ├── pyroscope.ts      # Pyroscope profiling skill (4 tools)
+│   ├── opa.ts            # Open Policy Agent skill (4 tools)
+│   ├── zipkin.ts         # Zipkin traces skill (5 tools)
+│   ├── envoy.ts          # Envoy proxy admin skill (4 tools)
+│   ├── consul.ts         # Consul skill (5 tools)
+│   ├── kong.ts           # Kong Gateway skill (4 tools)
+│   ├── traefik.ts        # Traefik skill (4 tools)
+│   ├── influxdb.ts       # InfluxDB metrics skill (3 tools)
+│   ├── opentsdb.ts       # OpenTSDB metrics skill (3 tools)
+│   ├── graylog.ts        # Graylog logs skill (3 tools)
+│   ├── tempo.ts          # Grafana Tempo TraceQL skill (4 tools)
+│   ├── skywalking.ts     # Apache SkyWalking skill (3 tools)
+│   ├── pinpoint.ts       # Pinpoint skill (3 tools)
+│   ├── pipeline.ts       # Collection pipelines skill (4 tools)
 │   ├── zk-proofs.ts      # ZK proof skill (4 tools)
 │   └── system.ts         # System health skill (4 tools)
 └── resources/
@@ -550,7 +788,7 @@ npx vitest run tests/auth.test.ts
 The following analysis was generated entirely by an AI agent (GitHub Copilot CLI) using this MCP server to query a production KrystalineX cluster — 27 tool calls across 6 skills, zero manual commands. This is what "Proof of Observability" looks like in practice.
 
 > **Cluster**: KrystalineX crypto exchange · 3-node K8s (1 control-plane, 2 workers) · Helm-managed  
-> **MCP Server**: v1.2.1 · 6/7 skills active (Elasticsearch disabled) · session-based HTTP transport  
+> **MCP Server**: v1.2.0 · 6/7 skills active (Elasticsearch disabled) · session-based HTTP transport  
 > **Date**: 2026-03-24T19:30 UTC
 
 ---
