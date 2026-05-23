@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mcp_server_info{version}` now reports `1.2.0` instead of stale `1.1.0` metadata.
 - README now accurately describes skill activation (core/app skills always-on with localhost defaults; all others opt-in via their backend URL) and the stray `v1.2.1` version reference was corrected to `v1.2.0`.
 - `package.json` `repository.url` updated from the stale `KrystalineX/otel-mcp-server` to the current `MoebiusX/otel-mcp-server` GitHub URL. Author field unchanged.
+- Docker image `org.opencontainers.image.source` label updated to the current `MoebiusX/otel-mcp-server` GitHub URL.
 
 ### Changed
 
