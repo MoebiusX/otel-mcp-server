@@ -99,6 +99,49 @@ These skills are still represented in `tests/live-test-matrix.json`, but are ski
 
 Those should become separate `full` or `kind` profiles rather than slowing down the default local loop.
 
+## Adding A New Skill To Live Tests
+
+When you add a new skill to the server, give it a live-test entry so it stays exercised end-to-end.
+
+1. **Add a fixture to `docker-compose.live.yml`.**
+   - Use an official upstream image, a lightweight config, and a healthcheck or ready endpoint where possible.
+   - Mount any required config from `tests/live-fixtures/<skill>/` so the file stays reviewable in git.
+   - Pin the image tag — never `latest`.
+
+2. **Register the skill in `tests/live-test-matrix.json`.**
+   - Add an entry under the appropriate profile with at least:
+     - `id` — the skill id used by `--tools` in the server.
+     - `name` — human-readable label shown in the report.
+     - `fixtures` — array of Compose service names this skill needs.
+     - `env` — backend URLs and auth env vars the MCP container should receive (use Docker service names, e.g. `http://my-service:1234`).
+     - `smoke` — `{ "tool": "<tool_id>", "args": { ... } }` for one safe read-only call.
+     - `expectedToolCount` — the number of tools the skill registers.
+     - `metricsContains` — substrings that must appear in `/metrics` after the smoke call.
+   - If the skill cannot run on the `standard` profile (needs Kubernetes, multi-service stack, cloud backend, etc.), add it with `"status": "skipped"` and a clear `reason` instead, and plan a `kind` or `full` profile entry separately.
+
+3. **Add a readiness check.**
+   - If the fixture has its own `healthcheck` in Compose, the harness will use it.
+   - Otherwise add an entry in `scripts/live-test.mjs`'s readiness probe map so the harness knows what URL to poll before running the smoke tool.
+
+4. **Iterate locally one skill at a time.**
+
+   ```bash
+   node scripts/live-test.mjs --skill <id> --no-build --keep-containers-on-fail
+   ```
+
+   - First run rebuilds the Docker image; subsequent runs can use `--no-build`.
+   - On failure, `--keep-containers-on-fail` leaves the MCP and fixture containers up so you can `docker logs` / `docker exec` them.
+
+5. **Verify the full profile still passes.**
+
+   ```bash
+   npm run test:live:standard
+   ```
+
+   Confirm the new skill shows up in the printed summary and in the JSON report under `.live-test-results/`.
+
+6. **Update `docs/live-testing.md`.** Add the new skill row to the coverage table above (or to the explicitly-skipped table if it lives on a heavier profile).
+
 ## Troubleshooting
 
 - If Docker ports are already in use, stop the conflicting local service or edit `docker-compose.live.yml` before running the harness.
