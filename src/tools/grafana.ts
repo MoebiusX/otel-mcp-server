@@ -425,7 +425,7 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
       max_data_points: z.number().int().positive().max(10_000).default(500).describe('Maximum returned data points requested from Grafana.'),
       instant: z.boolean().default(false).describe('Use an instant query when supported by the data source.'),
       format: z.enum(['summary', 'raw']).default('summary').describe('Return summarized frames by default, or raw Grafana response.'),
-      raw_query_model: z.record(z.any()).optional().describe('Advanced plugin-specific query model. Still sent read-only through /api/ds/query.'),
+      raw_query_model: z.record(z.string(), z.any()).optional().describe('Advanced plugin-specific query model. Still sent read-only through /api/ds/query.'),
     },
     async (params) => {
       try {
