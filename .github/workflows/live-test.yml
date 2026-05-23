@@ -1,0 +1,75 @@
+name: Live Docker Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Live-test profile to run
+        required: false
+        default: standard
+        type: string
+      skills:
+        description: Optional comma-separated skill ids (overrides profile)
+        required: false
+        default: ''
+        type: string
+  schedule:
+    # Nightly at 04:17 UTC. Off-peak, jittered minute to avoid scheduler bursts.
+    - cron: '17 4 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Standard live-test profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Build live-test Docker image
+        run: docker build -t otel-mcp-server:live-test .
+
+      - name: Run live-test harness
+        env:
+          PROFILE: ${{ inputs.profile || 'standard' }}
+          SKILLS: ${{ inputs.skills }}
+        run: |
+          set -euo pipefail
+          args=(--no-build --profile "$PROFILE")
+          if [ -n "${SKILLS:-}" ]; then
+            args+=(--skill "$SKILLS")
+          fi
+          node scripts/live-test.mjs "${args[@]}"
+
+      - name: Upload live-test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-test-report
+          path: .live-test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Cleanup live fixtures
+        if: always()
+        run: |
+          docker compose -f docker-compose.live.yml -p otel-mcp-live down -v --remove-orphans || true

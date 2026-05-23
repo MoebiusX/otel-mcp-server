@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -556,6 +556,7 @@ async function main() {
   await mkdir(resultsDir, { recursive: true });
   const reportPath = path.join(resultsDir, `live-test-${started.toISOString().replace(/[:.]/g, '-')}.json`);
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  await pruneOldReports(resultsDir, 20);
 
   printSummary(results);
   console.log(`\nReport: ${path.relative(repoRoot, reportPath)}`);
@@ -567,3 +568,17 @@ main().catch(error => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 });
+
+async function pruneOldReports(dir, keep) {
+  try {
+    const entries = await readdir(dir);
+    const reports = entries.filter(name => /^live-test-.*\.json$/.test(name)).sort();
+    const excess = reports.length - keep;
+    if (excess <= 0) return;
+    await Promise.all(
+      reports.slice(0, excess).map(name => unlink(path.join(dir, name)).catch(() => {})),
+    );
+  } catch {
+    // Best-effort retention; ignore errors so a report-write success isn't masked.
+  }
+}

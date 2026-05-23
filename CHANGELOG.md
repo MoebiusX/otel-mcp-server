@@ -44,12 +44,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Instrumented backend fetchers now forward request method/body options, which is required for `POST /api/ds/query` and Elasticsearch searches.
 - `mcp_server_info{version}` now reports `1.2.0` instead of stale `1.1.0` metadata.
 - README now accurately describes skill activation (core/app skills always-on with localhost defaults; all others opt-in via their backend URL) and the stray `v1.2.1` version reference was corrected to `v1.2.0`.
+- `package.json` `repository.url` updated from the stale `KrystalineX/otel-mcp-server` to the current `MoebiusX/otel-mcp-server` GitHub URL. Author field unchanged.
 
 ### Changed
 
 - Fully configured tool count: 32 → 42 → 111.
 - Skill count: 8 → 25.
 - Test count: 99 → 106 → 155. Added a registry-integrity guard (declared-vs-actual tool counts, unique skill ids and tool names), behavioral tests for all skills added this cycle, and node:http-mocked tests for the kubernetes skill's request path.
+
+### Testing & CI
+
+- Added an isolated Docker live-test harness ([scripts/live-test.mjs](scripts/live-test.mjs)) that brings up one fixture at a time, runs a single skill against the real container image over HTTP with API-key auth, and writes a JSON report under `.live-test-results/` (gitignored, last 20 reports retained).
+- Added [docker-compose.live.yml](docker-compose.live.yml), [tests/live-test-matrix.json](tests/live-test-matrix.json), [scripts/app-api-fixture.mjs](scripts/app-api-fixture.mjs), and the `tests/live-fixtures/` config tree.
+- Added `npm run test:live` and `npm run test:live:standard`. Standard profile: 19 passed, 0 failed, 6 expected skips (kubernetes, cilium, opentsdb, graylog, skywalking, pinpoint — deferred to future `kind`/`full` profiles).
+- Added a standalone HTML report viewer at [docs/live-test-report-viewer.html](docs/live-test-report-viewer.html) and live-test docs at [docs/live-testing.md](docs/live-testing.md), including a "how to add a new skill to live tests" section.
+- Added GitHub Actions workflows: [.github/workflows/ci.yml](.github/workflows/ci.yml) (lint, build, test, harness syntax check, Compose config validation on Node 20/22) and [.github/workflows/live-test.yml](.github/workflows/live-test.yml) (manual `workflow_dispatch` and nightly schedule for the Docker-backed live profile, with report artifact upload).
 
 ## [1.2.0] - 2026-03-24
 
