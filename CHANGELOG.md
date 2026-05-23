@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `npm run test:live` and `npm run test:live:standard`. Standard profile: 19 passed, 0 failed, 6 expected skips (kubernetes, cilium, opentsdb, graylog, skywalking, pinpoint — deferred to future `kind`/`full` profiles).
 - Added a standalone HTML report viewer at [docs/live-test-report-viewer.html](docs/live-test-report-viewer.html) and live-test docs at [docs/live-testing.md](docs/live-testing.md), including a "how to add a new skill to live tests" section.
 - Added GitHub Actions workflows: [.github/workflows/ci.yml](.github/workflows/ci.yml) (lint, build, test, harness syntax check, Compose config validation on Node 20/22) and [.github/workflows/live-test.yml](.github/workflows/live-test.yml) (manual `workflow_dispatch` and nightly schedule for the Docker-backed live profile, with report artifact upload).
+- Added README workflow/status badges and Dependabot weekly npm update configuration targeting `develop`.
 
 ## [1.2.0] - 2026-03-24
 

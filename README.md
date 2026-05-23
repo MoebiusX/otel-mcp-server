@@ -1,5 +1,9 @@
 # otel-mcp-server
 
+[![CI](https://github.com/MoebiusX/otel-mcp-server/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/MoebiusX/otel-mcp-server/actions/workflows/ci.yml)
+[![Live Docker Tests](https://github.com/MoebiusX/otel-mcp-server/actions/workflows/live-test.yml/badge.svg)](https://github.com/MoebiusX/otel-mcp-server/actions/workflows/live-test.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
 An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemetry** observability stack — traces, metrics, logs, and more — as tools for AI agents. Built on a **Skill** plugin architecture for easy extensibility.
 
 > Give any LLM agent the ability to query your Jaeger traces, run PromQL, search Loki logs, and investigate production issues — through a standard protocol.
