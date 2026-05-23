@@ -9,12 +9,12 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 > Give any LLM agent the ability to query your Jaeger traces, run PromQL, search Loki logs, and investigate production issues — through a standard protocol.
 
 ```
-┌─────────────────┐      MCP     ┌──────────────────┐──► Jaeger · Zipkin · Tempo · SkyWalking · Pinpoint
+┌─────────────────┐      MCP     ┌──────────────────┐──► Traces (Jaeger · Zipkin · Tempo · SkyWalking)
 │  Claude Desktop │ ◄──────────► │                  │──► Prometheus · InfluxDB · OpenTSDB
 │  GitHub Copilot │ (stdio/HTTP) │  otel-mcp-server │──► Loki · ClickHouse · Graylog (logs)
-│  Custom Agent   │              │                  │──► Elasticsearch · Alertmanager
-└─────────────────┘              │   25 skills      │──► Grafana · Pyroscope · OPA
-                                 │   111 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
+│  Custom Agent   │              │                  │──► Pinpoint · Elasticsearch · Alertmanager
+└─────────────────┘              │   22 skills      │──► Grafana · Pyroscope · OPA
+                                 │   99 tools       │──► Cilium · Kubernetes (eBPF/CRDs)
                                  │   authenticated  │──► Envoy · Consul · Kong · Traefik
                                  └──────────────────┘──► Fluent Bit · Beats · Vector · Alloy
                                                      └─► App API    (ZK/system)
@@ -36,7 +36,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **111 tools** across 25 skills — traces (Jaeger/Zipkin/Tempo/SkyWalking/Pinpoint), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), ZK proofs, system health
+- **99 tools** across 22 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), ZK proofs, system health
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
@@ -106,7 +106,11 @@ All configuration is via environment variables. The commonly used backend, auth,
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JAEGER_URL` | `http://localhost:16686` | Jaeger Query API |
+| `TRACES_PROVIDER` | `jaeger` | Trace backend selector — one of `jaeger`, `tempo`, `zipkin`, `skywalking` |
+| `JAEGER_URL` / `TRACES_JAEGER_URL` | `http://localhost:16686` | Jaeger Query API (used when `TRACES_PROVIDER=jaeger`) |
+| `TEMPO_URL` / `TRACES_TEMPO_URL` | `http://localhost:3200` | Grafana Tempo (used when `TRACES_PROVIDER=tempo`) |
+| `ZIPKIN_URL` / `TRACES_ZIPKIN_URL` | `http://localhost:9411` | Zipkin v2 API (used when `TRACES_PROVIDER=zipkin`) |
+| `SKYWALKING_URL` / `TRACES_SKYWALKING_URL` | `http://localhost:12800` | SkyWalking OAP GraphQL (used when `TRACES_PROVIDER=skywalking`) |
 | `PROMETHEUS_URL` | `http://localhost:9090` | Prometheus API |
 | `LOKI_URL` | `http://localhost:3100` | Loki API |
 | `PROMETHEUS_PATH_PREFIX` | _(empty)_ | Path prefix (e.g. `/prometheus`) |
@@ -119,7 +123,6 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `CLICKHOUSE_URL` | _(disabled)_ | ClickHouse HTTP interface |
 | `PYROSCOPE_URL` | _(disabled)_ | Pyroscope HTTP API (continuous profiling) |
 | `OPA_URL` | _(disabled)_ | Open Policy Agent REST API |
-| `ZIPKIN_URL` | _(disabled)_ | Zipkin API v2 |
 | `ENVOY_ADMIN_URL` | _(disabled)_ | Envoy admin API |
 | `CONSUL_URL` | _(disabled)_ | Consul HTTP API |
 | `KONG_ADMIN_URL` | _(disabled)_ | Kong Admin API |
@@ -127,8 +130,6 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `INFLUX_URL` | _(disabled)_ | InfluxDB HTTP API (InfluxQL) |
 | `OPENTSDB_URL` | _(disabled)_ | OpenTSDB HTTP API |
 | `GRAYLOG_URL` | _(disabled)_ | Graylog REST API |
-| `TEMPO_URL` | _(disabled)_ | Grafana Tempo native TraceQL API |
-| `SKYWALKING_URL` | _(disabled)_ | Apache SkyWalking OAP GraphQL API |
 | `PINPOINT_URL` | _(disabled)_ | Pinpoint web API |
 | `FLUENTBIT_URL` | _(disabled)_ | Fluent Bit HTTP monitoring server |
 | `BEATS_URL` | _(disabled)_ | Beats HTTP monitoring endpoint |
@@ -140,7 +141,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 
 ### Backend Authentication
 
-The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ZIPKIN_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `TEMPO_`, `SKYWALKING_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`), you can set:
+The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `TEMPO_`, `ZIPKIN_`, `SKYWALKING_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`), you can set:
 
 | Suffix | Effect |
 |--------|--------|
@@ -305,7 +306,9 @@ defaulting to `localhost` backends so the server works out of the box. Every oth
 `CLICKHOUSE_URL`), and is silently skipped otherwise. Use `--tools` to restrict which skills load
 regardless of configuration.
 
-### Traces (Jaeger) — `traces` — 5 tools
+### Traces — `traces` — 5 tools
+
+> Provider-agnostic. Select backend with `TRACES_PROVIDER` (`jaeger` [default], `tempo`, `zipkin`, `skywalking`). The verb surface is stable across providers; capabilities the chosen backend doesn't support (e.g. `traces_dependencies` on Tempo) return a clear error.
 
 | Tool | Description |
 |------|-------------|
@@ -439,18 +442,6 @@ regardless of configuration.
 | `opa_data` | Fetch/evaluate a document at a data path, with optional input |
 | `opa_query` | Ad-hoc Rego query — e.g. enumerate violations across packages |
 
-### Zipkin — `zipkin` — 5 tools
-
-> Enabled when `ZIPKIN_URL` is set. Mirrors the Jaeger traces skill's shape.
-
-| Tool | Description |
-|------|-------------|
-| `zipkin_services` | List services reporting spans |
-| `zipkin_spans` | Span (operation) names for a service |
-| `zipkin_traces_search` | Search traces by service, span, duration, or tags |
-| `zipkin_trace_get` | Full trace detail — all spans with timing and tags |
-| `zipkin_dependencies` | Service dependency graph |
-
 ### Envoy — `envoy` — 4 tools
 
 > Enabled when `ENVOY_ADMIN_URL` is set. Works for standalone Envoy and mesh sidecar proxies.
@@ -526,27 +517,9 @@ regardless of configuration.
 | `graylog_streams` | Streams (message routing rules) |
 | `graylog_search` | Search messages over a relative time window (Graylog query syntax) |
 
-### Grafana Tempo (TraceQL) — `tempo` — 4 tools
+### Grafana Tempo, Apache SkyWalking — see `traces`
 
-> Enabled when `TEMPO_URL` is set. The native TraceQL surface — distinct from pointing
-> `JAEGER_URL` at Tempo's Jaeger-compatible API (which the `traces` skill handles).
-
-| Tool | Description |
-|------|-------------|
-| `tempo_search` | Search traces with TraceQL |
-| `tempo_trace_get` | Full trace by ID — spans with service, timing, attributes |
-| `tempo_tags` | Searchable tag names |
-| `tempo_tag_values` | Values for a tag |
-
-### Apache SkyWalking — `skywalking` — 3 tools
-
-> Enabled when `SKYWALKING_URL` is set. Queries the OAP GraphQL API at `/graphql`.
-
-| Tool | Description |
-|------|-------------|
-| `skywalking_services` | Services known over a time window |
-| `skywalking_traces_search` | Search traces by window, service, state, min duration |
-| `skywalking_trace_get` | Spans of a trace by trace ID |
+> Tempo and SkyWalking are now exposed through the provider-agnostic `traces` skill — set `TRACES_PROVIDER=tempo` or `TRACES_PROVIDER=skywalking` and point the matching URL var at your backend.
 
 ### Pinpoint — `pinpoint` — 3 tools
 
@@ -696,7 +669,7 @@ src/
 ├── helpers.ts            # fetchJSON, createFetcher, utilities
 ├── metrics.ts            # Self-metrics (Prometheus format)
 ├── tools/
-│   ├── traces.ts         # Jaeger traces skill (5 tools)
+│   ├── traces.ts         # Traces layer — dispatches to a provider per TRACES_PROVIDER (5 tools)
 │   ├── metrics.ts        # Prometheus metrics skill (6 tools)
 │   ├── logs.ts           # Loki logs skill (4 tools)
 │   ├── elasticsearch.ts  # ES/OpenSearch skill (5 tools)
@@ -707,7 +680,6 @@ src/
 │   ├── clickhouse.ts     # ClickHouse logs skill (5 tools)
 │   ├── pyroscope.ts      # Pyroscope profiling skill (4 tools)
 │   ├── opa.ts            # Open Policy Agent skill (4 tools)
-│   ├── zipkin.ts         # Zipkin traces skill (5 tools)
 │   ├── envoy.ts          # Envoy proxy admin skill (4 tools)
 │   ├── consul.ts         # Consul skill (5 tools)
 │   ├── kong.ts           # Kong Gateway skill (4 tools)
@@ -715,12 +687,17 @@ src/
 │   ├── influxdb.ts       # InfluxDB metrics skill (3 tools)
 │   ├── opentsdb.ts       # OpenTSDB metrics skill (3 tools)
 │   ├── graylog.ts        # Graylog logs skill (3 tools)
-│   ├── tempo.ts          # Grafana Tempo TraceQL skill (4 tools)
-│   ├── skywalking.ts     # Apache SkyWalking skill (3 tools)
 │   ├── pinpoint.ts       # Pinpoint skill (3 tools)
 │   ├── pipeline.ts       # Collection pipelines skill (4 tools)
 │   ├── zk-proofs.ts      # ZK proof skill (4 tools)
 │   └── system.ts         # System health skill (4 tools)
+├── providers/
+│   └── traces/           # Trace provider implementations (Layer→Provider pattern)
+│       ├── types.ts      # TracesProvider interface + factory type
+│       ├── jaeger.ts     # Jaeger Query API provider (default)
+│       ├── tempo.ts      # Grafana Tempo TraceQL provider
+│       ├── zipkin.ts     # Zipkin v2 provider
+│       └── skywalking.ts # SkyWalking OAP GraphQL provider
 └── resources/
     └── overview.ts       # MCP resource: auto-generated overview
 ```
@@ -780,7 +757,7 @@ npm run lint
 # Build
 npm run build
 
-# Tests (155 tests across 11 suites)
+# Tests (162 tests across 12 suites)
 npm test
 
 # Run a single test file

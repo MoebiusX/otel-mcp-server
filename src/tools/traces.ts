@@ -1,65 +1,75 @@
 /**
- * Traces skill — query distributed traces via the Jaeger Query API.
+ * Traces layer — provider-agnostic distributed-trace skill.
  *
- * Tools: traces_search, trace_get, traces_services, traces_operations, traces_dependencies
+ * Exposes a stable verb surface (traces_search, trace_get, traces_services,
+ * traces_operations, traces_dependencies) and dispatches to a backend provider
+ * selected by the `TRACES_PROVIDER` environment variable.
+ *
+ * Supported providers: `jaeger` (default), `tempo`, `zipkin`, `skywalking`.
+ *
+ * Provider-specific config falls back to legacy per-vendor env vars so users
+ * coming from the v1.2.0 skill-per-vendor model don't need to rename anything:
+ *   TRACES_TEMPO_URL → TEMPO_URL → http://localhost:3200
+ *
+ * Auth continues to use the per-vendor prefix (`JAEGER_AUTH_*`, `TEMPO_AUTH_*`, ...).
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Skill, SkillHelpers } from '../skill.js';
-import { textResult, errorResult, parseDuration } from '../helpers.js';
+import { textResult, errorResult } from '../helpers.js';
+import type { TracesProvider, TracesProviderFactory } from '../providers/traces/types.js';
+import { createJaegerProvider } from '../providers/traces/jaeger.js';
+import { createTempoProvider } from '../providers/traces/tempo.js';
+import { createZipkinProvider } from '../providers/traces/zipkin.js';
+import { createSkyWalkingProvider } from '../providers/traces/skywalking.js';
+
+const PROVIDERS: Record<string, TracesProviderFactory> = {
+  jaeger: createJaegerProvider,
+  tempo: createTempoProvider,
+  zipkin: createZipkinProvider,
+  skywalking: createSkyWalkingProvider,
+};
+
+function resolveProvider(helpers: SkillHelpers): TracesProvider {
+  const id = (helpers.env('TRACES_PROVIDER', 'jaeger') || 'jaeger').toLowerCase();
+  const factory = PROVIDERS[id];
+  if (!factory) {
+    const supported = Object.keys(PROVIDERS).join(', ');
+    throw new Error(`Unknown TRACES_PROVIDER "${id}". Supported: ${supported}`);
+  }
+  return factory(helpers);
+}
+
+function unsupported(provider: TracesProvider, verb: string) {
+  return errorResult(`traces verb "${verb}" is not supported by provider "${provider.id}"`);
+}
 
 function registerTools(server: McpServer, helpers: SkillHelpers): void {
-  const jaegerUrl = helpers.env('JAEGER_URL', 'http://localhost:16686');
-  const fetchJSON = helpers.createFetcher('JAEGER', 'jaeger');
+  const provider = resolveProvider(helpers);
 
   // ── traces_search ─────────────────────────────────────────────────────────
 
   server.tool(
     'traces_search',
-    'Search distributed traces by service, operation, tags, or duration. Returns trace summaries with timing, span count, and error status.',
+    `Search distributed traces. Backend: ${provider.backend}. ` +
+      'Param semantics vary by provider: `service` works for jaeger/zipkin/skywalking ' +
+      '(skywalking expects a service id); `query` is a provider-native raw query (Tempo TraceQL).',
     {
-      service: z.string().describe('Service name (e.g. my-api, my-worker)'),
-      operation: z.string().optional().describe('Filter by operation name'),
-      tags: z.string().optional().describe('JSON object of span tags to filter (e.g. {"http.status_code":"500"})'),
-      min_duration: z.string().optional().describe('Minimum duration filter (e.g. "500ms", "1s")'),
-      max_duration: z.string().optional().describe('Maximum duration filter'),
+      service: z.string().optional().describe('Service name (jaeger/zipkin) or service id (skywalking)'),
+      operation: z.string().optional().describe('Operation/span/endpoint name filter'),
+      query: z.string().optional().describe('Provider-native raw query (Tempo TraceQL)'),
+      tags: z.string().optional().describe('JSON-encoded tag filter (Jaeger only)'),
+      annotation_query: z.string().optional().describe('Zipkin annotation query (e.g. "http.status_code=500 and error")'),
+      state: z.enum(['ALL', 'SUCCESS', 'ERROR']).optional().describe('Trace state filter (SkyWalking)'),
+      min_duration: z.string().optional().describe('Minimum duration (e.g. "500ms", "1s")'),
+      max_duration: z.string().optional().describe('Maximum duration (Jaeger only)'),
       lookback: z.string().default('1h').describe('Time window (e.g. "1h", "30m", "2d")'),
       limit: z.number().default(20).describe('Max traces to return'),
     },
     async (params) => {
       try {
-        const qs = new URLSearchParams({
-          service: params.service,
-          lookback: params.lookback,
-          limit: String(params.limit),
-        });
-        if (params.operation) qs.set('operation', params.operation);
-        if (params.tags) qs.set('tags', params.tags);
-        if (params.min_duration) qs.set('minDuration', params.min_duration);
-        if (params.max_duration) qs.set('maxDuration', params.max_duration);
-
-        const data = await fetchJSON(`${jaegerUrl}/api/traces?${qs}`);
-        const traces = (data.data || []).map((t: any) => {
-          const spans = t.spans || [];
-          const root = spans[0];
-          const services = Array.from(new Set(
-            spans.map((s: any) => s.processID)
-              .map((pid: string) => t.processes?.[pid]?.serviceName || pid),
-          ));
-          return {
-            traceId: t.traceID,
-            rootOperation: root?.operationName,
-            spanCount: spans.length,
-            duration_ms: (root?.duration || 0) / 1000,
-            services,
-            startTime: root ? new Date(root.startTime / 1000).toISOString() : null,
-            hasErrors: spans.some((s: any) =>
-              s.tags?.some((tag: any) => tag.key === 'error' && tag.value === true),
-            ),
-          };
-        });
-        return textResult({ count: traces.length, traces });
+        return textResult(await provider.search(params));
       } catch (e: any) {
         return errorResult(e.message);
       }
@@ -70,37 +80,11 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
 
   server.tool(
     'trace_get',
-    'Get full trace detail — all spans with timing, tags, logs, and parent-child relationships.',
-    {
-      trace_id: z.string().describe('Jaeger trace ID (hex string)'),
-    },
+    `Get full trace detail by ID. Backend: ${provider.backend}.`,
+    { trace_id: z.string().describe('Trace ID (hex string)') },
     async ({ trace_id }) => {
       try {
-        const data = await fetchJSON(`${jaegerUrl}/api/traces/${trace_id}`);
-        const trace = data.data?.[0];
-        if (!trace) return errorResult(`Trace ${trace_id} not found`);
-
-        const spans = (trace.spans || []).map((s: any) => ({
-          spanId: s.spanID,
-          parentSpanId: s.references?.[0]?.spanID || null,
-          operationName: s.operationName,
-          service: trace.processes?.[s.processID]?.serviceName,
-          duration_ms: s.duration / 1000,
-          startTime: new Date(s.startTime / 1000).toISOString(),
-          tags: Object.fromEntries((s.tags || []).map((t: any) => [t.key, t.value])),
-          logs: (s.logs || []).map((l: any) => ({
-            timestamp: new Date(l.timestamp / 1000).toISOString(),
-            fields: Object.fromEntries((l.fields || []).map((f: any) => [f.key, f.value])),
-          })),
-        }));
-
-        return textResult({
-          traceId: trace.traceID,
-          spanCount: spans.length,
-          totalDuration_ms: spans[0]?.duration_ms,
-          services: Array.from(new Set(spans.map((s: any) => s.service))),
-          spans,
-        });
+        return textResult(await provider.getTrace(trace_id));
       } catch (e: any) {
         return errorResult(e.message);
       }
@@ -111,12 +95,12 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
 
   server.tool(
     'traces_services',
-    'List all services currently reporting traces to Jaeger.',
-    {},
-    async () => {
+    `List services known to the traces backend. Backend: ${provider.backend}.`,
+    { lookback: z.string().default('1h').describe('Time window (used by some providers)') },
+    async ({ lookback }) => {
+      if (!provider.services) return unsupported(provider, 'traces_services');
       try {
-        const data = await fetchJSON(`${jaegerUrl}/api/services`);
-        return textResult({ services: data.data || [] });
+        return textResult(await provider.services({ lookback }));
       } catch (e: any) {
         return errorResult(e.message);
       }
@@ -127,14 +111,15 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
 
   server.tool(
     'traces_operations',
-    'List all operations for a given service.',
-    { service: z.string().describe('Service name') },
-    async ({ service }) => {
+    `List operations/endpoints for a service. Backend: ${provider.backend}.`,
+    {
+      service: z.string().describe('Service name'),
+      lookback: z.string().default('1h').describe('Time window (used by some providers)'),
+    },
+    async ({ service, lookback }) => {
+      if (!provider.operations) return unsupported(provider, 'traces_operations');
       try {
-        const data = await fetchJSON(
-          `${jaegerUrl}/api/operations?service=${encodeURIComponent(service)}`,
-        );
-        return textResult({ service, operations: data.data || [] });
+        return textResult(await provider.operations({ service, lookback }));
       } catch (e: any) {
         return errorResult(e.message);
       }
@@ -145,18 +130,12 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
 
   server.tool(
     'traces_dependencies',
-    'Get service dependency graph — which services call which, with call counts.',
-    {
-      lookback: z.string().default('1h').describe('Time window to compute dependencies (e.g. "1h", "6h", "1d")'),
-    },
+    `Service dependency graph — which services call which. Backend: ${provider.backend}.`,
+    { lookback: z.string().default('1h').describe('Time window to compute dependencies (e.g. "1h", "1d")') },
     async ({ lookback }) => {
+      if (!provider.dependencies) return unsupported(provider, 'traces_dependencies');
       try {
-        const lookbackMs = parseDuration(lookback);
-        const endTs = Date.now();
-        const data = await fetchJSON(
-          `${jaegerUrl}/api/dependencies?endTs=${endTs}&lookback=${lookbackMs}`,
-        );
-        return textResult({ dependencies: data.data || [] });
+        return textResult(await provider.dependencies({ lookback }));
       } catch (e: any) {
         return errorResult(e.message);
       }
@@ -164,12 +143,25 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
   );
 }
 
+/** Resolve the active provider's backend name for startup display. */
+function activeBackend(): string {
+  const id = (process.env['TRACES_PROVIDER'] || 'jaeger').toLowerCase();
+  switch (id) {
+    case 'jaeger': return 'Jaeger';
+    case 'tempo': return 'Tempo';
+    case 'zipkin': return 'Zipkin';
+    case 'skywalking': return 'SkyWalking';
+    default: return id;
+  }
+}
+
 export const skill: Skill = {
   id: 'traces',
   name: 'Distributed Traces',
-  description: 'Search and analyze distributed traces via the Jaeger Query API',
+  description:
+    'Provider-agnostic trace search and inspection. Select backend via TRACES_PROVIDER (jaeger, tempo, zipkin, skywalking).',
   tools: 5,
-  backends: ['Jaeger'],
+  get backends() { return [activeBackend()]; },
   isAvailable: () => true,
   register: registerTools,
 };
