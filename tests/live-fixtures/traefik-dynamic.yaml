@@ -1,0 +1,13 @@
+http:
+  routers:
+    app-api:
+      rule: PathPrefix(`/app-api`)
+      service: app-api
+      entryPoints:
+        - web
+
+  services:
+    app-api:
+      loadBalancer:
+        servers:
+          - url: http://app-api:5000

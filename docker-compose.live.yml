@@ -1,0 +1,200 @@
+services:
+  app-api:
+    image: node:22-alpine
+    command: ["node", "/fixtures/app-api-fixture.mjs"]
+    ports:
+      - "5000:5000"
+    profiles: ["standard"]
+    volumes:
+      - ./scripts/app-api-fixture.mjs:/fixtures/app-api-fixture.mjs:ro
+    networks: ["live-test"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r=>{if(!r.ok)throw new Error(r.status)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    profiles: ["standard"]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks: ["live-test"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:16686/api/services"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    profiles: ["standard"]
+    volumes:
+      - ./tests/live-fixtures/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks: ["live-test"]
+
+  loki:
+    image: grafana/loki:2.9.8
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+    profiles: ["standard"]
+    volumes:
+      - ./tests/live-fixtures/loki-local-config.yaml:/etc/loki/local-config.yaml:ro
+    networks: ["live-test"]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "9093:9093"
+    profiles: ["standard"]
+    volumes:
+      - ./tests/live-fixtures/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks: ["live-test"]
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    ports:
+      - "3000:3000"
+    profiles: ["standard"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./tests/live-fixtures/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks: ["live-test"]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.1
+    ports:
+      - "9200:9200"
+    profiles: ["standard"]
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    networks: ["live-test"]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    ports:
+      - "8123:8123"
+    profiles: ["standard"]
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: live-test
+    networks: ["live-test"]
+
+  opa:
+    image: openpolicyagent/opa:0.68.0
+    command: ["run", "--server", "--addr=0.0.0.0:8181"]
+    ports:
+      - "8181:8181"
+    profiles: ["standard"]
+    networks: ["live-test"]
+
+  pyroscope:
+    image: pyroscope/pyroscope:0.37.2
+    command: ["server"]
+    ports:
+      - "4040:4040"
+    profiles: ["standard"]
+    networks: ["live-test"]
+
+  zipkin:
+    image: openzipkin/zipkin:2.24
+    ports:
+      - "9411:9411"
+    profiles: ["standard"]
+    networks: ["live-test"]
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    command: ["-config.file=/etc/tempo/local-config.yaml"]
+    ports:
+      - "3200:3200"
+    profiles: ["standard"]
+    volumes:
+      - ./tests/live-fixtures/tempo-local-config.yaml:/etc/tempo/local-config.yaml:ro
+    networks: ["live-test"]
+
+  envoy:
+    image: envoyproxy/envoy:v1.31.0
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"]
+    ports:
+      - "9901:9901"
+    profiles: ["standard"]
+    volumes:
+      - ./tests/live-fixtures/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    networks: ["live-test"]
+
+  consul:
+    image: hashicorp/consul:1.20
+    command: ["agent", "-server", "-ui", "-bootstrap-expect=1", "-client=0.0.0.0"]
+    ports:
+      - "8500:8500"
+    profiles: ["standard"]
+    networks: ["live-test"]
+
+  kong:
+    image: kong:3.7
+    ports:
+      - "8001:8001"
+      - "8000:8000"
+    profiles: ["standard"]
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+    volumes:
+      - ./tests/live-fixtures/kong.yml:/kong/declarative/kong.yml:ro
+    networks: ["live-test"]
+
+  traefik:
+    image: traefik:v3.1
+    command: ["--configFile=/etc/traefik/traefik.yaml"]
+    ports:
+      - "8080:8080"
+      - "8081:80"
+    profiles: ["standard"]
+    volumes:
+      - ./tests/live-fixtures/traefik.yaml:/etc/traefik/traefik.yaml:ro
+      - ./tests/live-fixtures/traefik-dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+    networks: ["live-test"]
+
+  influxdb:
+    image: influxdb:1.8-alpine
+    ports:
+      - "8086:8086"
+    profiles: ["standard"]
+    networks: ["live-test"]
+
+  fluent-bit:
+    image: fluent/fluent-bit:3.1
+    command: ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/fluent-bit.conf"]
+    ports:
+      - "2020:2020"
+    profiles: ["standard"]
+    volumes:
+      - ./tests/live-fixtures/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    networks: ["live-test"]
+
+networks:
+  live-test:
+    name: otel-mcp-live-test

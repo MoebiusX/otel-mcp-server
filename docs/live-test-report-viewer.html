@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Test Report Viewer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --panel-2: #f0f3f6;
+      --text: #1d2733;
+      --muted: #66717f;
+      --line: #d9e0e7;
+      --pass: #18794e;
+      --pass-bg: #e5f6ed;
+      --fail: #bc2f32;
+      --fail-bg: #fde8e8;
+      --skip: #8a6100;
+      --skip-bg: #fff3cd;
+      --accent: #175ddc;
+      --shadow: 0 10px 30px rgba(28, 43, 64, 0.08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    button, input, select { font: inherit; }
+
+    .shell {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1;
+      font-weight: 760;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 760px;
+    }
+
+    .dropzone {
+      display: grid;
+      gap: 10px;
+      min-width: min(100%, 420px);
+      padding: 16px;
+      border: 1px dashed #9eb0c4;
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .dropzone.dragging {
+      border-color: var(--accent);
+      background: #eef5ff;
+    }
+
+    .dropzone label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 650;
+    }
+
+    .dropzone input[type="file"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-2);
+    }
+
+    .error {
+      display: none;
+      padding: 10px 12px;
+      border: 1px solid #f0a1a3;
+      border-radius: 6px;
+      background: var(--fail-bg);
+      color: var(--fail);
+      font-weight: 650;
+    }
+
+    .error.visible { display: block; }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .stat {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .stat .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .stat .value {
+      margin-top: 8px;
+      font-size: 30px;
+      line-height: 1;
+      font-weight: 780;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .meta div {
+      min-width: 0;
+      padding: 12px 14px;
+      background: var(--panel);
+    }
+
+    .meta span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .meta strong {
+      display: block;
+      overflow: hidden;
+      margin-top: 4px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) auto auto;
+      gap: 10px;
+      align-items: center;
+      margin: 16px 0 12px;
+    }
+
+    .toolbar input,
+    .toolbar select {
+      min-height: 40px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .status-tabs {
+      display: flex;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .status-tabs button {
+      min-height: 32px;
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .status-tabs button.active {
+      background: var(--text);
+      color: #ffffff;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      min-width: 1180px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #edf1f5;
+      color: #374150;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    tbody tr:hover { background: #f8fafc; }
+
+    .skill {
+      display: grid;
+      gap: 2px;
+    }
+
+    .skill strong { font-weight: 760; }
+
+    .skill code, .tool code, .fixtures code {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 68px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .badge.passed { background: var(--pass-bg); color: var(--pass); }
+    .badge.failed { background: var(--fail-bg); color: var(--fail); }
+    .badge.skipped { background: var(--skip-bg); color: var(--skip); }
+
+    pre {
+      max-width: 360px;
+      max-height: 170px;
+      overflow: auto;
+      margin: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #111827;
+      color: #e5e7eb;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .muted { color: var(--muted); }
+
+    .empty {
+      padding: 28px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    details {
+      max-width: 520px;
+    }
+
+    summary {
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .hidden { display: none; }
+
+    @media (max-width: 980px) {
+      header, .toolbar { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .dropzone { min-width: 0; }
+    }
+
+    @media (max-width: 620px) {
+      .shell { width: min(100vw - 20px, 1440px); padding-top: 18px; }
+      .summary, .meta { grid-template-columns: 1fr; }
+      .status-tabs { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>Live Test Report</h1>
+        <p class="subtitle">Load a `.live-test-results` JSON report to review skill coverage, smoke requests, responses, durations, fixtures, skips, and failures.</p>
+      </div>
+      <section class="dropzone" id="dropzone" aria-label="Report loader">
+        <label for="fileInput">
+          <span>Report JSON</span>
+          <span class="muted" id="fileName">No file loaded</span>
+        </label>
+        <input id="fileInput" type="file" accept="application/json,.json">
+      </section>
+    </header>
+
+    <div class="error" id="error"></div>
+
+    <section id="reportView" class="hidden">
+      <div class="summary" id="summary"></div>
+      <div class="meta" id="meta"></div>
+
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search skill, tool, fixture, response">
+        <div class="status-tabs" id="statusTabs" aria-label="Status filter"></div>
+        <select id="sort">
+          <option value="order">Original order</option>
+          <option value="status">Status</option>
+          <option value="duration-desc">Slowest first</option>
+          <option value="duration-asc">Fastest first</option>
+          <option value="skill">Skill name</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Skill</th>
+              <th>Fixture</th>
+              <th>Tool</th>
+              <th>Sent</th>
+              <th>Response</th>
+              <th>Timing</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div id="empty" class="empty hidden">No results match the current filters.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      report: null,
+      fileName: '',
+      status: 'all',
+      query: '',
+      sort: 'order',
+    };
+
+    const els = {
+      dropzone: document.getElementById('dropzone'),
+      fileInput: document.getElementById('fileInput'),
+      fileName: document.getElementById('fileName'),
+      error: document.getElementById('error'),
+      reportView: document.getElementById('reportView'),
+      summary: document.getElementById('summary'),
+      meta: document.getElementById('meta'),
+      search: document.getElementById('search'),
+      statusTabs: document.getElementById('statusTabs'),
+      sort: document.getElementById('sort'),
+      rows: document.getElementById('rows'),
+      empty: document.getElementById('empty'),
+    };
+
+    function parseReport(value) {
+      if (!value || !Array.isArray(value.results)) {
+        throw new Error('The selected JSON does not look like a live-test report.');
+      }
+      return value;
+    }
+
+    function setError(message) {
+      els.error.textContent = message;
+      els.error.classList.toggle('visible', Boolean(message));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatJson(value) {
+      if (value === undefined) return '';
+      return JSON.stringify(value, null, 2);
+    }
+
+    function compact(value, maxLength = 220) {
+      if (value === undefined || value === null || value === '') return 'none';
+      const text = typeof value === 'string' ? value : JSON.stringify(value);
+      const oneLine = String(text).replace(/\s+/g, ' ').trim();
+      return oneLine.length > maxLength ? `${oneLine.slice(0, maxLength - 3)}...` : oneLine;
+    }
+
+    function formatTime(value) {
+      if (!value) return 'n/a';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+    }
+
+    function formatDuration(ms) {
+      if (!Number.isFinite(ms)) return 'n/a';
+      if (ms < 1000) return `${Math.round(ms)} ms`;
+      return `${(ms / 1000).toFixed(2)} s`;
+    }
+
+    function counts(results) {
+      return results.reduce((acc, result) => {
+        acc[result.status] = (acc[result.status] || 0) + 1;
+        acc.total += 1;
+        return acc;
+      }, { total: 0, passed: 0, failed: 0, skipped: 0 });
+    }
+
+    function totalDuration(report) {
+      const started = new Date(report.startedAt).getTime();
+      const finished = new Date(report.finishedAt).getTime();
+      if (Number.isFinite(started) && Number.isFinite(finished)) return formatDuration(finished - started);
+      const sum = (report.results || []).reduce((acc, result) => acc + (Number(result.durationMs) || 0), 0);
+      return formatDuration(sum);
+    }
+
+    function renderSummary(report) {
+      const c = counts(report.results || []);
+      const values = [
+        ['Passed', c.passed],
+        ['Failed', c.failed],
+        ['Skipped', c.skipped],
+        ['Total', c.total],
+      ];
+      els.summary.innerHTML = values.map(([label, value]) => `
+        <div class="stat">
+          <div class="label">${label}</div>
+          <div class="value">${value}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderMeta(report) {
+      const values = [
+        ['Profile', report.profile || 'n/a'],
+        ['Fixture Mode', report.fixtureMode || 'n/a'],
+        ['Image', report.image || 'n/a'],
+        ['Started', formatTime(report.startedAt)],
+        ['Elapsed', totalDuration(report)],
+      ];
+      els.meta.innerHTML = values.map(([label, value]) => `
+        <div>
+          <span>${label}</span>
+          <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
+        </div>
+      `).join('');
+    }
+
+    function renderTabs(report) {
+      const c = counts(report.results || []);
+      const tabs = [
+        ['all', `All ${c.total}`],
+        ['passed', `Pass ${c.passed}`],
+        ['failed', `Fail ${c.failed}`],
+        ['skipped', `Skip ${c.skipped}`],
+      ];
+      els.statusTabs.innerHTML = tabs.map(([value, label]) => `
+        <button type="button" data-status="${value}" class="${state.status === value ? 'active' : ''}">${label}</button>
+      `).join('');
+    }
+
+    function searchableText(result) {
+      return [
+        result.id,
+        result.name,
+        result.status,
+        result.reason,
+        result.error,
+        result.smoke?.tool,
+        JSON.stringify(result.smoke?.args || {}),
+        JSON.stringify(result.smoke?.response ?? result.smoke?.summary ?? {}),
+        (result.fixtures || []).join(' '),
+      ].filter(Boolean).join(' ').toLowerCase();
+    }
+
+    function sortedResults(results) {
+      const items = results.map((result, index) => ({ result, index }));
+      const statusRank = { failed: 0, passed: 1, skipped: 2 };
+      items.sort((a, b) => {
+        if (state.sort === 'status') return (statusRank[a.result.status] ?? 9) - (statusRank[b.result.status] ?? 9) || a.index - b.index;
+        if (state.sort === 'duration-desc') return (b.result.durationMs || 0) - (a.result.durationMs || 0) || a.index - b.index;
+        if (state.sort === 'duration-asc') return (a.result.durationMs || 0) - (b.result.durationMs || 0) || a.index - b.index;
+        if (state.sort === 'skill') return String(a.result.id).localeCompare(String(b.result.id));
+        return a.index - b.index;
+      });
+      return items.map(item => item.result);
+    }
+
+    function detailCell(result) {
+      if (result.status === 'skipped') return escapeHtml(result.reason || 'Skipped');
+      if (result.status === 'failed') {
+        const logs = result.logs ? `<details><summary>Logs</summary><pre>${escapeHtml(result.logs)}</pre></details>` : '';
+        return `${escapeHtml(result.error || 'Failed')}${logs}`;
+      }
+      const fixtureText = (result.fixtures || []).length ? `Fixture: ${(result.fixtures || []).join(', ')}` : 'Fixture: n/a';
+      return `<span class="muted">${escapeHtml(fixtureText)}</span>`;
+    }
+
+    function rowHtml(result) {
+      const smoke = result.smoke || {};
+      const response = smoke.response ?? smoke.summary;
+      const toolCount = result.expectedToolCount == null ? '' : `${result.toolCount}/${result.expectedToolCount} tools`;
+      return `
+        <tr>
+          <td><span class="badge ${escapeHtml(result.status)}">${escapeHtml(result.status)}</span></td>
+          <td><div class="skill"><strong>${escapeHtml(result.name || result.id)}</strong><code>${escapeHtml(result.id)}</code></div></td>
+          <td class="fixtures">${(result.fixtures || []).map(fixture => `<code>${escapeHtml(fixture)}</code>`).join('<br>') || '<span class="muted">none</span>'}</td>
+          <td class="tool"><code>${escapeHtml(smoke.tool || 'none')}</code></td>
+          <td><pre>${escapeHtml(formatJson(smoke.args || {}))}</pre></td>
+          <td><pre title="${escapeHtml(compact(response, 600))}">${escapeHtml(formatJson(response ?? result.reason ?? result.error ?? null))}</pre></td>
+          <td>${escapeHtml(formatDuration(result.durationMs))}<br><span class="muted">smoke ${escapeHtml(formatDuration(smoke.durationMs))}</span><br><span class="muted">${escapeHtml(toolCount)}</span></td>
+          <td>${detailCell(result)}</td>
+        </tr>
+      `;
+    }
+
+    function renderRows(report) {
+      const query = state.query.trim().toLowerCase();
+      const filtered = sortedResults(report.results || []).filter(result => {
+        if (state.status !== 'all' && result.status !== state.status) return false;
+        if (query && !searchableText(result).includes(query)) return false;
+        return true;
+      });
+      els.rows.innerHTML = filtered.map(rowHtml).join('');
+      els.empty.classList.toggle('hidden', filtered.length > 0);
+    }
+
+    function render() {
+      if (!state.report) return;
+      renderSummary(state.report);
+      renderMeta(state.report);
+      renderTabs(state.report);
+      renderRows(state.report);
+      els.reportView.classList.remove('hidden');
+    }
+
+    async function loadFile(file) {
+      if (!file) return;
+      try {
+        setError('');
+        const text = await file.text();
+        state.report = parseReport(JSON.parse(text));
+        state.fileName = file.name;
+        els.fileName.textContent = file.name;
+        render();
+      } catch (error) {
+        state.report = null;
+        els.reportView.classList.add('hidden');
+        setError(error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    els.fileInput.addEventListener('change', event => loadFile(event.target.files?.[0]));
+    els.search.addEventListener('input', event => {
+      state.query = event.target.value;
+      renderRows(state.report);
+    });
+    els.sort.addEventListener('change', event => {
+      state.sort = event.target.value;
+      renderRows(state.report);
+    });
+    els.statusTabs.addEventListener('click', event => {
+      const button = event.target.closest('button[data-status]');
+      if (!button) return;
+      state.status = button.dataset.status;
+      render();
+    });
+
+    ['dragenter', 'dragover'].forEach(type => {
+      els.dropzone.addEventListener(type, event => {
+        event.preventDefault();
+        els.dropzone.classList.add('dragging');
+      });
+    });
+    ['dragleave', 'drop'].forEach(type => {
+      els.dropzone.addEventListener(type, event => {
+        event.preventDefault();
+        els.dropzone.classList.remove('dragging');
+      });
+    });
+    els.dropzone.addEventListener('drop', event => loadFile(event.dataTransfer?.files?.[0]));
+  </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+route:
+  receiver: live-test
+
+receivers:
+  - name: live-test

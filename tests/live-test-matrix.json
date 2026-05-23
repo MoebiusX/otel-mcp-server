@@ -1,0 +1,190 @@
+{
+  "profiles": {
+    "standard": {
+      "description": "Docker Compose fixtures that are practical to run on a local workstation.",
+      "composeProfiles": ["standard"],
+      "network": "otel-mcp-live-test",
+      "env": {
+        "APP_API_URL": "http://app-api:5000",
+        "JAEGER_URL": "http://jaeger:16686",
+        "PROMETHEUS_URL": "http://prometheus:9090",
+        "LOKI_URL": "http://loki:3100",
+        "ELASTICSEARCH_URL": "http://elasticsearch:9200",
+        "ALERTMANAGER_URL": "http://alertmanager:9093",
+        "GRAFANA_URL": "http://grafana:3000",
+        "CLICKHOUSE_URL": "http://clickhouse:8123",
+        "CLICKHOUSE_AUTH_BASIC": "default:live-test",
+        "PYROSCOPE_URL": "http://pyroscope:4040",
+        "OPA_URL": "http://opa:8181",
+        "ZIPKIN_URL": "http://zipkin:9411",
+        "TEMPO_URL": "http://tempo:3200",
+        "ENVOY_ADMIN_URL": "http://envoy:9901",
+        "CONSUL_URL": "http://consul:8500",
+        "KONG_ADMIN_URL": "http://kong:8001",
+        "TRAEFIK_URL": "http://traefik:8080",
+        "INFLUX_URL": "http://influxdb:8086",
+        "FLUENTBIT_URL": "http://fluent-bit:2020"
+      },
+      "readiness": [
+        { "id": "app-api", "url": "http://127.0.0.1:5000/health", "timeoutMs": 60000 },
+        { "id": "jaeger", "url": "http://127.0.0.1:16686/api/services", "timeoutMs": 90000 },
+        { "id": "prometheus", "url": "http://127.0.0.1:9090/-/ready", "timeoutMs": 90000 },
+        { "id": "loki", "url": "http://127.0.0.1:3100/ready", "timeoutMs": 90000 },
+        { "id": "alertmanager", "url": "http://127.0.0.1:9093/-/ready", "timeoutMs": 90000 },
+        { "id": "grafana", "url": "http://127.0.0.1:3000/api/health", "timeoutMs": 120000 },
+        { "id": "elasticsearch", "url": "http://127.0.0.1:9200/_cluster/health", "timeoutMs": 180000 },
+        { "id": "clickhouse", "url": "http://127.0.0.1:8123/ping", "timeoutMs": 90000 },
+        { "id": "opa", "url": "http://127.0.0.1:8181/health", "timeoutMs": 90000 },
+        { "id": "pyroscope", "url": "http://127.0.0.1:4040/", "timeoutMs": 90000 },
+        { "id": "zipkin", "url": "http://127.0.0.1:9411/health", "timeoutMs": 90000 },
+        { "id": "tempo", "url": "http://127.0.0.1:3200/ready", "timeoutMs": 120000 },
+        { "id": "envoy", "url": "http://127.0.0.1:9901/server_info", "timeoutMs": 90000 },
+        { "id": "consul", "url": "http://127.0.0.1:8500/v1/status/leader", "timeoutMs": 120000 },
+        { "id": "kong", "url": "http://127.0.0.1:8001/status", "timeoutMs": 120000 },
+        { "id": "traefik", "url": "http://127.0.0.1:8080/api/version", "timeoutMs": 90000 },
+        { "id": "influxdb", "url": "http://127.0.0.1:8086/health", "timeoutMs": 90000 },
+        { "id": "fluent-bit", "url": "http://127.0.0.1:2020/api/v1/uptime", "timeoutMs": 90000 }
+      ]
+    }
+  },
+  "skills": {
+    "traces": {
+      "profiles": ["standard"],
+      "fixtures": ["jaeger"],
+      "smoke": { "tool": "traces_services", "args": {} },
+      "metricsContains": "backend=\"jaeger\""
+    },
+    "metrics": {
+      "profiles": ["standard"],
+      "fixtures": ["prometheus"],
+      "smoke": { "tool": "metrics_query", "args": { "query": "up" } },
+      "metricsContains": "backend=\"prometheus\""
+    },
+    "logs": {
+      "profiles": ["standard"],
+      "fixtures": ["loki"],
+      "smoke": { "tool": "logs_labels", "args": {} },
+      "metricsContains": "backend=\"loki\""
+    },
+    "elasticsearch": {
+      "profiles": ["standard"],
+      "fixtures": ["elasticsearch"],
+      "smoke": { "tool": "es_cluster_health", "args": {} },
+      "metricsContains": "backend=\"elasticsearch\""
+    },
+    "alertmanager": {
+      "profiles": ["standard"],
+      "fixtures": ["alertmanager"],
+      "smoke": { "tool": "alertmanager_status", "args": {} },
+      "metricsContains": "backend=\"alertmanager\""
+    },
+    "grafana": {
+      "profiles": ["standard"],
+      "fixtures": ["grafana"],
+      "smoke": { "tool": "grafana_health", "args": {} },
+      "metricsContains": "backend=\"grafana\""
+    },
+    "cilium": {
+      "profiles": [],
+      "skipReason": "Requires a Kubernetes/Cilium fixture profile with kernel eBPF support; not part of the standard Docker fixture."
+    },
+    "kubernetes": {
+      "profiles": [],
+      "skipReason": "Requires a real kube-apiserver, ServiceAccount token, and CA; use a future kind profile instead of the standard fixture."
+    },
+    "clickhouse": {
+      "profiles": ["standard"],
+      "fixtures": ["clickhouse"],
+      "smoke": { "tool": "clickhouse_databases", "args": {} },
+      "metricsContains": "backend=\"clickhouse\""
+    },
+    "pyroscope": {
+      "profiles": ["standard"],
+      "fixtures": ["pyroscope"],
+      "smoke": { "tool": "pyroscope_profile_types", "args": {} },
+      "metricsContains": "backend=\"pyroscope\""
+    },
+    "opa": {
+      "profiles": ["standard"],
+      "fixtures": ["opa"],
+      "smoke": { "tool": "opa_health", "args": {} },
+      "metricsContains": "backend=\"opa\""
+    },
+    "zipkin": {
+      "profiles": ["standard"],
+      "fixtures": ["zipkin"],
+      "smoke": { "tool": "zipkin_services", "args": {} },
+      "metricsContains": "backend=\"zipkin\""
+    },
+    "envoy": {
+      "profiles": ["standard"],
+      "fixtures": ["envoy"],
+      "smoke": { "tool": "envoy_server_info", "args": {} },
+      "metricsContains": "backend=\"envoy\""
+    },
+    "consul": {
+      "profiles": ["standard"],
+      "fixtures": ["consul"],
+      "smoke": { "tool": "consul_health", "args": {} },
+      "metricsContains": "backend=\"consul\""
+    },
+    "kong": {
+      "profiles": ["standard"],
+      "fixtures": ["kong"],
+      "smoke": { "tool": "kong_status", "args": {} },
+      "metricsContains": "backend=\"kong\""
+    },
+    "traefik": {
+      "profiles": ["standard"],
+      "fixtures": ["traefik"],
+      "smoke": { "tool": "traefik_overview", "args": {} },
+      "metricsContains": "backend=\"traefik\""
+    },
+    "influx": {
+      "profiles": ["standard"],
+      "fixtures": ["influxdb"],
+      "smoke": { "tool": "influx_health", "args": {} },
+      "metricsContains": "backend=\"influxdb\""
+    },
+    "opentsdb": {
+      "profiles": [],
+      "skipReason": "OpenTSDB needs HBase/ZooKeeper and is intentionally excluded from the standard local fixture."
+    },
+    "graylog": {
+      "profiles": [],
+      "skipReason": "Graylog requires MongoDB and an Elasticsearch/OpenSearch backend; keep it for a future full profile."
+    },
+    "tempo": {
+      "profiles": ["standard"],
+      "fixtures": ["tempo"],
+      "smoke": { "tool": "tempo_tags", "args": {} },
+      "metricsContains": "backend=\"tempo\""
+    },
+    "skywalking": {
+      "profiles": [],
+      "skipReason": "SkyWalking OAP is a heavy Java service with storage dependencies; keep it for a future full profile."
+    },
+    "pinpoint": {
+      "profiles": [],
+      "skipReason": "Pinpoint needs its multi-service web/collector/storage stack; keep it for a future full profile."
+    },
+    "pipeline": {
+      "profiles": ["standard"],
+      "fixtures": ["fluent-bit"],
+      "smoke": { "tool": "pipeline_fluentbit", "args": {} },
+      "metricsContains": "backend=\"fluentbit\""
+    },
+    "zk-proofs": {
+      "profiles": ["standard"],
+      "fixtures": ["app-api"],
+      "smoke": { "tool": "zk_stats", "args": {} },
+      "metricsContains": "backend=\"app-api\""
+    },
+    "system": {
+      "profiles": ["standard"],
+      "fixtures": ["app-api"],
+      "smoke": { "tool": "system_health", "args": {} },
+      "metricsContains": "backend=\"app-api\""
+    }
+  }
+}

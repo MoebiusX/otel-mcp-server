@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+auth-keys.json
+.DS_Store
+cluster-report-*.txt
+.live-test-results/
