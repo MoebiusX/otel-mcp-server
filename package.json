@@ -45,6 +45,8 @@
     "dev:http": "tsx src/index.ts --http 3001",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:live": "node scripts/live-test.mjs",
+    "test:live:standard": "node scripts/live-test.mjs --profile standard",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build"

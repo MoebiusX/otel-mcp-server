@@ -1,0 +1,11 @@
+_format_version: "3.0"
+
+services:
+  - name: app-api
+    url: http://app-api:5000
+    routes:
+      - name: app-api-root
+        paths:
+          - /app-api
+
+plugins: []

@@ -96,7 +96,7 @@ docker run -p 3001:3001 \
 
 ## Configuration
 
-All configuration is via environment variables. See [`.env.example`](.env.example) for the full list.
+All configuration is via environment variables. The commonly used backend, auth, and runtime variables are listed below.
 
 ### Backend URLs
 
@@ -776,12 +776,18 @@ npm run lint
 # Build
 npm run build
 
-# Tests (106 tests across 8 suites)
+# Tests (155 tests across 11 suites)
 npm test
 
 # Run a single test file
 npx vitest run tests/auth.test.ts
+
+# Docker live tests against local backend fixtures
+npm run test:live
+node scripts/live-test.mjs --skill metrics
 ```
+
+For the Docker-backed one-skill-at-a-time workflow, fixture coverage, report viewer, and troubleshooting, see [docs/live-testing.md](docs/live-testing.md).
 
 ## Appendix: Live Cluster Analysis
 
