@@ -7,7 +7,7 @@ COPY src/ src/
 RUN npm run build
 
 FROM node:22-alpine
-LABEL org.opencontainers.image.source="https://github.com/KrystalineX/otel-mcp-server"
+LABEL org.opencontainers.image.source="https://github.com/MoebiusX/otel-mcp-server"
 LABEL org.opencontainers.image.description="OpenTelemetry MCP Server"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
