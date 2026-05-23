@@ -9,15 +9,15 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 > Give any LLM agent the ability to query your Jaeger traces, run PromQL, search Loki logs, and investigate production issues — through a standard protocol.
 
 ```
-┌─────────────────┐     MCP (stdio/HTTP)     ┌──────────────────┐──► Jaeger · Zipkin · Tempo · SkyWalking · Pinpoint
-│  Claude Desktop │ ◄──────────────────────► │                  │──► Prometheus · InfluxDB · OpenTSDB
-│  GitHub Copilot │                          │  otel-mcp-server │──► Loki · ClickHouse · Graylog (logs)
-│  Custom Agent   │                          │                  │──► Elasticsearch · Alertmanager
-└─────────────────┘                          │   25 skills      │──► Grafana · Pyroscope · OPA
-                                             │   111 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
-                                             │   authenticated  │──► Envoy · Consul · Kong · Traefik
-                                             └──────────────────┘──► Fluent Bit · Beats · Vector · Alloy
-                                                                  └─► App API    (ZK/system)
+┌─────────────────┐      MCP     ┌──────────────────┐──► Jaeger · Zipkin · Tempo · SkyWalking · Pinpoint
+│  Claude Desktop │ ◄──────────► │                  │──► Prometheus · InfluxDB · OpenTSDB
+│  GitHub Copilot │ (stdio/HTTP) │  otel-mcp-server │──► Loki · ClickHouse · Graylog (logs)
+│  Custom Agent   │              │                  │──► Elasticsearch · Alertmanager
+└─────────────────┘              │   25 skills      │──► Grafana · Pyroscope · OPA
+                                 │   111 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
+                                 │   authenticated  │──► Envoy · Consul · Kong · Traefik
+                                 └──────────────────┘──► Fluent Bit · Beats · Vector · Alloy
+                                                     └─► App API    (ZK/system)
 ```
 
 ## Example
