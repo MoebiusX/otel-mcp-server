@@ -5,3 +5,4 @@ dist/
 auth-keys.json
 .DS_Store
 cluster-report-*.txt
+.live-test-results/
