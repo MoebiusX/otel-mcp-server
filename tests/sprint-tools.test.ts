@@ -48,7 +48,6 @@ describe('new skill registration', () => {
     ['clickhouse', 'CLICKHOUSE_URL', 5],
     ['pyroscope', 'PYROSCOPE_URL', 4],
     ['opa', 'OPA_URL', 4],
-    ['zipkin', 'ZIPKIN_URL', 5],
     ['envoy', 'ENVOY_ADMIN_URL', 4],
     ['consul', 'CONSUL_URL', 5],
     ['kong', 'KONG_ADMIN_URL', 4],
@@ -56,8 +55,6 @@ describe('new skill registration', () => {
     ['influx', 'INFLUX_URL', 3],
     ['opentsdb', 'OPENTSDB_URL', 3],
     ['graylog', 'GRAYLOG_URL', 3],
-    ['tempo', 'TEMPO_URL', 4],
-    ['skywalking', 'SKYWALKING_URL', 3],
     ['pinpoint', 'PINPOINT_URL', 3],
     ['pipeline', 'FLUENTBIT_URL', 4],
   ];
@@ -155,52 +152,8 @@ describe('pyroscope', () => {
   });
 });
 
-// ─── Zipkin (trace summary) ────────────────────────────────────────────────
-
-describe('zipkin', () => {
-  beforeEach(() => {
-    process.env.ZIPKIN_URL = 'http://zipkin-test:9411';
-    vi.stubGlobal('fetch', mockFetch({
-      '/api/v2/traces': [[
-        { traceId: 't1', id: 's1', name: 'GET /', timestamp: 1_000_000, duration: 500_000, localEndpoint: { serviceName: 'svc' }, tags: {} },
-        { traceId: 't1', id: 's2', parentId: 's1', name: 'db', timestamp: 1_100_000, duration: 100_000, localEndpoint: { serviceName: 'db' }, tags: { error: '1' } },
-      ]],
-    }));
-  });
-
-  it('summarizes traces with duration and error flag', async () => {
-    const { client } = await createTestClient(['zipkin']);
-    const out = parse(await client.callTool({ name: 'zipkin_traces_search', arguments: { service: 'svc' } }));
-    expect(out.count).toBe(1);
-    expect(out.traces[0]).toMatchObject({ traceId: 't1', rootOperation: 'GET /', spanCount: 2, duration_ms: 500, hasErrors: true });
-    expect(out.traces[0].services.sort()).toEqual(['db', 'svc']);
-  });
-});
-
-// ─── Tempo (OTLP decode) ───────────────────────────────────────────────────
-
-describe('tempo', () => {
-  beforeEach(() => {
-    process.env.TEMPO_URL = 'http://tempo-test:3200';
-    vi.stubGlobal('fetch', mockFetch({
-      '/api/traces/': {
-        batches: [{
-          resource: { attributes: [{ key: 'service.name', value: { stringValue: 'api' } }] },
-          scopeSpans: [{ spans: [{ spanId: 'a', name: 'GET /', startTimeUnixNano: '1000000000', endTimeUnixNano: '1500000000', attributes: [{ key: 'http.method', value: { stringValue: 'GET' } }] }] }],
-        }],
-      },
-    }));
-  });
-
-  it('decodes OTLP spans with correct duration and attributes', async () => {
-    const { client } = await createTestClient(['tempo']);
-    const out = parse(await client.callTool({ name: 'tempo_trace_get', arguments: { trace_id: 'abc' } }));
-    expect(out.spanCount).toBe(1);
-    expect(out.services).toEqual(['api']);
-    expect(out.spans[0]).toMatchObject({ spanId: 'a', name: 'GET /', service: 'api', duration_ms: 500 });
-    expect(out.spans[0].attributes['http.method']).toBe('GET');
-  });
-});
+// ─── Zipkin / Tempo / SkyWalking are now providers under the traces layer.
+//     See tests/traces-layer.test.ts for their behavioral coverage.
 
 // ─── Envoy (cluster health derivation) ──────────────────────────────────────
 
@@ -376,23 +329,13 @@ describe('traefik', () => {
 describe('skywalking', () => {
   beforeEach(() => {
     process.env.SKYWALKING_URL = 'http://sw-test:12800';
-    vi.stubGlobal('fetch', mockFetch({
-      '/graphql': { data: { services: [{ id: '1', name: 'svc', group: 'g' }] } },
-    }));
+    vi.stubGlobal('fetch', mockFetch({}));
   });
 
-  it('lists services via GraphQL', async () => {
-    const { client } = await createTestClient(['skywalking']);
-    const out = parse(await client.callTool({ name: 'skywalking_services', arguments: {} }));
-    expect(out.count).toBe(1);
-    expect(out.services[0]).toMatchObject({ name: 'svc' });
-  });
-
-  it('surfaces GraphQL errors', async () => {
-    vi.stubGlobal('fetch', mockFetch({ '/graphql': { errors: [{ message: 'bad query' }] } }));
-    const { client } = await createTestClient(['skywalking']);
-    const out = await client.callTool({ name: 'skywalking_services', arguments: {} });
-    expect(out.isError).toBe(true);
+  it('is no longer registered as a standalone skill (now a traces provider)', async () => {
+    const { client } = await createTestClient(['skywalking', 'system']);
+    const names = (await client.listTools()).tools.map((t) => t.name);
+    expect(names.some((n) => n.startsWith('skywalking_'))).toBe(false);
   });
 });
 

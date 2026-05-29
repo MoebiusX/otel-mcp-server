@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Traces refactor (Layer→Provider).** Tempo, Zipkin, and SkyWalking are no longer standalone skills. They are now providers under a single provider-agnostic `traces` skill, selectable via `TRACES_PROVIDER` (`jaeger` [default] | `tempo` | `zipkin` | `skywalking`). The verb surface (`traces_search`, `trace_get`, `traces_services`, `traces_operations`, `traces_dependencies`) is stable across providers; capability gaps (e.g. Tempo has no dependency API) return a clear `not supported by provider "X"` error.
+  - Provider implementations live under `src/providers/traces/{jaeger,tempo,zipkin,skywalking}.ts` behind a `TracesProvider` interface (`src/providers/traces/types.ts`). This establishes the template for future layer/provider collapses (metrics, logs).
+  - Env vars: prefer namespaced `TRACES_<VENDOR>_URL` (`TRACES_TEMPO_URL`, `TRACES_ZIPKIN_URL`, `TRACES_SKYWALKING_URL`); legacy `TEMPO_URL` / `ZIPKIN_URL` / `SKYWALKING_URL` continue to work. Auth still uses per-vendor prefixes (`JAEGER_AUTH_*`, `TEMPO_AUTH_*`, `ZIPKIN_AUTH_*`, `SKYWALKING_AUTH_*`).
+  - Skill count: 25 → 22. Tool count: 111 → 99 (5 superset verbs replace 5 + 4 + 3 = 12 vendor-prefixed tools).
+  - Pinpoint stays as a standalone skill — its API surface (version-specific GET passthrough) doesn't fit the layer verbs cleanly.
+- Test count: 155 → 162. Added `tests/traces-layer.test.ts` covering each provider through the layer (including the unsupported-capability path), and pruned the dropped vendor blocks from `tests/sprint-tools.test.ts` and `tests/skill-registry.test.ts`.
+
 ## [1.3.0] - 2026-05-23
 
 ### Added
