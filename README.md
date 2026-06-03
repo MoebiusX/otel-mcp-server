@@ -14,7 +14,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 │  GitHub Copilot │ (stdio/HTTP) │  otel-mcp-server │──► Loki · ClickHouse · Graylog (logs)
 │  Custom Agent   │              │                  │──► Pinpoint · Elasticsearch · Alertmanager
 └─────────────────┘              │   22 skills      │──► Grafana · Pyroscope · OPA
-                                 │   99 tools       │──► Cilium · Kubernetes (eBPF/CRDs)
+                                 │   100 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
                                  │   authenticated  │──► Envoy · Consul · Kong · Traefik
                                  └──────────────────┘──► Fluent Bit · Beats · Vector · Alloy
                                                      └─► App API    (ZK/system)
@@ -36,11 +36,13 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **99 tools** across 22 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), ZK proofs, system health
+- **100 tools** across 22 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), ZK proofs, system health
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
 - **Selective skills** — enable only the skills you need (`--tools traces,metrics,logs`)
+- **Multi-version aware** — a typed `capability → product → protocol-adapter` model tracks which versions and protocol features each backend supports; runtime detection surfaces live product/version on `/health`, and `MCP_VERSION_GATING` (`off`/`warn`/`enforce`) can guard version-sensitive features (unknown versions always pass optimistically)
+- **Multi-backend & failover** — a single skill can address multiple named instances and fail over across replicas; tools accept an optional SSRF-safe `target` argument (see [Multi-backend instances & failover](#multi-backend-instances--failover))
 - **Self-metrics** — `GET /metrics` endpoint with tool call counts, backend latencies, auth attempts
 - **Container-native** — env-var config, K8s Secret mounting, multi-stage Dockerfile
 - **Zero dependencies** beyond the MCP SDK and Zod
@@ -360,6 +362,8 @@ regardless of configuration.
 
 ### Metrics (Prometheus) — `metrics` — 6 tools
 
+> Multi-backend: every tool accepts an optional `target` argument to select a named instance (see [Multi-backend instances & failover](#multi-backend-instances--failover)).
+
 | Tool | Description |
 |------|-------------|
 | `metrics_query` | Instant PromQL query |
@@ -371,6 +375,8 @@ regardless of configuration.
 
 ### Logs (Loki) — `logs` — 4 tools
 
+> Multi-backend: every tool accepts an optional `target` argument to select a named instance (see [Multi-backend instances & failover](#multi-backend-instances--failover)).
+
 | Tool | Description |
 |------|-------------|
 | `logs_query` | LogQL query for log lines |
@@ -380,7 +386,7 @@ regardless of configuration.
 
 ### Elasticsearch / OpenSearch — `elasticsearch` — 5 tools
 
-> Enabled when `ELASTICSEARCH_URL` is set.
+> Enabled when `ELASTICSEARCH_URL` is set. Multi-backend: every tool accepts an optional `target` argument to select a named instance (see [Multi-backend instances & failover](#multi-backend-instances--failover)).
 
 | Tool | Description |
 |------|-------------|
@@ -593,7 +599,7 @@ regardless of configuration.
 | `zk_solvency` | Latest solvency proof |
 | `zk_stats` | Aggregate proof statistics |
 
-### System — `system` — 4 tools
+### System — `system` — 5 tools
 
 | Tool | Description |
 |------|-------------|
@@ -601,6 +607,7 @@ regardless of configuration.
 | `anomalies_baselines` | Detection baselines |
 | `system_health` | Full health check |
 | `system_topology` | Service dependency topology |
+| `backend_capabilities` | Supported product versions and per-feature availability; optionally classifies a concrete version into its support tier and reports the active gating mode |
 
 ### Selective Skills
 
