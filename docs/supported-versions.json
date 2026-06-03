@@ -1,0 +1,1645 @@
+{
+  "protocols": [
+    {
+      "id": "promql",
+      "name": "Prometheus query API",
+      "queryLanguage": "PromQL",
+      "products": [
+        "Prometheus",
+        "Grafana Mimir",
+        "Thanos",
+        "Cortex",
+        "VictoriaMetrics"
+      ],
+      "specUrl": "https://prometheus.io/docs/prometheus/latest/querying/basics/",
+      "baselineFeatures": [
+        "sum",
+        "min",
+        "max",
+        "avg",
+        "group",
+        "stddev",
+        "stdvar",
+        "count",
+        "count_values",
+        "bottomk",
+        "topk",
+        "quantile",
+        "by",
+        "without",
+        "on",
+        "ignoring",
+        "group_left",
+        "group_right",
+        "rate",
+        "irate",
+        "increase",
+        "resets",
+        "changes",
+        "idelta",
+        "delta",
+        "deriv",
+        "predict_linear",
+        "holt_winters",
+        "abs",
+        "ceil",
+        "floor",
+        "round",
+        "exp",
+        "ln",
+        "log2",
+        "log10",
+        "sqrt",
+        "clamp",
+        "clamp_min",
+        "clamp_max",
+        "sgn",
+        "time",
+        "timestamp",
+        "minute",
+        "hour",
+        "day_of_week",
+        "day_of_month",
+        "day_of_year",
+        "days_in_month",
+        "month",
+        "year",
+        "label_replace",
+        "label_join",
+        "histogram_quantile",
+        "histogram_fraction",
+        "absent",
+        "absent_over_time",
+        "vector",
+        "scalar",
+        "sort",
+        "sort_desc",
+        "avg_over_time",
+        "min_over_time",
+        "max_over_time",
+        "sum_over_time",
+        "count_over_time",
+        "quantile_over_time",
+        "stddev_over_time",
+        "stdvar_over_time",
+        "last_over_time",
+        "present_over_time"
+      ],
+      "versionedFeatures": {
+        "subqueries": {
+          "summary": "Subquery range selectors `expr[5m:1m]`."
+        },
+        "at_modifier": {
+          "summary": "`@` modifier to fix evaluation timestamp."
+        },
+        "negative_offset": {
+          "summary": "Negative `offset` to look ahead."
+        },
+        "native_histograms": {
+          "summary": "Native (sparse) histogram queries."
+        },
+        "utf8_names": {
+          "summary": "UTF-8 metric and label names."
+        },
+        "sort_by_label": {
+          "summary": "`sort_by_label` / `sort_by_label_desc`."
+        },
+        "info_func": {
+          "summary": "`info()` function for metadata joins."
+        },
+        "double_exp_smoothing": {
+          "summary": "`double_exponential_smoothing` (renamed from `holt_winters` in 3.0)."
+        }
+      },
+      "backends": [
+        {
+          "skill": "metrics",
+          "backend": "Cortex",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ],
+            "should": [
+              "0.x"
+            ]
+          },
+          "featuresSince": {
+            "subqueries": "1.0",
+            "at_modifier": "1.11",
+            "negative_offset": "1.11"
+          }
+        },
+        {
+          "skill": "metrics",
+          "backend": "Grafana Mimir",
+          "productVersions": {
+            "must": [
+              "2.14",
+              "2.13"
+            ],
+            "should": [
+              "2.10"
+            ],
+            "optional": [
+              "2.0"
+            ]
+          },
+          "featuresSince": {
+            "subqueries": "2.0",
+            "at_modifier": "2.0",
+            "negative_offset": "2.0",
+            "native_histograms": "2.10",
+            "utf8_names": "2.14",
+            "sort_by_label": "2.13"
+          }
+        },
+        {
+          "skill": "metrics",
+          "backend": "Prometheus",
+          "productVersions": {
+            "must": [
+              "3.x"
+            ],
+            "should": [
+              "2.55",
+              "2.5x"
+            ],
+            "optional": [
+              "2.4x"
+            ]
+          },
+          "featuresSince": {
+            "subqueries": "2.7",
+            "at_modifier": "2.26",
+            "negative_offset": "2.26",
+            "native_histograms": "3.0",
+            "utf8_names": "3.0",
+            "sort_by_label": "2.55",
+            "info_func": "3.0",
+            "double_exp_smoothing": "3.0"
+          }
+        },
+        {
+          "skill": "metrics",
+          "backend": "Thanos",
+          "productVersions": {
+            "must": [
+              "0.37",
+              "0.36"
+            ],
+            "should": [
+              "0.34"
+            ],
+            "optional": [
+              "0.30"
+            ]
+          },
+          "featuresSince": {
+            "subqueries": "0.10",
+            "at_modifier": "0.21",
+            "negative_offset": "0.21",
+            "native_histograms": "0.34",
+            "utf8_names": "0.37",
+            "sort_by_label": "0.36"
+          }
+        },
+        {
+          "skill": "metrics",
+          "backend": "VictoriaMetrics",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ],
+            "should": [
+              "0.x"
+            ]
+          },
+          "featuresSince": {
+            "subqueries": "1.0",
+            "at_modifier": "1.54",
+            "negative_offset": "1.54",
+            "sort_by_label": "1.93"
+          }
+        }
+      ]
+    },
+    {
+      "id": "logql",
+      "name": "Loki query API",
+      "queryLanguage": "LogQL",
+      "products": [
+        "Grafana Loki"
+      ],
+      "specUrl": "https://grafana.com/docs/loki/latest/query/",
+      "baselineFeatures": [
+        "stream_selector",
+        "line_filter_eq",
+        "line_filter_neq",
+        "line_filter_regex",
+        "json",
+        "logfmt",
+        "regexp",
+        "unpack",
+        "line_format",
+        "label_format",
+        "label_filter",
+        "rate",
+        "count_over_time",
+        "bytes_rate",
+        "bytes_over_time",
+        "sum",
+        "avg",
+        "min",
+        "max",
+        "stddev",
+        "stdvar",
+        "count",
+        "topk",
+        "bottomk",
+        "quantile_over_time",
+        "first_over_time",
+        "last_over_time",
+        "absent_over_time",
+        "sum_over_time",
+        "avg_over_time",
+        "min_over_time",
+        "max_over_time",
+        "unwrap",
+        "by",
+        "without"
+      ],
+      "versionedFeatures": {
+        "ip_filter": {
+          "summary": "IP-address matching with `ip()`."
+        },
+        "pattern_parser": {
+          "summary": "`pattern` parser for structured extraction."
+        },
+        "drop_stage": {
+          "summary": "`drop` label stage."
+        },
+        "decolorize": {
+          "summary": "`decolorize` stage to strip ANSI codes."
+        },
+        "structured_metadata": {
+          "summary": "Query over structured metadata."
+        },
+        "keep_stage": {
+          "summary": "`keep` label stage."
+        },
+        "distinct": {
+          "summary": "`distinct` label filter."
+        }
+      },
+      "backends": [
+        {
+          "skill": "logs",
+          "backend": "Grafana Loki",
+          "productVersions": {
+            "must": [
+              "3.x"
+            ],
+            "should": [
+              "2.9"
+            ],
+            "optional": [
+              "2.8"
+            ]
+          },
+          "featuresSince": {
+            "ip_filter": "2.5",
+            "pattern_parser": "2.9",
+            "drop_stage": "2.9",
+            "decolorize": "2.9",
+            "structured_metadata": "3.0",
+            "keep_stage": "3.0",
+            "distinct": "3.1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "esdsl",
+      "name": "Elasticsearch Query DSL",
+      "queryLanguage": "Query DSL",
+      "products": [
+        "Elasticsearch",
+        "OpenSearch",
+        "Quickwit",
+        "Elastic APM"
+      ],
+      "specUrl": "https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html",
+      "baselineFeatures": [
+        "match",
+        "match_phrase",
+        "match_phrase_prefix",
+        "multi_match",
+        "term",
+        "terms",
+        "terms_set",
+        "range",
+        "exists",
+        "prefix",
+        "wildcard",
+        "regexp",
+        "fuzzy",
+        "ids",
+        "query_string",
+        "simple_query_string",
+        "bool",
+        "dis_max",
+        "boosting",
+        "constant_score",
+        "function_score",
+        "nested",
+        "avg",
+        "sum",
+        "min",
+        "max",
+        "stats",
+        "extended_stats",
+        "value_count",
+        "cardinality",
+        "percentiles",
+        "percentile_ranks",
+        "top_hits",
+        "geo_bounds",
+        "terms_agg",
+        "date_histogram",
+        "histogram",
+        "range_agg",
+        "date_range",
+        "filters",
+        "significant_terms",
+        "geo_distance",
+        "missing",
+        "global",
+        "sampler",
+        "derivative",
+        "cumulative_sum",
+        "moving_fn",
+        "bucket_script",
+        "bucket_selector",
+        "serial_diff",
+        "avg_bucket",
+        "max_bucket",
+        "min_bucket",
+        "sum_bucket",
+        "sort",
+        "source_filtering",
+        "highlight",
+        "paging",
+        "collapse",
+        "track_total_hits"
+      ],
+      "versionedFeatures": {
+        "search_after": {
+          "summary": "Deep pagination via `search_after`."
+        },
+        "composite_aggs": {
+          "summary": "Composite aggregation for paginated buckets."
+        },
+        "async_search": {
+          "summary": "Async search API."
+        },
+        "pit_search": {
+          "summary": "Point-in-time search context."
+        },
+        "runtime_fields": {
+          "summary": "Runtime (schema-on-read) fields."
+        },
+        "esql": {
+          "summary": "ES|QL piped query language."
+        }
+      },
+      "backends": [
+        {
+          "skill": "elasticsearch",
+          "backend": "Elasticsearch",
+          "productVersions": {
+            "must": [
+              "9.x"
+            ],
+            "should": [
+              "8.x"
+            ],
+            "optional": [
+              "7.x"
+            ]
+          },
+          "featuresSince": {
+            "search_after": "5.0",
+            "composite_aggs": "6.1",
+            "async_search": "7.7",
+            "pit_search": "7.10",
+            "runtime_fields": "7.11",
+            "esql": "8.14"
+          }
+        },
+        {
+          "skill": "elasticsearch",
+          "backend": "OpenSearch",
+          "productVersions": {
+            "must": [
+              "2.x"
+            ],
+            "should": [
+              "1.x"
+            ]
+          },
+          "featuresSince": {
+            "search_after": "1.0",
+            "composite_aggs": "1.0",
+            "pit_search": "2.4"
+          }
+        }
+      ]
+    },
+    {
+      "id": "jaeger",
+      "name": "Jaeger Query API",
+      "queryLanguage": "Jaeger Query",
+      "products": [
+        "Jaeger",
+        "Grafana Tempo (Jaeger-compatible)"
+      ],
+      "specUrl": "https://www.jaegertracing.io/docs/latest/apis/",
+      "baselineFeatures": [
+        "search_by_service",
+        "search_by_operation",
+        "search_by_tags",
+        "get_trace_by_id",
+        "lookback_window",
+        "limit",
+        "min_duration",
+        "max_duration"
+      ],
+      "versionedFeatures": {
+        "services_list": {
+          "summary": "List known services."
+        },
+        "operations_list": {
+          "summary": "List operations for a service."
+        },
+        "dependencies_graph": {
+          "summary": "Service dependency graph (needs dependency job)."
+        },
+        "otlp_native_storage": {
+          "summary": "Native OTLP ingestion path."
+        },
+        "clickhouse_storage_v2": {
+          "summary": "Jaeger v2 (OpenTelemetry-collector backed)."
+        }
+      },
+      "backends": [
+        {
+          "skill": "traces",
+          "backend": "Jaeger",
+          "productVersions": {
+            "must": [
+              "2.x"
+            ],
+            "should": [
+              "1.6x",
+              "1.5x"
+            ],
+            "optional": [
+              "1.4x"
+            ]
+          },
+          "featuresSince": {
+            "services_list": "1.0",
+            "operations_list": "1.0",
+            "dependencies_graph": "1.0",
+            "otlp_native_storage": "1.35",
+            "clickhouse_storage_v2": "2.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "traceql",
+      "name": "Tempo TraceQL API",
+      "queryLanguage": "TraceQL",
+      "products": [
+        "Grafana Tempo"
+      ],
+      "specUrl": "https://grafana.com/docs/tempo/latest/traceql/",
+      "baselineFeatures": [
+        "get_trace_by_id",
+        "span_attribute_filter",
+        "resource_attribute_filter",
+        "duration_filter",
+        "limit"
+      ],
+      "versionedFeatures": {
+        "traceql_basic": {
+          "summary": "Basic span selectors `{ ... }`."
+        },
+        "traceql_structural": {
+          "summary": "Structural operators (descendant/child/sibling)."
+        },
+        "traceql_aggregates": {
+          "summary": "Aggregates over matched spans."
+        },
+        "metrics_from_traces": {
+          "summary": "TraceQL metrics (rate/quantile_over_time)."
+        },
+        "traceql_instrument": {
+          "summary": "Exemplars / instrumented results."
+        }
+      },
+      "backends": [
+        {
+          "skill": "traces",
+          "backend": "Tempo",
+          "productVersions": {
+            "must": [
+              "2.7",
+              "2.6"
+            ],
+            "should": [
+              "2.5"
+            ],
+            "optional": [
+              "2.4"
+            ]
+          },
+          "featuresSince": {
+            "traceql_basic": "2.0",
+            "traceql_structural": "2.2",
+            "traceql_aggregates": "2.3",
+            "metrics_from_traces": "2.4",
+            "traceql_instrument": "2.6"
+          }
+        }
+      ]
+    },
+    {
+      "id": "zipkin",
+      "name": "Zipkin API v2",
+      "queryLanguage": "Zipkin Query",
+      "products": [
+        "Zipkin"
+      ],
+      "specUrl": "https://zipkin.io/zipkin-api/",
+      "baselineFeatures": [
+        "search",
+        "get_trace_by_id",
+        "services_list",
+        "span_names",
+        "dependencies",
+        "lookback",
+        "limit",
+        "min_duration"
+      ],
+      "versionedFeatures": {
+        "api_v2": {
+          "summary": "Zipkin API v2 (v1 endpoints are unsupported)."
+        }
+      },
+      "backends": [
+        {
+          "skill": "traces",
+          "backend": "Zipkin",
+          "productVersions": {
+            "must": [
+              "3.x"
+            ],
+            "should": [
+              "2.x"
+            ]
+          },
+          "featuresSince": {
+            "api_v2": "2.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "skywalking",
+      "name": "SkyWalking OAP GraphQL",
+      "queryLanguage": "GraphQL",
+      "products": [
+        "Apache SkyWalking"
+      ],
+      "specUrl": "https://skywalking.apache.org/docs/",
+      "baselineFeatures": [
+        "trace_query",
+        "get_trace_by_id",
+        "services_list",
+        "endpoints_list",
+        "topology",
+        "dependencies",
+        "duration_window"
+      ],
+      "versionedFeatures": {
+        "graphql_v3_schema": {
+          "summary": "Current GraphQL query-protocol schema."
+        },
+        "logs_correlation": {
+          "summary": "Trace↔log correlation queries."
+        },
+        "ebpf_profiling_query": {
+          "summary": "eBPF profiling queries."
+        }
+      },
+      "backends": [
+        {
+          "skill": "traces",
+          "backend": "SkyWalking",
+          "productVersions": {
+            "must": [
+              "10.x"
+            ],
+            "should": [
+              "9.x"
+            ],
+            "optional": [
+              "8.x"
+            ]
+          },
+          "featuresSince": {
+            "graphql_v3_schema": "9.0",
+            "logs_correlation": "9.2",
+            "ebpf_profiling_query": "9.3"
+          }
+        }
+      ]
+    },
+    {
+      "id": "influxql",
+      "name": "InfluxDB InfluxQL API",
+      "queryLanguage": "InfluxQL",
+      "products": [
+        "InfluxDB 1.x",
+        "InfluxDB 2.x (compat)"
+      ],
+      "specUrl": "https://docs.influxdata.com/influxdb/v1/query_language/",
+      "baselineFeatures": [
+        "select",
+        "where",
+        "group_by_time",
+        "group_by_tag",
+        "fill",
+        "mean",
+        "median",
+        "mode",
+        "sum",
+        "count",
+        "min",
+        "max",
+        "first",
+        "last",
+        "spread",
+        "stddev",
+        "percentile",
+        "distinct",
+        "top",
+        "bottom",
+        "sample",
+        "derivative",
+        "non_negative_derivative",
+        "difference",
+        "moving_average",
+        "cumulative_sum",
+        "elapsed",
+        "into",
+        "show_measurements",
+        "show_tag_keys",
+        "show_field_keys",
+        "show_series"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "influx",
+          "backend": "InfluxDB 1.x",
+          "productVersions": {
+            "must": [
+              "1.11"
+            ],
+            "should": [
+              "1.8"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "flux",
+      "name": "InfluxDB Flux API",
+      "queryLanguage": "Flux",
+      "products": [
+        "InfluxDB 2.x"
+      ],
+      "specUrl": "https://docs.influxdata.com/flux/v0/",
+      "baselineFeatures": [
+        "from",
+        "range",
+        "filter",
+        "group",
+        "aggregateWindow",
+        "map",
+        "pivot",
+        "join",
+        "to"
+      ],
+      "versionedFeatures": {
+        "flux_read": {
+          "summary": "Flux read queries (removed in InfluxDB 3.x)."
+        }
+      },
+      "backends": [
+        {
+          "skill": "influx",
+          "backend": "InfluxDB 2.x",
+          "productVersions": {
+            "must": [
+              "2.7"
+            ],
+            "should": [
+              "2.6"
+            ]
+          },
+          "featuresSince": {
+            "flux_read": "2.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "influx_sql",
+      "name": "InfluxDB 3 SQL/FlightSQL API",
+      "queryLanguage": "SQL",
+      "products": [
+        "InfluxDB 3 Core",
+        "InfluxDB 3 Enterprise"
+      ],
+      "specUrl": "https://docs.influxdata.com/influxdb3/core/query-data/sql/",
+      "baselineFeatures": [
+        "select",
+        "where",
+        "group_by",
+        "having",
+        "order_by",
+        "window_functions",
+        "information_schema"
+      ],
+      "versionedFeatures": {
+        "sql_query": {
+          "summary": "ANSI SQL over measurements-as-tables."
+        },
+        "flightsql_transport": {
+          "summary": "FlightSQL transport."
+        },
+        "date_bin_windowing": {
+          "summary": "`date_bin()` time-bucketing."
+        },
+        "last_cache": {
+          "summary": "Last-value / distinct-value cache."
+        }
+      },
+      "backends": [
+        {
+          "skill": "influx",
+          "backend": "InfluxDB 3.x",
+          "productVersions": {
+            "must": [
+              "3.x"
+            ]
+          },
+          "featuresSince": {
+            "sql_query": "3.0",
+            "flightsql_transport": "3.0",
+            "date_bin_windowing": "3.0",
+            "last_cache": "3.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "clickhouse",
+      "name": "ClickHouse HTTP SQL",
+      "queryLanguage": "SQL",
+      "products": [
+        "ClickHouse"
+      ],
+      "specUrl": "https://clickhouse.com/docs/en/sql-reference",
+      "baselineFeatures": [
+        "select",
+        "where",
+        "group_by",
+        "order_by",
+        "limit",
+        "join",
+        "cte",
+        "array_join",
+        "subqueries",
+        "format_json",
+        "system_tables",
+        "count",
+        "sum",
+        "avg",
+        "min",
+        "max",
+        "uniq",
+        "uniqExact",
+        "quantile",
+        "quantiles",
+        "groupArray",
+        "datetime_functions",
+        "show_tables",
+        "show_databases",
+        "describe"
+      ],
+      "versionedFeatures": {
+        "analyzer_new": {
+          "summary": "New query analyzer (default-on in 24.8)."
+        },
+        "parallel_replicas": {
+          "summary": "Parallel replicas for distributed reads."
+        },
+        "json_object_type": {
+          "summary": "Native JSON data type."
+        },
+        "query_condition_cache": {
+          "summary": "Query condition cache."
+        }
+      },
+      "backends": [
+        {
+          "skill": "clickhouse",
+          "backend": "ClickHouse",
+          "productVersions": {
+            "must": [
+              "25.x",
+              "24.x"
+            ],
+            "should": [
+              "24.3"
+            ],
+            "optional": [
+              "23.8"
+            ]
+          },
+          "featuresSince": {
+            "parallel_replicas": "23.11",
+            "analyzer_new": "24.3",
+            "json_object_type": "24.8",
+            "query_condition_cache": "25.1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "graylog",
+      "name": "Graylog search API",
+      "queryLanguage": "Lucene",
+      "products": [
+        "Graylog"
+      ],
+      "specUrl": "https://go2docs.graylog.org/current/what_is_graylog/what_is_graylog.html",
+      "baselineFeatures": [
+        "full_text",
+        "field_value",
+        "boolean_ops",
+        "range",
+        "wildcards",
+        "exists",
+        "timerange",
+        "sort",
+        "paging",
+        "streams_filter",
+        "fields_projection",
+        "message_by_id",
+        "inputs_listing",
+        "streams_listing"
+      ],
+      "versionedFeatures": {
+        "views_search_api": {
+          "summary": "POST /views/search aggregation API."
+        },
+        "pivot_aggregations": {
+          "summary": "Pivot-style aggregations."
+        },
+        "parameters_in_views": {
+          "summary": "Parameterised views (Ops/Enterprise)."
+        },
+        "data_tiering": {
+          "summary": "Data tiering / warm tier."
+        },
+        "search_filters_reusable": {
+          "summary": "Reusable saved search filters."
+        }
+      },
+      "backends": [
+        {
+          "skill": "graylog",
+          "backend": "Graylog",
+          "productVersions": {
+            "must": [
+              "6.x"
+            ],
+            "should": [
+              "5.2"
+            ],
+            "optional": [
+              "5.0",
+              "4.x"
+            ]
+          },
+          "featuresSince": {
+            "views_search_api": "4.0",
+            "pivot_aggregations": "4.0",
+            "parameters_in_views": "5.0",
+            "data_tiering": "5.2",
+            "search_filters_reusable": "6.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "opentsdb",
+      "name": "OpenTSDB HTTP query API",
+      "queryLanguage": "OpenTSDB Query",
+      "products": [
+        "OpenTSDB"
+      ],
+      "specUrl": "http://opentsdb.net/docs/build/html/api_http/index.html",
+      "baselineFeatures": [
+        "query",
+        "sum",
+        "avg",
+        "min",
+        "max",
+        "count",
+        "dev",
+        "zimsum",
+        "mimmin",
+        "mimmax",
+        "downsampling",
+        "rate",
+        "suggest",
+        "search_lookup",
+        "multi_metric",
+        "time_range"
+      ],
+      "versionedFeatures": {
+        "fill_policies_downsample": {
+          "summary": "Downsample fill policies (none/nan/null/zero)."
+        },
+        "explicit_tags": {
+          "summary": "Explicit-tags query optimisation."
+        },
+        "rollup_preagg_queries": {
+          "summary": "Rollup / pre-aggregate queries."
+        },
+        "histograms_sketches": {
+          "summary": "Histogram & sketch data types."
+        },
+        "exp_expression_query": {
+          "summary": "`/api/query/exp` expression queries."
+        }
+      },
+      "backends": [
+        {
+          "skill": "opentsdb",
+          "backend": "OpenTSDB",
+          "productVersions": {
+            "must": [
+              "2.4.x"
+            ],
+            "should": [
+              "2.3.x"
+            ]
+          },
+          "featuresSince": {
+            "fill_policies_downsample": "2.2",
+            "explicit_tags": "2.3",
+            "exp_expression_query": "2.3",
+            "rollup_preagg_queries": "2.4",
+            "histograms_sketches": "2.4"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pyroscope",
+      "name": "Pyroscope query API",
+      "queryLanguage": "Pyroscope Query",
+      "products": [
+        "Grafana Pyroscope"
+      ],
+      "specUrl": "https://grafana.com/docs/pyroscope/latest/",
+      "baselineFeatures": [
+        "profile_by_app",
+        "label_selector",
+        "time_range",
+        "flamegraph",
+        "profile_types",
+        "render_json",
+        "flamebearer",
+        "label_names",
+        "label_values"
+      ],
+      "versionedFeatures": {
+        "render_api_legacy": {
+          "summary": "Legacy `/render` API (pre-1.0)."
+        },
+        "connect_query_api": {
+          "summary": "Connect querier.v1 API (post-Phlare merge)."
+        },
+        "select_merge_profile": {
+          "summary": "`SelectMergeProfile` query."
+        },
+        "flamegraph_diff": {
+          "summary": "Flamegraph diff (`render-diff`)."
+        },
+        "relabeling_query": {
+          "summary": "Relabeling at query time."
+        },
+        "span_profiles": {
+          "summary": "Span profiles (trace→profile link)."
+        }
+      },
+      "backends": [
+        {
+          "skill": "pyroscope",
+          "backend": "Grafana Pyroscope",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ],
+            "should": [
+              "0.x"
+            ]
+          },
+          "featuresSince": {
+            "render_api_legacy": "0.1",
+            "connect_query_api": "1.0",
+            "select_merge_profile": "1.0",
+            "flamegraph_diff": "1.1",
+            "relabeling_query": "1.2",
+            "span_profiles": "1.3"
+          }
+        }
+      ]
+    },
+    {
+      "id": "opa-rest",
+      "name": "OPA Data & Decision API",
+      "queryLanguage": "Rego",
+      "products": [
+        "Open Policy Agent"
+      ],
+      "specUrl": "https://www.openpolicyagent.org/docs/latest/rest-api/",
+      "baselineFeatures": [
+        "query_data",
+        "post_data_input",
+        "list_policies",
+        "get_policy",
+        "health",
+        "metrics"
+      ],
+      "versionedFeatures": {
+        "partial_eval_compile": {
+          "summary": "Partial evaluation via `/v1/compile`."
+        },
+        "decision_logs_api": {
+          "summary": "Decision logs API."
+        },
+        "bundle_status_api": {
+          "summary": "Bundle status API."
+        },
+        "rego_v1_syntax": {
+          "summary": "Rego v1 syntax (`if`/`contains`; default in 1.0)."
+        },
+        "strict_builtin_errors": {
+          "summary": "Strict built-in error handling."
+        }
+      },
+      "backends": [
+        {
+          "skill": "opa",
+          "backend": "Open Policy Agent",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ],
+            "should": [
+              "0.6x"
+            ],
+            "optional": [
+              "0.5x"
+            ]
+          },
+          "featuresSince": {
+            "partial_eval_compile": "0.11",
+            "decision_logs_api": "0.13",
+            "bundle_status_api": "0.13",
+            "rego_v1_syntax": "0.59",
+            "strict_builtin_errors": "1.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "grafana-http",
+      "name": "Grafana HTTP API",
+      "queryLanguage": "Grafana HTTP",
+      "products": [
+        "Grafana"
+      ],
+      "specUrl": "https://grafana.com/docs/grafana/latest/developers/http_api/",
+      "baselineFeatures": [
+        "health",
+        "search_dashboards",
+        "get_dashboard",
+        "list_datasources",
+        "list_folders",
+        "list_alert_rules",
+        "list_users",
+        "list_teams",
+        "datasource_proxy"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "grafana",
+          "backend": "Grafana",
+          "productVersions": {
+            "must": [
+              "12.x",
+              "13.x"
+            ],
+            "should": [
+              "11.x"
+            ],
+            "optional": [
+              "10.x",
+              "9.x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "alertmanager-http",
+      "name": "Alertmanager API v2",
+      "queryLanguage": "Alertmanager HTTP",
+      "products": [
+        "Alertmanager"
+      ],
+      "specUrl": "https://github.com/prometheus/alertmanager/blob/main/api/v2/openapi.yaml",
+      "baselineFeatures": [
+        "alerts",
+        "silences",
+        "status",
+        "receivers"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "alertmanager",
+          "backend": "Alertmanager",
+          "productVersions": {
+            "must": [
+              "0.28",
+              "0.27"
+            ],
+            "should": [
+              "0.26"
+            ],
+            "optional": [
+              "0.25"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "k8s-core",
+      "name": "Kubernetes core API",
+      "queryLanguage": "Kubernetes API",
+      "products": [
+        "Kubernetes"
+      ],
+      "specUrl": "https://kubernetes.io/docs/reference/kubernetes-api/",
+      "baselineFeatures": [
+        "list_pods",
+        "list_nodes",
+        "list_namespaces",
+        "list_events",
+        "get_resource"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "kubernetes",
+          "backend": "Kubernetes",
+          "productVersions": {
+            "must": [
+              "1.33",
+              "1.32"
+            ],
+            "should": [
+              "1.31"
+            ],
+            "optional": [
+              "1.30"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "envoy-admin",
+      "name": "Envoy admin API",
+      "queryLanguage": "Envoy Admin",
+      "products": [
+        "Envoy"
+      ],
+      "specUrl": "https://www.envoyproxy.io/docs/envoy/latest/operations/admin",
+      "baselineFeatures": [
+        "server_info",
+        "stats",
+        "clusters",
+        "config_dump"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "envoy",
+          "backend": "Envoy",
+          "productVersions": {
+            "must": [
+              "1.33",
+              "1.32"
+            ],
+            "should": [
+              "1.31"
+            ],
+            "optional": [
+              "1.30"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "consul-http",
+      "name": "Consul HTTP API",
+      "queryLanguage": "Consul HTTP",
+      "products": [
+        "Consul"
+      ],
+      "specUrl": "https://developer.hashicorp.com/consul/api-docs",
+      "baselineFeatures": [
+        "health",
+        "services",
+        "nodes",
+        "kv",
+        "catalog"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "consul",
+          "backend": "Consul",
+          "productVersions": {
+            "must": [
+              "1.20",
+              "1.19"
+            ],
+            "should": [
+              "1.18"
+            ],
+            "optional": [
+              "1.17"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "kong-admin",
+      "name": "Kong admin API",
+      "queryLanguage": "Kong Admin",
+      "products": [
+        "Kong"
+      ],
+      "specUrl": "https://docs.konghq.com/gateway/latest/admin-api/",
+      "baselineFeatures": [
+        "status",
+        "services",
+        "routes",
+        "plugins"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "kong",
+          "backend": "Kong",
+          "productVersions": {
+            "must": [
+              "3.8",
+              "3.7"
+            ],
+            "should": [
+              "3.6"
+            ],
+            "optional": [
+              "3.4"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "traefik-http",
+      "name": "Traefik API",
+      "queryLanguage": "Traefik HTTP",
+      "products": [
+        "Traefik"
+      ],
+      "specUrl": "https://doc.traefik.io/traefik/operations/api/",
+      "baselineFeatures": [
+        "overview",
+        "routers",
+        "services",
+        "middlewares"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "traefik",
+          "backend": "Traefik",
+          "productVersions": {
+            "must": [
+              "3.x"
+            ],
+            "should": [
+              "2.11"
+            ],
+            "optional": [
+              "2.10"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "pinpoint-http",
+      "name": "Pinpoint web API",
+      "queryLanguage": "Pinpoint HTTP",
+      "products": [
+        "Pinpoint"
+      ],
+      "specUrl": "https://pinpoint-apm.gitbook.io/pinpoint/",
+      "baselineFeatures": [
+        "applications",
+        "agents",
+        "server_map",
+        "transactions"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "pinpoint",
+          "backend": "Pinpoint",
+          "productVersions": {
+            "must": [
+              "3.x"
+            ],
+            "should": [
+              "2.5"
+            ],
+            "optional": [
+              "2.4"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "cilium-http",
+      "name": "Cilium agent API",
+      "queryLanguage": "Cilium HTTP",
+      "products": [
+        "Cilium"
+      ],
+      "specUrl": "https://docs.cilium.io/en/stable/api/",
+      "baselineFeatures": [
+        "health",
+        "endpoints",
+        "policy",
+        "status"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "cilium",
+          "backend": "Cilium",
+          "productVersions": {
+            "must": [
+              "1.17",
+              "1.16"
+            ],
+            "should": [
+              "1.15"
+            ],
+            "optional": [
+              "1.14"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "fluentbit-http",
+      "name": "Fluent Bit monitoring API",
+      "queryLanguage": "Fluent Bit HTTP",
+      "products": [
+        "Fluent Bit"
+      ],
+      "specUrl": "https://docs.fluentbit.io/manual/administration/monitoring",
+      "baselineFeatures": [
+        "uptime",
+        "metrics",
+        "health"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "pipeline",
+          "backend": "Fluent Bit",
+          "productVersions": {
+            "must": [
+              "3.x"
+            ],
+            "should": [
+              "2.2"
+            ],
+            "optional": [
+              "2.1"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "beats-http",
+      "name": "Beats monitoring API",
+      "queryLanguage": "Beats HTTP",
+      "products": [
+        "Filebeat",
+        "Metricbeat"
+      ],
+      "specUrl": "https://www.elastic.co/guide/en/beats/filebeat/current/http-endpoint.html",
+      "baselineFeatures": [
+        "stats",
+        "state",
+        "info"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "pipeline",
+          "backend": "Beats",
+          "productVersions": {
+            "must": [
+              "9.x",
+              "8.x"
+            ],
+            "should": [
+              "8.x"
+            ],
+            "optional": [
+              "7.x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "vector-http",
+      "name": "Vector GraphQL/HTTP API",
+      "queryLanguage": "Vector GraphQL",
+      "products": [
+        "Vector"
+      ],
+      "specUrl": "https://vector.dev/docs/reference/api/",
+      "baselineFeatures": [
+        "health",
+        "components",
+        "metrics"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "pipeline",
+          "backend": "Vector",
+          "productVersions": {
+            "must": [
+              "0.4x"
+            ],
+            "should": [
+              "0.3x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "alloy-http",
+      "name": "Grafana Alloy API",
+      "queryLanguage": "Alloy HTTP",
+      "products": [
+        "Grafana Alloy"
+      ],
+      "specUrl": "https://grafana.com/docs/alloy/latest/",
+      "baselineFeatures": [
+        "ready",
+        "components",
+        "metrics"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "pipeline",
+          "backend": "Grafana Alloy",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "zk-native",
+      "name": "Zero-knowledge proof protocol",
+      "queryLanguage": "ZK Protocol",
+      "products": [
+        "ZK Proofs"
+      ],
+      "baselineFeatures": [
+        "generate_proof",
+        "verify_proof"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "zk-proofs",
+          "backend": "ZK Proofs",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "app-api",
+      "name": "Application API (internal)",
+      "queryLanguage": "App API",
+      "products": [
+        "Application API"
+      ],
+      "baselineFeatures": [
+        "health",
+        "info"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "system",
+          "backend": "Application API",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    }
+  ]
+}

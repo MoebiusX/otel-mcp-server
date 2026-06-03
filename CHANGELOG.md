@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Multi-version & protocol-feature model.** A typed catalog now tracks which product versions and protocol features each backend supports, following a `capability → product → protocol-adapter` model (many products share one protocol, but ship features at different versions).
+  - `src/protocols.ts` — typed protocol catalog (`PROTOCOLS`) with per-protocol query language, products, baseline (always-available) features, and versioned-feature summaries. 30 protocol adapters.
+  - `src/versions.ts` — version model (`BackendVersionSupport`, `SupportTier` of `must`/`should`/`optional` tiers) plus pure helpers: `parseVersion`, `compareVersions`, `matchesRange` (x-ranges, comparators, LTS-stripping), `classify`, `supportsFeature`, `supportsCapability`. The typed `backend()` builder checks `protocolFeaturesSince` keys against the protocol's feature union at compile time.
+  - `src/skill-versions.ts` — centralized per-product version data for all 22 skills, with per-product feature since-versions (e.g. `native_histograms`: Prometheus 3.0 vs Mimir 2.10 vs Thanos 0.34).
+  - `src/detect.ts` — best-effort backend product/version detection: `{PREFIX}_PRODUCT`/`{PREFIX}_VERSION` config override → buildinfo probe → protocol default. Unknown versions degrade optimistically.
+  - `backend_capabilities` tool (system skill) — reports supported versions and per-feature availability; optionally classifies a concrete version into its support tier. System skill: 4 → 5 tools.
+  - `npm run gen:versions` generates `docs/supported-versions.{json,md}` (grouped by protocol) from the catalog; a drift test guards the committed manifest.
+- Test count: 162 → 167. Added version-metadata validation in `tests/skill-registry.test.ts` and a manifest drift guard in `tests/version-manifest.test.ts`. Default/full tool counts updated (23 → 24, 42 → 43).
+- **Runtime version registry.** `src/version-registry.ts` resolves each configured backend's live product/version and classifies it into a support tier.
+  - `BACKEND_INSTANCES` catalog maps every probeable backend slot to its protocol, env prefix, and URL env vars. Multi-product protocols (PromQL, Query DSL) leave the product unset so the buildinfo probe disambiguates the real product (e.g. Prometheus vs Mimir vs Thanos); the active traces provider is chosen via `TRACES_PROVIDER`, and the InfluxDB slot by `INFLUX_VERSION` major.
+  - `VersionRegistry` probes lazily with a short timeout, caches results (60s TTL), and never throws — failures and unknown versions degrade to the `unknown` tier.
+  - The HTTP `/health` endpoint now includes a `backendVersions` array (per-instance product, detected version, source, and tier). Skip probing with `/health?versions=0` for fast liveness checks.
+- Test count: 167 → 178. Added `tests/version-registry.test.ts` (instance configuration predicates, probe-driven detection, product disambiguation, config override, TTL caching).
+- **Capability gating.** `src/gating.ts` turns the version model and runtime registry into a guard tool handlers can call before attempting a version-sensitive feature.
+  - `MCP_VERSION_GATING` policy: `off` (legacy, no gating) | `warn` (default — proceed but annotate when a feature is unlikely to be supported) | `enforce` (block features the detected version does not support).
+  - Unknown versions always pass optimistically with a warning — even under `enforce` — so a probe failure is never worse than having no gating at all.
+  - `requireFeature(skillId, feature, helpers, opts?)` resolves the live backend version via the registry and returns a proceed/block verdict with an advisory or error message; `evaluateFeature` / `applyGating` expose the pure pieces for offline classification.
+  - `backend_capabilities` classification output now includes the active `gatingMode`, a `gatedOut` list of versioned features below the detected version's minimum, and a per-feature `proceed`/`blocked` decision with warning/error text.
+- Test count: 178 → 198. Added `tests/gating.test.ts` (mode resolution, baseline vs versioned evaluation, per-product since maps, off/warn/enforce policy, optimistic unknown handling, live registry-backed guard).
+- **Multi-backend instances & failover.** A skill can now address multiple named backends and fail over across replicas. `src/backends.ts` adds a `BackendRegistry` that resolves a skill's configured instances from the environment, fully backward compatible (a plain `PROMETHEUS_URL` stays the `default` instance).
+  - **Named instances** via a `__<NAME>` suffix on the base URL var (`PROMETHEUS_URL__PROD`), with auth from the `<PREFIX>__<NAME>_` prefix.
+  - **Failover** — any URL value may be a comma-separated list or JSON array; `createFailoverFetcher` (in `src/helpers.ts`) tries each URL in order and only fails over on infrastructure errors (5xx / timeout / network), never on a 4xx.
+  - **Rich form** — `MCP_BACKENDS` (JSON array) for full control: explicit `product` (skips version probe), `authPrefix`, and per-instance `extraHeaders`. Precedence: `MCP_BACKENDS` > suffixed env > base env.
+  - Tools on multi-backend skills accept an optional `target` argument to select a named instance; it is validated against the configured instance names only, so a caller can never coerce an arbitrary URL (no SSRF). `SkillHelpers` gains `listInstances` and `resolveBackend`.
+  - Wired into the reference skills `metrics` (Prometheus), `logs` (Loki), and `elasticsearch`; remaining skills follow the same one-line `resolveBackend` pattern.
+- Test count: 198 → 219. Added `tests/backends.test.ts` (URL splitting, default/named/`MCP_BACKENDS` precedence, SSRF-safe target resolution, and failover behaviour).
+
 ### Changed
 
 - **Traces refactor (Layer→Provider).** Tempo, Zipkin, and SkyWalking are no longer standalone skills. They are now providers under a single provider-agnostic `traces` skill, selectable via `TRACES_PROVIDER` (`jaeger` [default] | `tempo` | `zipkin` | `skywalking`). The verb surface (`traces_search`, `trace_get`, `traces_services`, `traces_operations`, `traces_dependencies`) is stable across providers; capability gaps (e.g. Tempo has no dependency API) return a clear `not supported by provider "X"` error.
