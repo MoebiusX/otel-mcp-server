@@ -49,6 +49,51 @@ export function createFetcher(timeoutMs: number, auth: BackendAuth, backend?: st
   return backend ? instrumentFetcher(baseFetcher, backend) : baseFetcher;
 }
 
+/** Should a failed request be retried against the next failover URL? */
+function isRetryable(err: unknown): boolean {
+  const msg = String((err as any)?.message ?? err);
+  const status = msg.match(/HTTP (\d{3})/);
+  // 4xx are caller/data errors — do not failover. 5xx, timeouts, and network
+  // errors (no status) are infrastructure failures — try the next URL.
+  if (status) return Number(status[1]) >= 500;
+  return true;
+}
+
+/**
+ * Create a failover-aware fetcher over an ordered list of base URLs.
+ *
+ * Callers build request URLs against the *primary* base (`bases[0]`). On an
+ * infrastructure failure (5xx / timeout / network), the request is retried
+ * against each subsequent base by substituting the URL prefix. 4xx responses
+ * are returned immediately (they are not transient). With a single base this
+ * behaves exactly like {@link createFetcher}.
+ */
+export function createFailoverFetcher(
+  timeoutMs: number,
+  auth: BackendAuth,
+  bases: string[],
+  backend?: string,
+) {
+  const primary = bases[0] ?? '';
+  const fetcher = async (url: string, overrideTimeout?: number, options?: FetchOptions) => {
+    let lastErr: unknown;
+    for (let i = 0; i < bases.length; i++) {
+      // Only the primary-built URL can be rewritten onto a fallback base.
+      const target =
+        i === 0 || !url.startsWith(primary) ? url : bases[i] + url.slice(primary.length);
+      try {
+        return await fetchJSON(target, overrideTimeout ?? timeoutMs, auth, options);
+      } catch (err) {
+        lastErr = err;
+        if (i === bases.length - 1 || !isRetryable(err)) throw err;
+      }
+    }
+    throw lastErr;
+  };
+  return backend ? instrumentFetcher(fetcher, backend) : fetcher;
+}
+
+
 /** Wrap arbitrary data into an MCP text content result. */
 export function textResult(data: unknown) {
   return {

@@ -7,13 +7,30 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Skill, SkillHelpers } from '../skill.js';
+import type { SkillBackendSpec } from '../backends.js';
 import { textResult, errorResult } from '../helpers.js';
 
-function registerTools(server: McpServer, helpers: SkillHelpers): void {
-  const esUrl = helpers.env('ELASTICSEARCH_URL');
-  if (!esUrl) return;
+const SPEC: SkillBackendSpec = {
+  skillId: 'elasticsearch',
+  baseEnvVar: 'ELASTICSEARCH_URL',
+  prefix: 'ELASTICSEARCH',
+};
 
-  const fetchJSON = helpers.createFetcher('ELASTICSEARCH', 'elasticsearch');
+function registerTools(server: McpServer, helpers: SkillHelpers): void {
+  const instances = helpers.listInstances(SPEC);
+  if (instances.length === 0) return;
+
+  const targetDesc =
+    `Named backend instance to query (configured: ${instances.join(', ')}). ` +
+    `Defaults to the primary.`;
+
+  /** Resolve a `{ url, fetch }` pair for the requested target, or null if unknown. */
+  const pick = (target?: string) => {
+    const b = helpers.resolveBackend(SPEC, 'elasticsearch', target);
+    return b ? { url: b.baseUrl, fetch: b.fetch } : null;
+  };
+  const unknownTarget = (target?: string) =>
+    errorResult(`Unknown target "${target}". Configured instances: ${instances.join(', ')}.`);
 
   // ── es_search ─────────────────────────────────────────────────────────────
 
@@ -27,8 +44,11 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
       sort: z.string().optional().describe('Sort field (e.g. "@timestamp:desc")'),
       from: z.number().default(0).describe('Offset for pagination'),
       fields: z.array(z.string()).optional().describe('Specific fields to return (default: all)'),
+      target: z.string().optional().describe(targetDesc),
     },
-    async ({ index, query, size, sort, from, fields }) => {
+    async ({ index, query, size, sort, from, fields, target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
         const body: any = {
           query: { query_string: { query } },
@@ -43,8 +63,8 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
           body._source = fields;
         }
 
-        const data = await fetchJSON(
-          `${esUrl}/${encodeURIComponent(index)}/_search`,
+        const data = await b.fetch(
+          `${b.url}/${encodeURIComponent(index)}/_search`,
           undefined,
           { method: 'POST', body: JSON.stringify(body) },
         );
@@ -72,10 +92,14 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
   server.tool(
     'es_cluster_health',
     'Get Elasticsearch cluster health — status (green/yellow/red), node count, shard allocation.',
-    {},
-    async () => {
+    {
+      target: z.string().optional().describe(targetDesc),
+    },
+    async ({ target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
-        const data = await fetchJSON(`${esUrl}/_cluster/health`);
+        const data = await b.fetch(`${b.url}/_cluster/health`);
         return textResult({
           cluster: data.cluster_name,
           status: data.status,
@@ -105,11 +129,14 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
       pattern: z.string().default('*').describe('Index name pattern (e.g. "logs-*")'),
       sort_by: z.enum(['docs.count', 'store.size', 'index']).default('index')
         .describe('Sort indices by field'),
+      target: z.string().optional().describe(targetDesc),
     },
-    async ({ pattern, sort_by }) => {
+    async ({ pattern, sort_by, target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
-        const data = await fetchJSON(
-          `${esUrl}/_cat/indices/${encodeURIComponent(pattern)}?format=json&s=${sort_by}:desc`,
+        const data = await b.fetch(
+          `${b.url}/_cat/indices/${encodeURIComponent(pattern)}?format=json&s=${sort_by}:desc`,
         );
         const indices = (Array.isArray(data) ? data : []).map((idx: any) => ({
           index: idx.index,
@@ -134,11 +161,14 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
     'Get the field mappings for an Elasticsearch index — shows field names, types, and analyzers.',
     {
       index: z.string().describe('Index name (e.g. "logs-2026.03")'),
+      target: z.string().optional().describe(targetDesc),
     },
-    async ({ index }) => {
+    async ({ index, target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
-        const data = await fetchJSON(
-          `${esUrl}/${encodeURIComponent(index)}/_mapping`,
+        const data = await b.fetch(
+          `${b.url}/${encodeURIComponent(index)}/_mapping`,
         );
         // Flatten nested mapping structure for readability
         const mappings: Record<string, any> = {};
@@ -157,11 +187,15 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
   server.tool(
     'es_cat_nodes',
     'Get Elasticsearch node resource usage — CPU, heap, disk, load average per node.',
-    {},
-    async () => {
+    {
+      target: z.string().optional().describe(targetDesc),
+    },
+    async ({ target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
-        const data = await fetchJSON(
-          `${esUrl}/_cat/nodes?format=json&h=name,ip,heap.percent,ram.percent,cpu,load_1m,load_5m,disk.used_percent,node.role,master`,
+        const data = await b.fetch(
+          `${b.url}/_cat/nodes?format=json&h=name,ip,heap.percent,ram.percent,cpu,load_1m,load_5m,disk.used_percent,node.role,master`,
         );
         const nodes = (Array.isArray(data) ? data : []).map((n: any) => ({
           name: n.name,

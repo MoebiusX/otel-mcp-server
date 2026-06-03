@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { allSkills } from '../src/skills.js';
 import { createSkillHelpers } from '../src/skill.js';
+import { PROTOCOLS, isProtocolId } from '../src/protocols.js';
+import { parseVersion } from '../src/versions.js';
 
 /**
  * Registry integrity — guards against the drift that creeps in as the skill
@@ -77,3 +79,53 @@ describe('skill registry integrity', () => {
     }
   });
 });
+
+describe('skill version-support metadata', () => {
+  const versioned = allSkills.filter((s) => s.versions);
+
+  it('every skill declares version support', () => {
+    const missing = allSkills.filter((s) => !s.versions).map((s) => s.id);
+    expect(missing).toEqual([]);
+  });
+
+  it('each backend entry references a known protocol and non-empty must tier', () => {
+    for (const s of versioned) {
+      for (const [backendName, entry] of Object.entries(s.versions!)) {
+        const where = `${s.id}/${backendName}`;
+        expect(isProtocolId(entry.protocol), `${where} protocol`).toBe(true);
+        expect(entry.productVersions.must.length, `${where} must`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('all declared product version tokens are non-empty strings', () => {
+    for (const s of versioned) {
+      for (const [backendName, entry] of Object.entries(s.versions!)) {
+        const tiers = [
+          ...entry.productVersions.must,
+          ...(entry.productVersions.should ?? []),
+          ...(entry.productVersions.optional ?? []),
+        ];
+        for (const t of tiers) {
+          expect(typeof t, `${s.id}/${backendName} token`).toBe('string');
+          expect(t.trim().length, `${s.id}/${backendName} token`).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('protocolFeaturesSince keys are valid protocol features with parseable since-versions', () => {
+    for (const s of versioned) {
+      for (const [backendName, entry] of Object.entries(s.versions!)) {
+        const since = entry.protocolFeaturesSince ?? {};
+        const valid = Object.keys(PROTOCOLS[entry.protocol].versionedFeatures);
+        for (const [feature, ver] of Object.entries(since)) {
+          const where = `${s.id}/${backendName}/${feature}`;
+          expect(valid, `${where} known feature`).toContain(feature);
+          expect(parseVersion(ver as string), `${where} since`).not.toBeNull();
+        }
+      }
+    }
+  });
+});
+

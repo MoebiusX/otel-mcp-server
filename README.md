@@ -166,6 +166,46 @@ LOKI_AUTH_TOKEN=my-loki-token
 LOKI_TENANT_ID=team-platform
 ```
 
+### Multi-backend instances & failover
+
+A single skill can talk to **multiple named backends** and **fail over** across
+replicas. The single-URL config above keeps working unchanged — it simply
+becomes the `default` instance. Supported skills today: `metrics` (Prometheus),
+`logs` (Loki), and `elasticsearch`.
+
+**Named instances** — add a `__<NAME>` suffix to the base URL var. Auth for a
+named instance uses the `<PREFIX>__<NAME>_` prefix:
+
+```bash
+PROMETHEUS_URL=http://prom:9090                 # instance "default"
+PROMETHEUS_URL__PROD=http://prom-prod:9090       # instance "PROD"
+PROMETHEUS__PROD_AUTH_TOKEN=eyJhbGci...          # auth for "PROD"
+```
+
+**Failover** — any URL value may be a comma-separated list or JSON array. URLs
+are tried in order; the server fails over only on infrastructure errors
+(5xx / timeout / network) and never on a 4xx:
+
+```bash
+PROMETHEUS_URL=http://prom-a:9090,http://prom-b:9090
+```
+
+**Rich form** — `MCP_BACKENDS` (a JSON array) gives full control, including an
+explicit `product` (skips version auto-probe) and per-instance headers. It takes
+precedence over the env-var forms:
+
+```bash
+MCP_BACKENDS='[{"skill":"metrics","instance":"PROD",
+  "urls":["http://mimir-a","http://mimir-b"],
+  "authPrefix":"MIMIR_PROD","product":"Grafana Mimir",
+  "extraHeaders":{"X-Scope-OrgID":"team-a"}}]'
+```
+
+**Selecting a backend** — tools on multi-backend skills accept an optional
+`target` argument naming the instance (e.g. `"PROD"`). Omit it to use the
+primary. `target` is validated against the configured instance names only, so a
+caller can never coerce the server into fetching an arbitrary URL (no SSRF).
+
 ### Client Authentication (HTTP mode)
 
 Clients connecting to the MCP server over HTTP must present an API key. Keys are loaded from (first match wins):

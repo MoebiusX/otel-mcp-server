@@ -29,6 +29,7 @@ import { skill as pipeline } from './tools/pipeline.js';
 import { skill as zkProofs } from './tools/zk-proofs.js';
 import { skill as system } from './tools/system.js';
 import type { Skill } from './skill.js';
+import { SKILL_VERSIONS } from './skill-versions.js';
 
 export const allSkills: Skill[] = [
   traces,
@@ -54,3 +55,10 @@ export const allSkills: Skill[] = [
   zkProofs,
   system,
 ];
+
+// Attach centralized version-support metadata to each skill (single source of
+// truth in skill-versions.ts; skills opt in by having a matching id key).
+for (const skill of allSkills) {
+  const versions = SKILL_VERSIONS[skill.id];
+  if (versions) skill.versions = versions;
+}

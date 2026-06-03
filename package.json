@@ -48,6 +48,7 @@
     "test:live": "node scripts/live-test.mjs",
     "test:live:standard": "node scripts/live-test.mjs --profile standard",
     "lint": "tsc --noEmit",
+    "gen:versions": "tsx scripts/gen-version-manifest.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build"
   },
