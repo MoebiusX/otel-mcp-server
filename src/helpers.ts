@@ -3,7 +3,7 @@
  */
 
 import type { BackendAuth } from './auth.js';
-import { backendHeaders } from './auth.js';
+import { resolveAuthHeaders } from './auth.js';
 import { instrumentFetcher } from './metrics.js';
 
 /** Extra fetch options beyond the standard auth/timeout. */
@@ -22,7 +22,7 @@ export async function fetchJSON(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const headers: Record<string, string> = auth ? backendHeaders(auth) : {};
+    const headers: Record<string, string> = auth ? await resolveAuthHeaders(auth) : {};
     if (options?.body) headers['Content-Type'] = 'application/json';
     const res = await fetch(url, {
       signal: controller.signal,
@@ -31,6 +31,8 @@ export async function fetchJSON(
       body: options?.body,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText} — ${url}`);
+    // 204 No Content (e.g. provisioning DELETE) has an empty body — res.json() would throw.
+    if (res.status === 204) return undefined;
     return await res.json();
   } finally {
     clearTimeout(timer);
