@@ -1,4 +1,5 @@
 import type { FetchOptions } from './helpers.js';
+import { VERSION } from './version.js';
 
 /**
  * Self-metrics — lightweight Prometheus-format metrics for the MCP server itself.
@@ -206,7 +207,7 @@ export function serializeMetrics(): string {
 }
 
 // Set server info label
-metrics.serverInfo.set({ version: '1.2.0' }, 1);
+metrics.serverInfo.set({ version: VERSION }, 1);
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Instrumented fetch wrapper

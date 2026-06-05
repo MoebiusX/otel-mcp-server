@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-06-05
+
+### Fixed
+
+- **Server version no longer drifts.** The startup banner, `GET /health`, and the `mcp_server_info{version}` metric now read the version from `package.json` at runtime via a new zero-dependency `src/version.ts` (using built-in `createRequire`), instead of a hardcoded constant that was stuck at `1.2.0`. The compiled `dist/version.js` resolves the sibling `package.json` in both the source (tests) and published (`dist/`) layouts.
+
 ## [1.4.0] - 2026-06-05
 
 ### Added

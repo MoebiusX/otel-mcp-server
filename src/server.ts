@@ -9,7 +9,8 @@ import { createSkillHelpers } from './skill.js';
 import type { Skill } from './skill.js';
 import { registerResources } from './resources/overview.js';
 
-export const VERSION = '1.2.0';
+export { VERSION } from './version.js';
+import { VERSION } from './version.js';
 
 export interface ServerOptions {
   /** Skill IDs to enable. Defaults to all available. */
