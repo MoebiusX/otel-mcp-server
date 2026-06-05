@@ -93,7 +93,7 @@ node dist/index.js
 
 ```bash
 node dist/index.js --http 3001
-# ✓ otel-mcp-server v1.2.0 listening on http://0.0.0.0:3001
+# ✓ otel-mcp-server v1.4.0 listening on http://0.0.0.0:3001
 #   Skills:
 #     ✓ traces         — Distributed Traces (5 tools) [Jaeger]
 #     ✓ metrics        — Prometheus Metrics (6 tools) [Prometheus]
