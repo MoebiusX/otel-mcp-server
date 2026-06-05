@@ -53,12 +53,30 @@ For role-based Studio workflows, see [docs/studio-user-journeys.md](docs/studio-
 
 ### Install
 
+Run directly with `npx` (no clone or build needed):
+
+```bash
+npx -y @moebiusx/otel-mcp-server
+```
+
+Or install globally:
+
+```bash
+npm install -g @moebiusx/otel-mcp-server
+otel-mcp-server
+```
+
+<details>
+<summary>Build from source (for development)</summary>
+
 ```bash
 git clone https://github.com/MoebiusX/otel-mcp-server.git
 cd otel-mcp-server
 npm install
 npm run build
 ```
+
+</details>
 
 ### Run (stdio — for Claude Desktop / Copilot)
 
@@ -655,8 +673,8 @@ Add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "otel": {
-      "command": "node",
-      "args": ["/path/to/otel-mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@moebiusx/otel-mcp-server"],
       "env": {
         "JAEGER_URL": "http://localhost:16686",
         "PROMETHEUS_URL": "http://localhost:9090",
@@ -675,8 +693,8 @@ Add to `.vscode/mcp.json`:
 {
   "servers": {
     "otel": {
-      "command": "node",
-      "args": ["${workspaceFolder}/otel-mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@moebiusx/otel-mcp-server"],
       "env": {
         "JAEGER_URL": "http://localhost:16686",
         "PROMETHEUS_URL": "http://localhost:9090",
