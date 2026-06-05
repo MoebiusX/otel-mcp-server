@@ -9,6 +9,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch: {} # manual trigger for publish/auth diagnostics
 
 permissions:
   contents: read
@@ -42,12 +43,29 @@ jobs:
         run: npm test
 
       - name: Verify tag matches package version
+        if: github.event_name == 'push'
         run: |
           PKG_VERSION="v$(node -p "require('./package.json').version")"
           if [ "$PKG_VERSION" != "${GITHUB_REF_NAME}" ]; then
             echo "Tag ${GITHUB_REF_NAME} does not match package version ${PKG_VERSION}" >&2
             exit 1
           fi
+
+      - name: Diagnose npm auth (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: |
+          echo "::group::npm whoami"
+          npm whoami || echo "whoami failed (token not authenticating)"
+          echo "::endgroup::"
+          echo "::group::org membership (moebiusx)"
+          npm org ls moebiusx 2>&1 || echo "cannot list org moebiusx (not a member / no access)"
+          echo "::endgroup::"
+          echo "::group::writable packages/scopes"
+          npm access list packages 2>&1 || echo "cannot list package access"
+          echo "::endgroup::"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm
         run: npm publish --provenance --access public
