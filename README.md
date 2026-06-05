@@ -157,6 +157,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `ALLOY_URL` | _(disabled)_ | Grafana Alloy |
 | `GRAFANA_DEFAULT_FROM` | `now-1h` | Default Grafana query range start |
 | `GRAFANA_MAX_ITEMS` | `50` | Default Grafana list/search limit |
+| `MCP_ENABLE_WRITES` | _(off)_ | Enable mutating/write tools (e.g. Grafana dashboard provisioning). Read-only by default |
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
 
 ### Backend Authentication
@@ -185,6 +186,43 @@ PROMETHEUS_AUTH_TOKEN=eyJhbGci...
 LOKI_AUTH_TOKEN=my-loki-token
 LOKI_TENANT_ID=team-platform
 ```
+
+#### OAuth 2.0 / OIDC (client-credentials)
+
+When **no** static `_AUTH_*` var is set for a backend, the server can obtain a
+bearer token via the OAuth 2.0 **client-credentials** grant and refresh it
+transparently (cached in-memory, refreshed ~60s before expiry, concurrent
+requests de-duped). Client secrets are never logged or echoed in error
+messages. Use the same `<PREFIX>` as above with `_AUTH_OAUTH_*` suffixes:
+
+| Suffix | Effect |
+|--------|--------|
+| `_AUTH_OAUTH_CLIENT_ID` | OAuth client ID (required) |
+| `_AUTH_OAUTH_CLIENT_SECRET` | OAuth client secret (required) |
+| `_AUTH_OAUTH_TOKEN_URL` | Explicit token endpoint (skips OIDC discovery) |
+| `_AUTH_OAUTH_ISSUER` | OIDC issuer — token endpoint is discovered from `/.well-known/openid-configuration` |
+| `_AUTH_OAUTH_SCOPE` | Requested scope (optional) |
+| `_AUTH_OAUTH_AUDIENCE` | Requested audience (optional; Entra derives `.default` scope from it) |
+| `_AUTH_OAUTH_PROVIDER` | Preset: `entra` / `azure` / `azuread`, `google`, or `oidc` |
+| `_AUTH_OAUTH_TENANT` | Entra/Azure tenant ID (with the `entra` preset) |
+
+```bash
+# Generic OIDC (token endpoint auto-discovered from the issuer)
+PROMETHEUS_AUTH_OAUTH_ISSUER=https://idp.example.com/realms/obs
+PROMETHEUS_AUTH_OAUTH_CLIENT_ID=otel-mcp
+PROMETHEUS_AUTH_OAUTH_CLIENT_SECRET=...
+PROMETHEUS_AUTH_OAUTH_SCOPE=metrics:read
+
+# Microsoft Entra ID (Azure AD) preset
+TEMPO_AUTH_OAUTH_PROVIDER=entra
+TEMPO_AUTH_OAUTH_TENANT=00000000-0000-0000-0000-000000000000
+TEMPO_AUTH_OAUTH_CLIENT_ID=...
+TEMPO_AUTH_OAUTH_CLIENT_SECRET=...
+TEMPO_AUTH_OAUTH_AUDIENCE=api://obs-backend       # → scope api://obs-backend/.default
+```
+
+Static `_AUTH_TOKEN` / `_AUTH_BASIC` / `_AUTH_HEADER` always take precedence,
+so existing configs are unaffected.
 
 ### Multi-backend instances & failover
 
@@ -427,7 +465,7 @@ regardless of configuration.
 
 ### Grafana — `grafana` — 10 tools
 
-> Enabled when `GRAFANA_URL` is set. All Grafana tools are read-only and intended for verification/interrogation workflows.
+> Enabled when `GRAFANA_URL` is set. The 10 tools below are read-only and intended for verification/interrogation workflows. Three additional **write** tools are available when `MCP_ENABLE_WRITES` is set — see [Write tools](#write-tools-opt-in).
 
 | Tool | Description |
 |------|-------------|
@@ -441,6 +479,28 @@ regardless of configuration.
 | `grafana_alert_rules` | List Grafana-managed alert rules and query references |
 | `grafana_alerts` | List active Grafana Alertmanager alert instances |
 | `grafana_contact_points` | List alert contact points or receivers with safe integration status metadata |
+
+#### Write tools (opt-in)
+
+> **Disabled by default.** The server is read-only out of the box. Set `MCP_ENABLE_WRITES=true` (also accepts `1`/`yes`/`on`) to advertise and enable the mutating tools below. The Grafana token must also carry the matching write scopes.
+
+| Tool | Description | Token scope |
+|------|-------------|-------------|
+| `grafana_create_dashboard` | Create / upsert / update a dashboard (`POST /api/dashboards/db`) | `dashboards:write` |
+| `grafana_delete_dashboard` | Delete a dashboard by UID (`DELETE /api/dashboards/uid/{uid}`) | `dashboards:delete` |
+| `grafana_create_folder` | Create or upsert a folder | `folders:write` |
+| `grafana_create_alert_rule` | Create / upsert / update a Grafana-managed alerting or recording rule (`/api/v1/provisioning/alert-rules`) | `alert.provisioning:write` |
+| `grafana_delete_alert_rule` | Delete a Grafana-managed rule by UID (`DELETE /api/v1/provisioning/alert-rules/{uid}`) | `alert.provisioning:write` |
+
+**Write modes** — each write tool takes an explicit `mode` so the caller controls overwrite behavior; the default is the safe one:
+
+- `create` (default) — **strict insert**: fails with a clear conflict error (including the existing object's UID and version) if the target UID already exists. Use this for promotion workflows (e.g. staging → prod) where silently overwriting is dangerous.
+- `upsert` — idempotent **create-or-update** by UID, for reconcile / infra-as-code loops.
+- `update` (dashboards and alert rules) — **strict update**: fails if the target UID does not already exist.
+
+Alert rules are **Grafana-managed** (the JSON provisioning API, no YAML dependency). A rule whose body includes a `record` object is treated as a **recording rule**; otherwise it is an **alerting rule**. Provisioning writes are sent with `X-Disable-Provenance: true` so the rules stay editable in the Grafana UI. (Mimir/Cortex ruler rules are YAML-based and remain a future follow-up.)
+
+All write tools accept `dry_run: true` to validate and report the planned action without writing. Conflict detection for strict `create`/`update` uses a GET pre-check, and `grafana_create_dashboard` also sends Grafana's native `overwrite=false` as a second safety net. Returns the resulting UID and version on success. Existing read-only behavior is unchanged when writes are disabled.
 
 ### Cilium (eBPF networking) — `cilium` — 6 tools
 

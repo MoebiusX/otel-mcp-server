@@ -1,10 +1,14 @@
 /**
- * Grafana skill — read-only verification and interrogation of Grafana.
+ * Grafana skill — read-only verification and interrogation of Grafana, plus
+ * opt-in write tools for provisioning dashboards and folders.
  *
- * Tools: grafana_health, grafana_datasources, grafana_datasource_health,
+ * Read tools: grafana_health, grafana_datasources, grafana_datasource_health,
  *        grafana_datasource_query, grafana_dashboards_search,
  *        grafana_dashboard_get, grafana_folders, grafana_alert_rules,
  *        grafana_alerts, grafana_contact_points
+ * Write tools (only when MCP_ENABLE_WRITES is set): grafana_create_dashboard,
+ *        grafana_delete_dashboard, grafana_create_folder,
+ *        grafana_create_alert_rule, grafana_delete_alert_rule
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -330,6 +334,20 @@ function summarizeContactPoint(receiver: any): Record<string, unknown> {
   };
 }
 
+/**
+ * Whether mutating (write) tools are enabled. Writes are opt-in and disabled by
+ * default: read-only stays the safe default posture. Enable with
+ * `MCP_ENABLE_WRITES=true` (also accepts 1/yes/on).
+ */
+function writesEnabled(helpers: SkillHelpers): boolean {
+  return /^(1|true|yes|on)$/i.test(helpers.env('MCP_ENABLE_WRITES').trim());
+}
+
+/** True when an error from the fetcher carries a given HTTP status code. */
+function isHttpStatus(err: unknown, status: number): boolean {
+  return new RegExp(`HTTP ${status}\\b`).test(String((err as any)?.message ?? err));
+}
+
 function registerTools(server: McpServer, helpers: SkillHelpers): void {
   const grafanaUrl = normalizeBaseUrl(helpers.env('GRAFANA_URL'));
   if (!grafanaUrl) return;
@@ -639,12 +657,324 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
       }
     },
   );
+
+  // ── Write tools (opt-in) ──────────────────────────────────────────────────
+  // Disabled unless MCP_ENABLE_WRITES is set. Read-only stays the default
+  // posture, so these tools are only advertised when writes are enabled.
+  if (!writesEnabled(helpers)) return;
+
+  /** Look up a dashboard by UID; returns existence + version without throwing on 404. */
+  async function getDashboard(uid: string): Promise<{ exists: boolean; version?: number; title?: string }> {
+    try {
+      const data = await fetchGrafana(`${grafanaUrl}/api/dashboards/uid/${encodeURIComponent(uid)}`);
+      return { exists: true, version: data.dashboard?.version, title: data.dashboard?.title };
+    } catch (err: any) {
+      if (isHttpStatus(err, 404)) return { exists: false };
+      throw err;
+    }
+  }
+
+  /** Look up a folder by UID; returns existence + version without throwing on 404. */
+  async function getFolder(uid: string): Promise<{ exists: boolean; version?: number; title?: string }> {
+    try {
+      const data = await fetchGrafana(`${grafanaUrl}/api/folders/${encodeURIComponent(uid)}`);
+      return { exists: true, version: data.version, title: data.title };
+    } catch (err: any) {
+      if (isHttpStatus(err, 404)) return { exists: false };
+      throw err;
+    }
+  }
+
+  // ── grafana_create_dashboard ─────────────────────────────────────────────
+
+  server.tool(
+    'grafana_create_dashboard',
+    'Create, upsert, or update a Grafana dashboard via POST /api/dashboards/db. ' +
+      'mode=create (default) is a strict insert that fails if the UID already exists; ' +
+      'mode=upsert creates or overwrites; mode=update requires the dashboard to already exist. ' +
+      'Requires MCP_ENABLE_WRITES and a token with dashboards:write.',
+    {
+      dashboard: z.record(z.string(), z.any()).describe('Dashboard model JSON (must include a "title"; "uid" optional). An "id" field is ignored.'),
+      folder_uid: z.string().optional().describe('Target folder UID. Omit for the General folder.'),
+      message: z.string().optional().describe('Commit message recorded in the dashboard version history.'),
+      mode: z.enum(['create', 'upsert', 'update']).default('create').describe('create = strict insert (fail if UID exists); upsert = create-or-overwrite; update = fail if UID is absent.'),
+      dry_run: z.boolean().default(false).describe('Validate and report the planned action without writing.'),
+    },
+    async ({ dashboard, folder_uid, message, mode, dry_run }) => {
+      try {
+        const dash: Record<string, unknown> = { ...dashboard };
+        delete dash.id; // UID + overwrite drive create/update; a stale numeric id can misbind.
+        const title = dash.title;
+        if (typeof title !== 'string' || !title.trim()) {
+          return errorResult('dashboard.title is required and must be a non-empty string.');
+        }
+        const uid = typeof dash.uid === 'string' && dash.uid ? dash.uid : undefined;
+
+        if (uid && (mode === 'create' || mode === 'update')) {
+          const existing = await getDashboard(uid);
+          if (mode === 'create' && existing.exists) {
+            return errorResult(
+              `conflict: dashboard uid "${uid}" already exists (version ${existing.version}, title "${existing.title}"). Use mode=upsert to overwrite.`,
+            );
+          }
+          if (mode === 'update' && !existing.exists) {
+            return errorResult(`dashboard uid "${uid}" does not exist. Use mode=create to create it.`);
+          }
+        }
+
+        if (dry_run) {
+          return textResult({ dryRun: true, mode, wouldApply: { uid: uid ?? null, title, folderUid: folder_uid ?? null } });
+        }
+
+        const overwrite = mode !== 'create'; // strict insert never overwrites; upsert/update may.
+        const body: Record<string, unknown> = { dashboard: dash, overwrite };
+        if (folder_uid) body.folderUid = folder_uid;
+        if (message) body.message = message;
+
+        try {
+          const result = await fetchGrafana(`${grafanaUrl}/api/dashboards/db`, undefined, {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+          return textResult({
+            status: result.status ?? 'success',
+            uid: result.uid,
+            id: result.id,
+            version: result.version,
+            url: result.url,
+            slug: result.slug,
+            mode,
+          });
+        } catch (err: any) {
+          // overwrite=false collisions (UID/title/version) surface as 412/409/400.
+          if (mode === 'create' && (isHttpStatus(err, 412) || isHttpStatus(err, 409) || isHttpStatus(err, 400))) {
+            return errorResult(`conflict creating dashboard "${title}": ${err.message}. Use mode=upsert to overwrite.`);
+          }
+          throw err;
+        }
+      } catch (err: any) {
+        return errorResult(err.message);
+      }
+    },
+  );
+
+  // ── grafana_delete_dashboard ─────────────────────────────────────────────
+
+  server.tool(
+    'grafana_delete_dashboard',
+    'Delete a Grafana dashboard by UID via DELETE /api/dashboards/uid/{uid}. ' +
+      'Requires MCP_ENABLE_WRITES and a token with dashboards:delete.',
+    {
+      uid: z.string().describe('Dashboard UID to delete.'),
+      dry_run: z.boolean().default(false).describe('Report the dashboard that would be deleted without deleting it.'),
+    },
+    async ({ uid, dry_run }) => {
+      try {
+        const existing = await getDashboard(uid);
+        if (!existing.exists) {
+          return errorResult(`dashboard uid "${uid}" not found.`);
+        }
+        if (dry_run) {
+          return textResult({ dryRun: true, wouldDelete: { uid, title: existing.title } });
+        }
+        const result = await fetchGrafana(`${grafanaUrl}/api/dashboards/uid/${encodeURIComponent(uid)}`, undefined, {
+          method: 'DELETE',
+        });
+        return textResult({ deleted: true, uid, title: result.title ?? existing.title, message: result.message });
+      } catch (err: any) {
+        return errorResult(err.message);
+      }
+    },
+  );
+
+  // ── grafana_create_folder ────────────────────────────────────────────────
+
+  server.tool(
+    'grafana_create_folder',
+    'Create or upsert a Grafana folder. mode=create (default) is a strict insert that fails if the UID exists; ' +
+      'mode=upsert creates the folder or renames it when the UID already exists. ' +
+      'Requires MCP_ENABLE_WRITES and a token with folders:write.',
+    {
+      title: z.string().describe('Folder title.'),
+      uid: z.string().optional().describe('Folder UID. Omit to let Grafana generate one (create only).'),
+      mode: z.enum(['create', 'upsert']).default('create').describe('create = strict insert (fail if UID exists); upsert = create-or-update.'),
+      dry_run: z.boolean().default(false).describe('Validate and report the planned action without writing.'),
+    },
+    async ({ title, uid, mode, dry_run }) => {
+      try {
+        if (!title.trim()) return errorResult('title is required and must be a non-empty string.');
+
+        if (uid && mode === 'create') {
+          const existing = await getFolder(uid);
+          if (existing.exists) {
+            return errorResult(
+              `conflict: folder uid "${uid}" already exists (title "${existing.title}"). Use mode=upsert to update.`,
+            );
+          }
+        }
+
+        if (dry_run) {
+          return textResult({ dryRun: true, mode, wouldApply: { uid: uid ?? null, title } });
+        }
+
+        if (mode === 'upsert' && uid) {
+          const existing = await getFolder(uid);
+          if (existing.exists) {
+            const result = await fetchGrafana(`${grafanaUrl}/api/folders/${encodeURIComponent(uid)}`, undefined, {
+              method: 'PUT',
+              body: JSON.stringify({ title, overwrite: true }),
+            });
+            return textResult({ updated: true, uid: result.uid, title: result.title, version: result.version, url: result.url });
+          }
+        }
+
+        const result = await fetchGrafana(`${grafanaUrl}/api/folders`, undefined, {
+          method: 'POST',
+          body: JSON.stringify(uid ? { uid, title } : { title }),
+        });
+        return textResult({ created: true, uid: result.uid, title: result.title, version: result.version, url: result.url });
+      } catch (err: any) {
+        return errorResult(err.message);
+      }
+    },
+  );
+
+  // ── grafana_create_alert_rule / grafana_delete_alert_rule ─────────────────
+  // Grafana-managed alerting & recording rules via the provisioning API
+  // (/api/v1/provisioning/alert-rules). A rule is a recording rule when it
+  // carries a "record" object; otherwise it is an alerting rule. The
+  // X-Disable-Provenance header keeps provisioned rules editable in the UI too.
+
+  const fetchGrafanaRules = helpers.createFetcher('GRAFANA', 'grafana', {
+    timeoutMs: Math.max(helpers.timeoutMs, 30_000),
+    extraHeaders: {
+      ...(orgId ? { 'X-Grafana-Org-Id': orgId } : {}),
+      'X-Disable-Provenance': 'true',
+    },
+  });
+
+  /** Look up an alert rule by UID; returns existence + title without throwing on 404. */
+  async function getAlertRule(uid: string): Promise<{ exists: boolean; title?: string; isRecording?: boolean }> {
+    try {
+      const data = await fetchGrafanaRules(`${grafanaUrl}/api/v1/provisioning/alert-rules/${encodeURIComponent(uid)}`);
+      return { exists: true, title: data?.title, isRecording: !!data?.record };
+    } catch (err: any) {
+      if (isHttpStatus(err, 404)) return { exists: false };
+      throw err;
+    }
+  }
+
+  server.tool(
+    'grafana_create_alert_rule',
+    'Create, upsert, or update a Grafana-managed alerting or recording rule via the provisioning API ' +
+      '(/api/v1/provisioning/alert-rules). A rule is a recording rule when it includes a "record" object; ' +
+      'otherwise it is an alerting rule. mode=create (default) is a strict insert that fails if the UID already ' +
+      'exists; mode=upsert creates or updates; mode=update requires the rule to already exist. ' +
+      'Requires MCP_ENABLE_WRITES and a token with alert.provisioning:write.',
+    {
+      rule: z.record(z.string(), z.any()).describe(
+        'Grafana provisioned rule model. Alerting rules need title, condition, data, folderUID, ruleGroup, ' +
+        'noDataState, execErrState, for; recording rules need title, data, folderUID, ruleGroup, and a "record" ' +
+        '({ metric, from }) object. Provide "uid" to target an existing rule (required for upsert/update).',
+      ),
+      mode: z.enum(['create', 'upsert', 'update']).default('create').describe('create = strict insert (fail if UID exists); upsert = create-or-update; update = fail if UID is absent.'),
+      dry_run: z.boolean().default(false).describe('Validate and report the planned action without writing.'),
+    },
+    async ({ rule, mode, dry_run }) => {
+      try {
+        const body: Record<string, unknown> = { ...rule };
+        const title = body.title;
+        if (typeof title !== 'string' || !title.trim()) {
+          return errorResult('rule.title is required and must be a non-empty string.');
+        }
+        const uid = typeof body.uid === 'string' && body.uid ? body.uid : undefined;
+        const kind = body.record ? 'recording' : 'alerting';
+
+        if (mode === 'update' && !uid) {
+          return errorResult('mode=update requires the rule to include a "uid".');
+        }
+
+        let exists = false;
+        if (uid) {
+          const existing = await getAlertRule(uid);
+          exists = existing.exists;
+          if (mode === 'create' && exists) {
+            return errorResult(
+              `conflict: alert rule uid "${uid}" already exists (title "${existing.title}"). Use mode=upsert to update.`,
+            );
+          }
+          if (mode === 'update' && !exists) {
+            return errorResult(`alert rule uid "${uid}" does not exist. Use mode=create to create it.`);
+          }
+        }
+
+        if (dry_run) {
+          return textResult({ dryRun: true, mode, kind, wouldApply: { uid: uid ?? null, title } });
+        }
+
+        // PUT when the rule already exists (update / upsert-existing); POST otherwise.
+        const useUpdate = !!uid && (mode === 'update' || (mode === 'upsert' && exists));
+        const result = useUpdate
+          ? await fetchGrafanaRules(`${grafanaUrl}/api/v1/provisioning/alert-rules/${encodeURIComponent(uid!)}`, undefined, {
+              method: 'PUT',
+              body: JSON.stringify(body),
+            })
+          : await fetchGrafanaRules(`${grafanaUrl}/api/v1/provisioning/alert-rules`, undefined, {
+              method: 'POST',
+              body: JSON.stringify(body),
+            });
+
+        return textResult({
+          [useUpdate ? 'updated' : 'created']: true,
+          uid: result?.uid ?? uid,
+          title: result?.title ?? title,
+          kind,
+          folderUID: result?.folderUID,
+          ruleGroup: result?.ruleGroup,
+          mode,
+        });
+      } catch (err: any) {
+        // A strict create that collides at the API surfaces as 409/400.
+        if (mode === 'create' && (isHttpStatus(err, 409) || isHttpStatus(err, 400))) {
+          return errorResult(`conflict creating alert rule: ${err.message}. Use mode=upsert to update.`);
+        }
+        return errorResult(err.message);
+      }
+    },
+  );
+
+  server.tool(
+    'grafana_delete_alert_rule',
+    'Delete a Grafana-managed alerting or recording rule by UID via DELETE ' +
+      '/api/v1/provisioning/alert-rules/{uid}. Requires MCP_ENABLE_WRITES and a token with alert.provisioning:write.',
+    {
+      uid: z.string().describe('Alert/recording rule UID to delete.'),
+      dry_run: z.boolean().default(false).describe('Report the rule that would be deleted without deleting it.'),
+    },
+    async ({ uid, dry_run }) => {
+      try {
+        const existing = await getAlertRule(uid);
+        if (!existing.exists) {
+          return errorResult(`alert rule uid "${uid}" not found.`);
+        }
+        if (dry_run) {
+          return textResult({ dryRun: true, wouldDelete: { uid, title: existing.title, kind: existing.isRecording ? 'recording' : 'alerting' } });
+        }
+        await fetchGrafanaRules(`${grafanaUrl}/api/v1/provisioning/alert-rules/${encodeURIComponent(uid)}`, undefined, {
+          method: 'DELETE',
+        });
+        return textResult({ deleted: true, uid, title: existing.title });
+      } catch (err: any) {
+        return errorResult(err.message);
+      }
+    },
+  );
 }
 
 export const skill: Skill = {
   id: 'grafana',
   name: 'Grafana',
-  description: 'Read-only Grafana verification across data sources, dashboards, folders, alerts, and contact points',
+  description: 'Read-only Grafana verification across data sources, dashboards, folders, alerts, and contact points (plus opt-in dashboard/folder/alert-rule write tools via MCP_ENABLE_WRITES)',
   tools: 10,
   backends: ['Grafana'],
   isAvailable: () => !!process.env['GRAFANA_URL'],

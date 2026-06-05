@@ -11,6 +11,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { buildOAuthAuth } from './oauth.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Backend Auth — outbound credentials for telemetry backends
@@ -21,6 +22,12 @@ export interface BackendAuth {
   authorization?: string;
   /** Extra headers to attach (e.g. X-Scope-OrgID for multi-tenant Loki) */
   extraHeaders?: Record<string, string>;
+  /**
+   * Lazy async resolver for a fresh Authorization header value (e.g. an OAuth
+   * bearer token that is fetched/cached/refreshed on demand). When present it
+   * takes precedence over the static {@link BackendAuth.authorization} value.
+   */
+  getAuthorization?: () => Promise<string | undefined>;
 }
 
 /**
@@ -30,6 +37,9 @@ export interface BackendAuth {
  *   PREFIX_AUTH_TOKEN   — Bearer token (sets Authorization: Bearer <token>)
  *   PREFIX_AUTH_BASIC   — Basic auth in user:password format
  *   PREFIX_AUTH_HEADER  — Raw Authorization header value (overrides token/basic)
+ *
+ * If none of the static vars are set, OAuth 2.0 client-credentials config
+ * (PREFIX_AUTH_OAUTH_*) is used when present — see {@link buildOAuthAuth}.
  */
 export function buildAuth(prefix: string): BackendAuth {
   const header = process.env[`${prefix}_AUTH_HEADER`];
@@ -44,15 +54,38 @@ export function buildAuth(prefix: string): BackendAuth {
     return { authorization: `Basic ${encoded}` };
   }
 
+  const oauth = buildOAuthAuth(prefix);
+  if (oauth) return oauth;
+
   return {};
 }
 
 /**
  * Build a Headers object for a fetch() call to a specific backend.
+ *
+ * Synchronous: only resolves the static {@link BackendAuth.authorization}.
+ * For OAuth-backed auth (async token resolution) use {@link resolveAuthHeaders}.
  */
 export function backendHeaders(auth: BackendAuth): Record<string, string> {
   const headers: Record<string, string> = {};
   if (auth.authorization) headers['Authorization'] = auth.authorization;
+  if (auth.extraHeaders) Object.assign(headers, auth.extraHeaders);
+  return headers;
+}
+
+/**
+ * Async variant of {@link backendHeaders}: awaits {@link BackendAuth.getAuthorization}
+ * (e.g. an OAuth token fetch/refresh) when present, falling back to the static
+ * `authorization` value otherwise. Always used on the request path.
+ */
+export async function resolveAuthHeaders(auth: BackendAuth): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  let authorization = auth.authorization;
+  if (auth.getAuthorization) {
+    const resolved = await auth.getAuthorization();
+    if (resolved) authorization = resolved;
+  }
+  if (authorization) headers['Authorization'] = authorization;
   if (auth.extraHeaders) Object.assign(headers, auth.extraHeaders);
   return headers;
 }
