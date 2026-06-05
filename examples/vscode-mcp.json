@@ -1,8 +1,8 @@
 {
   "servers": {
     "otel": {
-      "command": "node",
-      "args": ["${workspaceFolder}/otel-mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@moebiusx/otel-mcp-server"],
       "env": {
         "JAEGER_URL": "http://localhost:16686",
         "PROMETHEUS_URL": "http://localhost:9090",

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **npm distribution.** The server is now published to npm as the scoped package `@moebiusx/otel-mcp-server` and can be run with `npx -y @moebiusx/otel-mcp-server` — no clone or build required. A `Release` GitHub Actions workflow publishes with npm provenance on every `v*` tag (gated on lint, build, and tests, and on the tag matching `package.json` version). README and example client configs (Claude Desktop, VS Code) now use the `npx` invocation.
 - **Multi-version & protocol-feature model.** A typed catalog now tracks which product versions and protocol features each backend supports, following a `capability → product → protocol-adapter` model (many products share one protocol, but ship features at different versions).
   - `src/protocols.ts` — typed protocol catalog (`PROTOCOLS`) with per-protocol query language, products, baseline (always-available) features, and versioned-feature summaries. 30 protocol adapters.
   - `src/versions.ts` — version model (`BackendVersionSupport`, `SupportTier` of `must`/`should`/`optional` tiers) plus pure helpers: `parseVersion`, `compareVersions`, `matchesRange` (x-ranges, comparators, LTS-stripping), `classify`, `supportsFeature`, `supportsCapability`. The typed `backend()` builder checks `protocolFeaturesSince` keys against the protocol's feature union at compile time.
