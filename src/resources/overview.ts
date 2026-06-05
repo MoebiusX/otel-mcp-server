@@ -45,6 +45,14 @@ The server exposes its own metrics at \`GET /metrics\` (HTTP mode):
 
 ## Common Workflows
 
+### Switch trace backend
+The \`traces\` skill is provider-agnostic. Set \`TRACES_PROVIDER\` to one of
+\`jaeger\` (default), \`tempo\`, \`zipkin\`, or \`skywalking\` and point the
+matching URL var (e.g. \`TRACES_TEMPO_URL\`, legacy \`TEMPO_URL\` still works).
+The verb surface (\`traces_search\`, \`trace_get\`, \`traces_services\`,
+\`traces_operations\`, \`traces_dependencies\`) is the same across providers;
+capabilities the chosen backend doesn't support return a clear error.
+
 ### Investigate a slow request
 1. \`traces_search\` with \`min_duration: "1s"\` to find slow traces
 2. \`trace_get\` with the trace ID to see all spans

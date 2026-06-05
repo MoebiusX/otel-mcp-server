@@ -8,12 +8,30 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Skill, SkillHelpers } from '../skill.js';
+import type { SkillBackendSpec } from '../backends.js';
 import { textResult, errorResult } from '../helpers.js';
 
+const SPEC: SkillBackendSpec = {
+  skillId: 'metrics',
+  baseEnvVar: 'PROMETHEUS_URL',
+  prefix: 'PROMETHEUS',
+  defaultUrl: 'http://localhost:9090',
+};
+
 function registerTools(server: McpServer, helpers: SkillHelpers): void {
-  const promUrl = helpers.env('PROMETHEUS_URL', 'http://localhost:9090')
-                + helpers.env('PROMETHEUS_PATH_PREFIX', '');
-  const fetchJSON = helpers.createFetcher('PROMETHEUS', 'prometheus');
+  const pathPrefix = helpers.env('PROMETHEUS_PATH_PREFIX', '');
+  const instances = helpers.listInstances(SPEC);
+  const targetDesc =
+    `Named backend instance to query (configured: ${instances.join(', ')}). ` +
+    `Defaults to the primary.`;
+
+  /** Resolve a `{ url, fetch }` pair for the requested target, or null if unknown. */
+  const pick = (target?: string) => {
+    const b = helpers.resolveBackend(SPEC, 'prometheus', target);
+    return b ? { url: b.baseUrl + pathPrefix, fetch: b.fetch } : null;
+  };
+  const unknownTarget = (target?: string) =>
+    errorResult(`Unknown target "${target}". Configured instances: ${instances.join(', ')}.`);
 
   // ── metrics_query ─────────────────────────────────────────────────────────
 
@@ -23,12 +41,15 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
     {
       query: z.string().describe('PromQL expression (e.g. rate(http_requests_total[5m]))'),
       time: z.string().optional().describe('Evaluation timestamp (ISO 8601 or Unix epoch). Defaults to now.'),
+      target: z.string().optional().describe(targetDesc),
     },
-    async ({ query, time }) => {
+    async ({ query, time, target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
         const qs = new URLSearchParams({ query });
         if (time) qs.set('time', time);
-        const data = await fetchJSON(`${promUrl}/api/v1/query?${qs}`);
+        const data = await b.fetch(`${b.url}/api/v1/query?${qs}`);
         return textResult({
           status: data.status,
           resultType: data.data?.resultType,
@@ -50,11 +71,14 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
       start: z.string().describe('Range start (ISO 8601 or Unix epoch)'),
       end: z.string().describe('Range end (ISO 8601 or Unix epoch)'),
       step: z.string().default('60s').describe('Query resolution step (e.g. "15s", "1m", "5m")'),
+      target: z.string().optional().describe(targetDesc),
     },
-    async ({ query, start, end, step }) => {
+    async ({ query, start, end, step, target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
         const qs = new URLSearchParams({ query, start, end, step });
-        const data = await fetchJSON(`${promUrl}/api/v1/query_range?${qs}`);
+        const data = await b.fetch(`${b.url}/api/v1/query_range?${qs}`);
         return textResult({
           status: data.status,
           resultType: data.data?.resultType,
@@ -71,10 +95,14 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
   server.tool(
     'metrics_targets',
     'List all Prometheus scrape targets and their health status.',
-    {},
-    async () => {
+    {
+      target: z.string().optional().describe(targetDesc),
+    },
+    async ({ target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
-        const data = await fetchJSON(`${promUrl}/api/v1/targets`);
+        const data = await b.fetch(`${b.url}/api/v1/targets`);
         const targets = (data.data?.activeTargets || []).map((t: any) => ({
           job: t.labels?.job,
           instance: t.labels?.instance,
@@ -97,10 +125,13 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
     {
       filter: z.enum(['all', 'firing', 'pending', 'inactive']).default('all')
         .describe('Filter alerts by state'),
+      target: z.string().optional().describe(targetDesc),
     },
-    async ({ filter }) => {
+    async ({ filter, target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
-        const data = await fetchJSON(`${promUrl}/api/v1/rules?type=alert`);
+        const data = await b.fetch(`${b.url}/api/v1/rules?type=alert`);
         const groups = (data.data?.groups || []).map((g: any) => ({
           name: g.name,
           rules: (g.rules || [])
@@ -129,11 +160,14 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
     'Look up metric metadata — type, help text, and unit for a metric name.',
     {
       metric: z.string().describe('Metric name (e.g. http_requests_total)'),
+      target: z.string().optional().describe(targetDesc),
     },
-    async ({ metric }) => {
+    async ({ metric, target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
-        const data = await fetchJSON(
-          `${promUrl}/api/v1/metadata?metric=${encodeURIComponent(metric)}`,
+        const data = await b.fetch(
+          `${b.url}/api/v1/metadata?metric=${encodeURIComponent(metric)}`,
         );
         return textResult({ metric, metadata: data.data?.[metric] || [] });
       } catch (e: any) {
@@ -149,11 +183,14 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
     'Get all values for a given Prometheus label (e.g. list all jobs, instances, or status codes).',
     {
       label: z.string().describe('Label name (e.g. "job", "instance", "status_code")'),
+      target: z.string().optional().describe(targetDesc),
     },
-    async ({ label }) => {
+    async ({ label, target }) => {
+      const b = pick(target);
+      if (!b) return unknownTarget(target);
       try {
-        const data = await fetchJSON(
-          `${promUrl}/api/v1/label/${encodeURIComponent(label)}/values`,
+        const data = await b.fetch(
+          `${b.url}/api/v1/label/${encodeURIComponent(label)}/values`,
         );
         return textResult({ label, values: data.data || [] });
       } catch (e: any) {

@@ -35,8 +35,10 @@
  */
 
 import { buildAuth } from './auth.js';
-import { createFetcher as createRawFetcher } from './helpers.js';
+import { createFetcher as createRawFetcher, createFailoverFetcher } from './helpers.js';
 import type { FetchOptions } from './helpers.js';
+import type { SkillVersionSupport } from './versions.js';
+import { BackendRegistry, type SkillBackendSpec } from './backends.js';
 
 // ─── Public Types ────────────────────────────────────────────────────────────
 
@@ -57,10 +59,23 @@ export interface Skill {
   tools: number;
   /** Backend system names for startup display */
   backends: string[];
+  /**
+   * Version-support metadata: backend display name → supported product
+   * versions and protocol-feature availability. Optional; skills are migrated
+   * to declare this incrementally. Keys should align with `backends`.
+   */
+  versions?: SkillVersionSupport;
   /** Return true if this skill's backend(s) are configured and available */
   isAvailable(): boolean;
   /** Register MCP tools on the server */
   register(server: any, helpers: SkillHelpers): void;
+  /**
+   * Optionally probe the live backend for its version string.
+   * Returns null when the version cannot be determined (gating then falls back
+   * to optimistic pass-through). `backend` selects which configured backend to
+   * probe for multi-backend skills (defaults to the primary).
+   */
+  detectVersion?(helpers: SkillHelpers, backend?: string): Promise<string | null>;
 }
 
 export interface CreateFetcherOptions {
@@ -68,6 +83,23 @@ export interface CreateFetcherOptions {
   extraHeaders?: Record<string, string>;
   /** Override the default timeout for all requests made by this fetcher (ms) */
   timeoutMs?: number;
+}
+
+/**
+ * A resolved backend instance ready to query: its primary base URL, the full
+ * ordered URL list (for failover), and a failover-aware fetcher.
+ */
+export interface ResolvedBackend {
+  /** Instance name (`default` for the unsuffixed base var). */
+  instance: string;
+  /** Primary base URL (first in the failover list). */
+  baseUrl: string;
+  /** All candidate URLs, tried in order on infrastructure failures. */
+  urls: string[];
+  /** Explicit product override, when configured. */
+  product?: string;
+  /** Failover-aware fetcher bound to this instance's URLs and auth. */
+  fetch: Fetcher;
 }
 
 export interface SkillHelpers {
@@ -92,6 +124,21 @@ export interface SkillHelpers {
 
   /** Read an environment variable with optional fallback */
   env(key: string, fallback?: string): string;
+
+  /** Configured instance names for a skill's backend slot (`default` first). */
+  listInstances(spec: SkillBackendSpec): string[];
+
+  /**
+   * Resolve a backend instance for a skill, optionally selecting a named
+   * `target`. Returns a {@link ResolvedBackend} with a failover-aware fetcher,
+   * or `null` when `target` does not match a configured instance (SSRF-safe).
+   */
+  resolveBackend(
+    spec: SkillBackendSpec,
+    backend: string,
+    target?: string,
+    options?: CreateFetcherOptions,
+  ): ResolvedBackend | null;
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
@@ -101,6 +148,8 @@ export function createSkillHelpers(overrides?: { timeoutMs?: number }): SkillHel
   const timeoutMs =
     overrides?.timeoutMs ??
     parseInt(process.env['MCP_TIMEOUT_MS'] || '15000', 10);
+
+  const registry = new BackendRegistry();
 
   return {
     timeoutMs,
@@ -119,6 +168,39 @@ export function createSkillHelpers(overrides?: { timeoutMs?: number }): SkillHel
 
     env(key: string, fallback = ''): string {
       return process.env[key] || fallback;
+    },
+
+    listInstances(spec: SkillBackendSpec): string[] {
+      return registry.names(spec);
+    },
+
+    resolveBackend(
+      spec: SkillBackendSpec,
+      backend: string,
+      target?: string,
+      options?: CreateFetcherOptions,
+    ): ResolvedBackend | null {
+      const inst = registry.resolve(spec, target);
+      if (!inst) return null;
+
+      const auth = buildAuth(inst.authPrefix);
+      const extraHeaders = { ...inst.extraHeaders, ...options?.extraHeaders };
+      if (Object.keys(extraHeaders).length > 0) {
+        auth.extraHeaders = { ...auth.extraHeaders, ...extraHeaders };
+      }
+
+      return {
+        instance: inst.instance,
+        baseUrl: inst.urls[0],
+        urls: inst.urls,
+        product: inst.product,
+        fetch: createFailoverFetcher(
+          options?.timeoutMs ?? timeoutMs,
+          auth,
+          inst.urls,
+          backend,
+        ),
+      };
     },
   };
 }

@@ -22,6 +22,8 @@ import { createServer, VERSION, allSkills } from './server.js';
 import type { ServerOptions } from './server.js';
 import { loadClientKeys, validateClientKey } from './auth.js';
 import { metrics, serializeMetrics } from './metrics.js';
+import { createSkillHelpers } from './skill.js';
+import { versionRegistry } from './version-registry.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -65,7 +67,21 @@ async function main(): Promise<void> {
 
       const httpServer = http.createServer(async (req, res) => {
         // Health check — always open
-        if (req.method === 'GET' && req.url === '/health') {
+        if (req.method === 'GET' && req.url?.startsWith('/health')) {
+          // Detected backend versions/tiers. Opt out with `/health?versions=0`
+          // to skip live probing (e.g. for fast liveness checks).
+          const wantVersions = !/[?&]versions=0\b/.test(req.url);
+          let versions: unknown[] = [];
+          if (wantVersions) {
+            try {
+              versions = await versionRegistry.resolveEnabled(
+                createSkillHelpers(),
+                enabledIds,
+              );
+            } catch {
+              versions = [];
+            }
+          }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
             status: 'ok',
@@ -75,6 +91,7 @@ async function main(): Promise<void> {
             skills: allSkills
               .filter(s => enabledIds.has(s.id))
               .map(s => ({ id: s.id, available: s.isAvailable(), tools: s.tools })),
+            backendVersions: versions,
           }));
           return;
         }
