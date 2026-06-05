@@ -187,6 +187,43 @@ LOKI_AUTH_TOKEN=my-loki-token
 LOKI_TENANT_ID=team-platform
 ```
 
+#### OAuth 2.0 / OIDC (client-credentials)
+
+When **no** static `_AUTH_*` var is set for a backend, the server can obtain a
+bearer token via the OAuth 2.0 **client-credentials** grant and refresh it
+transparently (cached in-memory, refreshed ~60s before expiry, concurrent
+requests de-duped). Client secrets are never logged or echoed in error
+messages. Use the same `<PREFIX>` as above with `_AUTH_OAUTH_*` suffixes:
+
+| Suffix | Effect |
+|--------|--------|
+| `_AUTH_OAUTH_CLIENT_ID` | OAuth client ID (required) |
+| `_AUTH_OAUTH_CLIENT_SECRET` | OAuth client secret (required) |
+| `_AUTH_OAUTH_TOKEN_URL` | Explicit token endpoint (skips OIDC discovery) |
+| `_AUTH_OAUTH_ISSUER` | OIDC issuer — token endpoint is discovered from `/.well-known/openid-configuration` |
+| `_AUTH_OAUTH_SCOPE` | Requested scope (optional) |
+| `_AUTH_OAUTH_AUDIENCE` | Requested audience (optional; Entra derives `.default` scope from it) |
+| `_AUTH_OAUTH_PROVIDER` | Preset: `entra` / `azure` / `azuread`, `google`, or `oidc` |
+| `_AUTH_OAUTH_TENANT` | Entra/Azure tenant ID (with the `entra` preset) |
+
+```bash
+# Generic OIDC (token endpoint auto-discovered from the issuer)
+PROMETHEUS_AUTH_OAUTH_ISSUER=https://idp.example.com/realms/obs
+PROMETHEUS_AUTH_OAUTH_CLIENT_ID=otel-mcp
+PROMETHEUS_AUTH_OAUTH_CLIENT_SECRET=...
+PROMETHEUS_AUTH_OAUTH_SCOPE=metrics:read
+
+# Microsoft Entra ID (Azure AD) preset
+TEMPO_AUTH_OAUTH_PROVIDER=entra
+TEMPO_AUTH_OAUTH_TENANT=00000000-0000-0000-0000-000000000000
+TEMPO_AUTH_OAUTH_CLIENT_ID=...
+TEMPO_AUTH_OAUTH_CLIENT_SECRET=...
+TEMPO_AUTH_OAUTH_AUDIENCE=api://obs-backend       # → scope api://obs-backend/.default
+```
+
+Static `_AUTH_TOKEN` / `_AUTH_BASIC` / `_AUTH_HEADER` always take precedence,
+so existing configs are unaffected.
+
 ### Multi-backend instances & failover
 
 A single skill can talk to **multiple named backends** and **fail over** across
