@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **OAuth 2.0 / OIDC backend authentication (outbound).** Backends can now be accessed with a bearer token obtained via the OAuth 2.0 **client-credentials** grant, fetched and refreshed transparently at request time (#20).
+  - `src/oauth.ts` — zero-dependency client (built-in `fetch`/`URLSearchParams` only): `readOAuthConfig`, `buildOAuthAuth`, `clearOAuthCaches`. In-memory token cache with refresh ~60s before expiry, concurrent-fetch de-duplication, and OIDC token-endpoint discovery via `/.well-known/openid-configuration`. Presets for Microsoft Entra ID (`entra`/`azure`/`azuread` — derives the tenant token URL and `<audience>/.default` scope), Google, and generic OIDC. Client secrets are never logged or echoed in error messages.
+  - Configured per backend with `<PREFIX>_AUTH_OAUTH_*` env vars (`CLIENT_ID`, `CLIENT_SECRET`, `TOKEN_URL`, `ISSUER`, `SCOPE`, `AUDIENCE`, `PROVIDER`, `TENANT`). Used automatically when no static `_AUTH_*` var is set; static `_AUTH_TOKEN`/`_AUTH_BASIC`/`_AUTH_HEADER` still take precedence, so existing configs are unaffected.
+  - `BackendAuth` gains an optional async `getAuthorization()` resolver; `src/auth.ts` adds `resolveAuthHeaders()` and the request path (`fetchJSON`) now resolves headers asynchronously so tokens are fetched/refreshed on demand.
+- Test count: 219 → 235. Added `tests/oauth.test.ts` covering token acquisition, caching, refresh-on-expiry, concurrent de-dup, error/secret handling, OIDC discovery, Entra/Google presets, and `buildAuth` precedence/fallthrough.
+
 ## [1.3.1] - 2026-06-05
 
 ### Added
