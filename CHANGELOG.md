@@ -9,11 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Grafana write tools (opt-in).** The Grafana skill gains three mutating tools so agents can provision dashboards and folders, not just read them (#22). Writes are **disabled by default** and only registered/advertised when `MCP_ENABLE_WRITES` is set (`true`/`1`/`yes`/`on`) — read-only stays the default posture.
+  - `grafana_create_dashboard` — create / upsert / update a dashboard via `POST /api/dashboards/db`.
+  - `grafana_delete_dashboard` — delete a dashboard by UID.
+  - `grafana_create_folder` — create or upsert a folder.
+  - **Write modes** via an explicit `mode` arg: `create` (default, strict insert — fails with a conflict error carrying the existing UID/version), `upsert` (idempotent create-or-update), and `update` (dashboards only, strict update). Strict conflict detection uses a GET pre-check (portable across backends), and dashboard creates also send Grafana's native `overwrite=false` as a second safety net. All write tools support `dry_run` and never log secrets.
+  - Docs: README Grafana write-tools section (modes, required token scopes), `MCP_ENABLE_WRITES` in the env-var table and `.env.example`.
+- Test count: 219 → 234. Added `tests/grafana-write.test.ts` (15 tests) covering gating (off by default / on when enabled), all write modes (insert success, insert-conflict, upsert overwrite, strict-update-absent), dry-run, validation, and request shaping. Existing read-only Grafana tests unchanged.
 - **OAuth 2.0 / OIDC backend authentication (outbound).** Backends can now be accessed with a bearer token obtained via the OAuth 2.0 **client-credentials** grant, fetched and refreshed transparently at request time (#20).
   - `src/oauth.ts` — zero-dependency client (built-in `fetch`/`URLSearchParams` only): `readOAuthConfig`, `buildOAuthAuth`, `clearOAuthCaches`. In-memory token cache with refresh ~60s before expiry, concurrent-fetch de-duplication, and OIDC token-endpoint discovery via `/.well-known/openid-configuration`. Presets for Microsoft Entra ID (`entra`/`azure`/`azuread` — derives the tenant token URL and `<audience>/.default` scope), Google, and generic OIDC. Client secrets are never logged or echoed in error messages.
   - Configured per backend with `<PREFIX>_AUTH_OAUTH_*` env vars (`CLIENT_ID`, `CLIENT_SECRET`, `TOKEN_URL`, `ISSUER`, `SCOPE`, `AUDIENCE`, `PROVIDER`, `TENANT`). Used automatically when no static `_AUTH_*` var is set; static `_AUTH_TOKEN`/`_AUTH_BASIC`/`_AUTH_HEADER` still take precedence, so existing configs are unaffected.
   - `BackendAuth` gains an optional async `getAuthorization()` resolver; `src/auth.ts` adds `resolveAuthHeaders()` and the request path (`fetchJSON`) now resolves headers asynchronously so tokens are fetched/refreshed on demand.
-- Test count: 219 → 235. Added `tests/oauth.test.ts` covering token acquisition, caching, refresh-on-expiry, concurrent de-dup, error/secret handling, OIDC discovery, Entra/Google presets, and `buildAuth` precedence/fallthrough.
+- Test count: 234 → 250. Added `tests/oauth.test.ts` covering token acquisition, caching, refresh-on-expiry, concurrent de-dup, error/secret handling, OIDC discovery, Entra/Google presets, and `buildAuth` precedence/fallthrough.
 
 ## [1.3.1] - 2026-06-05
 
