@@ -71,16 +71,20 @@ describe('grafana write tools — gating', () => {
     expect(names).not.toContain('grafana_create_dashboard');
     expect(names).not.toContain('grafana_delete_dashboard');
     expect(names).not.toContain('grafana_create_folder');
+    expect(names).not.toContain('grafana_create_alert_rule');
+    expect(names).not.toContain('grafana_delete_alert_rule');
   });
 
-  it('registers the 3 write tools when MCP_ENABLE_WRITES=true', async () => {
+  it('registers the write tools when MCP_ENABLE_WRITES=true', async () => {
     process.env.MCP_ENABLE_WRITES = 'true';
     const { client } = await createTestClient();
     const names = (await client.listTools()).tools.map(t => t.name);
-    expect(names).toHaveLength(13);
+    expect(names).toHaveLength(15);
     expect(names).toContain('grafana_create_dashboard');
     expect(names).toContain('grafana_delete_dashboard');
     expect(names).toContain('grafana_create_folder');
+    expect(names).toContain('grafana_create_alert_rule');
+    expect(names).toContain('grafana_delete_alert_rule');
   });
 });
 
@@ -327,5 +331,205 @@ describe('grafana_create_folder', () => {
     expect(out.created).toBe(true);
     expect(calls.some(c => c.method === 'PUT')).toBe(false);
     expect(calls.some(c => c.method === 'POST')).toBe(true);
+  });
+});
+
+const RULES = '/api/v1/provisioning/alert-rules';
+const ALERT_RULE = {
+  uid: 'rule-1',
+  title: 'High error rate',
+  condition: 'A',
+  folderUID: 'gt7',
+  ruleGroup: 'gt7',
+  noDataState: 'NoData',
+  execErrState: 'Error',
+  for: '5m',
+  data: [{ refId: 'A', datasourceUid: 'prometheus', model: { expr: 'rate(errors[5m]) > 1' } }],
+};
+
+describe('grafana_create_alert_rule', () => {
+  const originalEnv = process.env;
+  let calls: Call[];
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    process.env.GRAFANA_URL = 'http://grafana:3000/';
+    process.env.GRAFANA_AUTH_TOKEN = 'grafana-token';
+    process.env.GRAFANA_ORG_ID = '2';
+    process.env.MCP_ENABLE_WRITES = 'true';
+    calls = [];
+  });
+  afterEach(() => {
+    process.env = originalEnv;
+    vi.unstubAllGlobals();
+  });
+
+  it('create mode POSTs a new alerting rule and disables provenance', async () => {
+    vi.stubGlobal('fetch', routedFetch([
+      // GET pre-check on rule-1 → 404 (does not exist) via fall-through
+      { method: 'POST', match: RULES, json: { ...ALERT_RULE, uid: 'rule-1' } },
+    ], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: ALERT_RULE } });
+    const out = parse(res);
+    expect(out.created).toBe(true);
+    expect(out.uid).toBe('rule-1');
+    expect(out.kind).toBe('alerting');
+
+    const post = calls.find(c => c.method === 'POST' && c.url.endsWith(RULES));
+    expect(post).toBeTruthy();
+    expect(post!.init.headers['X-Disable-Provenance']).toBe('true');
+    expect(post!.init.headers['X-Grafana-Org-Id']).toBe('2');
+    expect(post!.init.headers.Authorization).toBe('Bearer grafana-token');
+  });
+
+  it('detects a recording rule via the "record" field', async () => {
+    const recRule = { uid: 'rec-1', title: 'job:errors:rate5m', folderUID: 'gt7', ruleGroup: 'gt7', data: ALERT_RULE.data, record: { metric: 'job:errors:rate5m', from: 'A' } };
+    vi.stubGlobal('fetch', routedFetch([
+      { method: 'POST', match: RULES, json: recRule },
+    ], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: recRule } });
+    const out = parse(res);
+    expect(out.created).toBe(true);
+    expect(out.kind).toBe('recording');
+  });
+
+  it('create mode conflicts when the UID already exists', async () => {
+    vi.stubGlobal('fetch', routedFetch([
+      { method: 'GET', match: `${RULES}/rule-1`, json: ALERT_RULE },
+      { method: 'POST', match: RULES, json: ALERT_RULE },
+    ], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: ALERT_RULE } });
+    expect(res.isError).toBe(true);
+    expect((res.content as any)[0].text).toMatch(/conflict/i);
+    expect((res.content as any)[0].text).toMatch(/High error rate/);
+    expect(calls.some(c => c.method === 'POST')).toBe(false);
+  });
+
+  it('upsert mode PUTs when the rule exists', async () => {
+    vi.stubGlobal('fetch', routedFetch([
+      { method: 'GET', match: `${RULES}/rule-1`, json: ALERT_RULE },
+      { method: 'PUT', match: `${RULES}/rule-1`, json: { ...ALERT_RULE, title: 'Updated' } },
+    ], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: ALERT_RULE, mode: 'upsert' } });
+    const out = parse(res);
+    expect(out.updated).toBe(true);
+    const put = calls.find(c => c.method === 'PUT');
+    expect(put).toBeTruthy();
+    expect(JSON.parse(put!.init.body).uid).toBe('rule-1');
+  });
+
+  it('upsert mode POSTs when the rule is absent', async () => {
+    vi.stubGlobal('fetch', routedFetch([
+      { method: 'POST', match: RULES, json: { ...ALERT_RULE } },
+    ], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: ALERT_RULE, mode: 'upsert' } });
+    const out = parse(res);
+    expect(out.created).toBe(true);
+    expect(calls.some(c => c.method === 'PUT')).toBe(false);
+    expect(calls.some(c => c.method === 'POST')).toBe(true);
+  });
+
+  it('update mode fails when the rule does not exist', async () => {
+    vi.stubGlobal('fetch', routedFetch([], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: ALERT_RULE, mode: 'update' } });
+    expect(res.isError).toBe(true);
+    expect((res.content as any)[0].text).toMatch(/does not exist/i);
+    expect(calls.some(c => c.method === 'PUT' || c.method === 'POST')).toBe(false);
+  });
+
+  it('update mode requires a uid', async () => {
+    vi.stubGlobal('fetch', routedFetch([], calls));
+    const { client } = await createTestClient();
+
+    const { uid: _omit, ...noUid } = ALERT_RULE;
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: noUid, mode: 'update' } });
+    expect(res.isError).toBe(true);
+    expect((res.content as any)[0].text).toMatch(/requires the rule to include a "uid"/i);
+  });
+
+  it('rejects a rule without a title', async () => {
+    vi.stubGlobal('fetch', routedFetch([], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: { uid: 'x' } } });
+    expect(res.isError).toBe(true);
+    expect((res.content as any)[0].text).toMatch(/title is required/i);
+  });
+
+  it('dry_run validates without writing', async () => {
+    vi.stubGlobal('fetch', routedFetch([], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_create_alert_rule', arguments: { rule: ALERT_RULE, dry_run: true } });
+    const out = parse(res);
+    expect(out.dryRun).toBe(true);
+    expect(out.kind).toBe('alerting');
+    expect(calls.some(c => c.method === 'POST' || c.method === 'PUT')).toBe(false);
+  });
+});
+
+describe('grafana_delete_alert_rule', () => {
+  const originalEnv = process.env;
+  let calls: Call[];
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    process.env.GRAFANA_URL = 'http://grafana:3000/';
+    process.env.GRAFANA_AUTH_TOKEN = 'grafana-token';
+    process.env.MCP_ENABLE_WRITES = 'on';
+    calls = [];
+  });
+  afterEach(() => {
+    process.env = originalEnv;
+    vi.unstubAllGlobals();
+  });
+
+  it('deletes an existing rule (204 No Content)', async () => {
+    vi.stubGlobal('fetch', routedFetch([
+      { method: 'GET', match: `${RULES}/rule-1`, json: ALERT_RULE },
+      { method: 'DELETE', match: `${RULES}/rule-1`, status: 204 },
+    ], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_delete_alert_rule', arguments: { uid: 'rule-1' } });
+    const out = parse(res);
+    expect(out.deleted).toBe(true);
+    expect(out.uid).toBe('rule-1');
+    expect(calls.some(c => c.method === 'DELETE')).toBe(true);
+  });
+
+  it('errors when the rule is not found', async () => {
+    vi.stubGlobal('fetch', routedFetch([], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_delete_alert_rule', arguments: { uid: 'ghost' } });
+    expect(res.isError).toBe(true);
+    expect((res.content as any)[0].text).toMatch(/not found/i);
+    expect(calls.some(c => c.method === 'DELETE')).toBe(false);
+  });
+
+  it('dry_run reports the target without deleting', async () => {
+    vi.stubGlobal('fetch', routedFetch([
+      { method: 'GET', match: `${RULES}/rule-1`, json: ALERT_RULE },
+    ], calls));
+    const { client } = await createTestClient();
+
+    const res = await client.callTool({ name: 'grafana_delete_alert_rule', arguments: { uid: 'rule-1', dry_run: true } });
+    const out = parse(res);
+    expect(out.dryRun).toBe(true);
+    expect(out.wouldDelete.uid).toBe('rule-1');
+    expect(calls.some(c => c.method === 'DELETE')).toBe(false);
   });
 });

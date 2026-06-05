@@ -7,7 +7,8 @@
  *        grafana_dashboard_get, grafana_folders, grafana_alert_rules,
  *        grafana_alerts, grafana_contact_points
  * Write tools (only when MCP_ENABLE_WRITES is set): grafana_create_dashboard,
- *        grafana_delete_dashboard, grafana_create_folder
+ *        grafana_delete_dashboard, grafana_create_folder,
+ *        grafana_create_alert_rule, grafana_delete_alert_rule
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -837,12 +838,143 @@ function registerTools(server: McpServer, helpers: SkillHelpers): void {
       }
     },
   );
+
+  // ── grafana_create_alert_rule / grafana_delete_alert_rule ─────────────────
+  // Grafana-managed alerting & recording rules via the provisioning API
+  // (/api/v1/provisioning/alert-rules). A rule is a recording rule when it
+  // carries a "record" object; otherwise it is an alerting rule. The
+  // X-Disable-Provenance header keeps provisioned rules editable in the UI too.
+
+  const fetchGrafanaRules = helpers.createFetcher('GRAFANA', 'grafana', {
+    timeoutMs: Math.max(helpers.timeoutMs, 30_000),
+    extraHeaders: {
+      ...(orgId ? { 'X-Grafana-Org-Id': orgId } : {}),
+      'X-Disable-Provenance': 'true',
+    },
+  });
+
+  /** Look up an alert rule by UID; returns existence + title without throwing on 404. */
+  async function getAlertRule(uid: string): Promise<{ exists: boolean; title?: string; isRecording?: boolean }> {
+    try {
+      const data = await fetchGrafanaRules(`${grafanaUrl}/api/v1/provisioning/alert-rules/${encodeURIComponent(uid)}`);
+      return { exists: true, title: data?.title, isRecording: !!data?.record };
+    } catch (err: any) {
+      if (isHttpStatus(err, 404)) return { exists: false };
+      throw err;
+    }
+  }
+
+  server.tool(
+    'grafana_create_alert_rule',
+    'Create, upsert, or update a Grafana-managed alerting or recording rule via the provisioning API ' +
+      '(/api/v1/provisioning/alert-rules). A rule is a recording rule when it includes a "record" object; ' +
+      'otherwise it is an alerting rule. mode=create (default) is a strict insert that fails if the UID already ' +
+      'exists; mode=upsert creates or updates; mode=update requires the rule to already exist. ' +
+      'Requires MCP_ENABLE_WRITES and a token with alert.provisioning:write.',
+    {
+      rule: z.record(z.string(), z.any()).describe(
+        'Grafana provisioned rule model. Alerting rules need title, condition, data, folderUID, ruleGroup, ' +
+        'noDataState, execErrState, for; recording rules need title, data, folderUID, ruleGroup, and a "record" ' +
+        '({ metric, from }) object. Provide "uid" to target an existing rule (required for upsert/update).',
+      ),
+      mode: z.enum(['create', 'upsert', 'update']).default('create').describe('create = strict insert (fail if UID exists); upsert = create-or-update; update = fail if UID is absent.'),
+      dry_run: z.boolean().default(false).describe('Validate and report the planned action without writing.'),
+    },
+    async ({ rule, mode, dry_run }) => {
+      try {
+        const body: Record<string, unknown> = { ...rule };
+        const title = body.title;
+        if (typeof title !== 'string' || !title.trim()) {
+          return errorResult('rule.title is required and must be a non-empty string.');
+        }
+        const uid = typeof body.uid === 'string' && body.uid ? body.uid : undefined;
+        const kind = body.record ? 'recording' : 'alerting';
+
+        if (mode === 'update' && !uid) {
+          return errorResult('mode=update requires the rule to include a "uid".');
+        }
+
+        let exists = false;
+        if (uid) {
+          const existing = await getAlertRule(uid);
+          exists = existing.exists;
+          if (mode === 'create' && exists) {
+            return errorResult(
+              `conflict: alert rule uid "${uid}" already exists (title "${existing.title}"). Use mode=upsert to update.`,
+            );
+          }
+          if (mode === 'update' && !exists) {
+            return errorResult(`alert rule uid "${uid}" does not exist. Use mode=create to create it.`);
+          }
+        }
+
+        if (dry_run) {
+          return textResult({ dryRun: true, mode, kind, wouldApply: { uid: uid ?? null, title } });
+        }
+
+        // PUT when the rule already exists (update / upsert-existing); POST otherwise.
+        const useUpdate = !!uid && (mode === 'update' || (mode === 'upsert' && exists));
+        const result = useUpdate
+          ? await fetchGrafanaRules(`${grafanaUrl}/api/v1/provisioning/alert-rules/${encodeURIComponent(uid!)}`, undefined, {
+              method: 'PUT',
+              body: JSON.stringify(body),
+            })
+          : await fetchGrafanaRules(`${grafanaUrl}/api/v1/provisioning/alert-rules`, undefined, {
+              method: 'POST',
+              body: JSON.stringify(body),
+            });
+
+        return textResult({
+          [useUpdate ? 'updated' : 'created']: true,
+          uid: result?.uid ?? uid,
+          title: result?.title ?? title,
+          kind,
+          folderUID: result?.folderUID,
+          ruleGroup: result?.ruleGroup,
+          mode,
+        });
+      } catch (err: any) {
+        // A strict create that collides at the API surfaces as 409/400.
+        if (mode === 'create' && (isHttpStatus(err, 409) || isHttpStatus(err, 400))) {
+          return errorResult(`conflict creating alert rule: ${err.message}. Use mode=upsert to update.`);
+        }
+        return errorResult(err.message);
+      }
+    },
+  );
+
+  server.tool(
+    'grafana_delete_alert_rule',
+    'Delete a Grafana-managed alerting or recording rule by UID via DELETE ' +
+      '/api/v1/provisioning/alert-rules/{uid}. Requires MCP_ENABLE_WRITES and a token with alert.provisioning:write.',
+    {
+      uid: z.string().describe('Alert/recording rule UID to delete.'),
+      dry_run: z.boolean().default(false).describe('Report the rule that would be deleted without deleting it.'),
+    },
+    async ({ uid, dry_run }) => {
+      try {
+        const existing = await getAlertRule(uid);
+        if (!existing.exists) {
+          return errorResult(`alert rule uid "${uid}" not found.`);
+        }
+        if (dry_run) {
+          return textResult({ dryRun: true, wouldDelete: { uid, title: existing.title, kind: existing.isRecording ? 'recording' : 'alerting' } });
+        }
+        await fetchGrafanaRules(`${grafanaUrl}/api/v1/provisioning/alert-rules/${encodeURIComponent(uid)}`, undefined, {
+          method: 'DELETE',
+        });
+        return textResult({ deleted: true, uid, title: existing.title });
+      } catch (err: any) {
+        return errorResult(err.message);
+      }
+    },
+  );
 }
 
 export const skill: Skill = {
   id: 'grafana',
   name: 'Grafana',
-  description: 'Read-only Grafana verification across data sources, dashboards, folders, alerts, and contact points (plus opt-in dashboard/folder write tools via MCP_ENABLE_WRITES)',
+  description: 'Read-only Grafana verification across data sources, dashboards, folders, alerts, and contact points (plus opt-in dashboard/folder/alert-rule write tools via MCP_ENABLE_WRITES)',
   tools: 10,
   backends: ['Grafana'],
   isAvailable: () => !!process.env['GRAFANA_URL'],

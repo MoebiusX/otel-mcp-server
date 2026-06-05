@@ -31,6 +31,8 @@ export async function fetchJSON(
       body: options?.body,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText} — ${url}`);
+    // 204 No Content (e.g. provisioning DELETE) has an empty body — res.json() would throw.
+    if (res.status === 204) return undefined;
     return await res.json();
   } finally {
     clearTimeout(timer);

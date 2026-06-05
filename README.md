@@ -489,12 +489,16 @@ regardless of configuration.
 | `grafana_create_dashboard` | Create / upsert / update a dashboard (`POST /api/dashboards/db`) | `dashboards:write` |
 | `grafana_delete_dashboard` | Delete a dashboard by UID (`DELETE /api/dashboards/uid/{uid}`) | `dashboards:delete` |
 | `grafana_create_folder` | Create or upsert a folder | `folders:write` |
+| `grafana_create_alert_rule` | Create / upsert / update a Grafana-managed alerting or recording rule (`/api/v1/provisioning/alert-rules`) | `alert.provisioning:write` |
+| `grafana_delete_alert_rule` | Delete a Grafana-managed rule by UID (`DELETE /api/v1/provisioning/alert-rules/{uid}`) | `alert.provisioning:write` |
 
 **Write modes** — each write tool takes an explicit `mode` so the caller controls overwrite behavior; the default is the safe one:
 
 - `create` (default) — **strict insert**: fails with a clear conflict error (including the existing object's UID and version) if the target UID already exists. Use this for promotion workflows (e.g. staging → prod) where silently overwriting is dangerous.
 - `upsert` — idempotent **create-or-update** by UID, for reconcile / infra-as-code loops.
-- `update` (dashboards only) — **strict update**: fails if the target UID does not already exist.
+- `update` (dashboards and alert rules) — **strict update**: fails if the target UID does not already exist.
+
+Alert rules are **Grafana-managed** (the JSON provisioning API, no YAML dependency). A rule whose body includes a `record` object is treated as a **recording rule**; otherwise it is an **alerting rule**. Provisioning writes are sent with `X-Disable-Provenance: true` so the rules stay editable in the Grafana UI. (Mimir/Cortex ruler rules are YAML-based and remain a future follow-up.)
 
 All write tools accept `dry_run: true` to validate and report the planned action without writing. Conflict detection for strict `create`/`update` uses a GET pre-check, and `grafana_create_dashboard` also sends Grafana's native `overwrite=false` as a second safety net. Returns the resulting UID and version on success. Existing read-only behavior is unchanged when writes are disabled.
 
