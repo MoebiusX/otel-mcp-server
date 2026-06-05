@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-06-05
+
 ### Added
 
 - **npm distribution.** The server is now published to npm as the scoped package `@moebiusx/otel-mcp-server` and can be run with `npx -y @moebiusx/otel-mcp-server` — no clone or build required. A `Release` GitHub Actions workflow publishes with npm provenance on every `v*` tag (gated on lint, build, and tests, and on the tag matching `package.json` version). README and example client configs (Claude Desktop, VS Code) now use the `npx` invocation.
