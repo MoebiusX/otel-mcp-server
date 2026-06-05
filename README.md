@@ -157,6 +157,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `ALLOY_URL` | _(disabled)_ | Grafana Alloy |
 | `GRAFANA_DEFAULT_FROM` | `now-1h` | Default Grafana query range start |
 | `GRAFANA_MAX_ITEMS` | `50` | Default Grafana list/search limit |
+| `MCP_ENABLE_WRITES` | _(off)_ | Enable mutating/write tools (e.g. Grafana dashboard provisioning). Read-only by default |
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
 
 ### Backend Authentication
@@ -427,7 +428,7 @@ regardless of configuration.
 
 ### Grafana — `grafana` — 10 tools
 
-> Enabled when `GRAFANA_URL` is set. All Grafana tools are read-only and intended for verification/interrogation workflows.
+> Enabled when `GRAFANA_URL` is set. The 10 tools below are read-only and intended for verification/interrogation workflows. Three additional **write** tools are available when `MCP_ENABLE_WRITES` is set — see [Write tools](#write-tools-opt-in).
 
 | Tool | Description |
 |------|-------------|
@@ -441,6 +442,24 @@ regardless of configuration.
 | `grafana_alert_rules` | List Grafana-managed alert rules and query references |
 | `grafana_alerts` | List active Grafana Alertmanager alert instances |
 | `grafana_contact_points` | List alert contact points or receivers with safe integration status metadata |
+
+#### Write tools (opt-in)
+
+> **Disabled by default.** The server is read-only out of the box. Set `MCP_ENABLE_WRITES=true` (also accepts `1`/`yes`/`on`) to advertise and enable the mutating tools below. The Grafana token must also carry the matching write scopes.
+
+| Tool | Description | Token scope |
+|------|-------------|-------------|
+| `grafana_create_dashboard` | Create / upsert / update a dashboard (`POST /api/dashboards/db`) | `dashboards:write` |
+| `grafana_delete_dashboard` | Delete a dashboard by UID (`DELETE /api/dashboards/uid/{uid}`) | `dashboards:delete` |
+| `grafana_create_folder` | Create or upsert a folder | `folders:write` |
+
+**Write modes** — each write tool takes an explicit `mode` so the caller controls overwrite behavior; the default is the safe one:
+
+- `create` (default) — **strict insert**: fails with a clear conflict error (including the existing object's UID and version) if the target UID already exists. Use this for promotion workflows (e.g. staging → prod) where silently overwriting is dangerous.
+- `upsert` — idempotent **create-or-update** by UID, for reconcile / infra-as-code loops.
+- `update` (dashboards only) — **strict update**: fails if the target UID does not already exist.
+
+All write tools accept `dry_run: true` to validate and report the planned action without writing. Conflict detection for strict `create`/`update` uses a GET pre-check, and `grafana_create_dashboard` also sends Grafana's native `overwrite=false` as a second safety net. Returns the resulting UID and version on success. Existing read-only behavior is unchanged when writes are disabled.
 
 ### Cilium (eBPF networking) — `cilium` — 6 tools
 

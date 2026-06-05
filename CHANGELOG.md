@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Grafana write tools (opt-in).** The Grafana skill gains three mutating tools so agents can provision dashboards and folders, not just read them (#22). Writes are **disabled by default** and only registered/advertised when `MCP_ENABLE_WRITES` is set (`true`/`1`/`yes`/`on`) — read-only stays the default posture.
+  - `grafana_create_dashboard` — create / upsert / update a dashboard via `POST /api/dashboards/db`.
+  - `grafana_delete_dashboard` — delete a dashboard by UID.
+  - `grafana_create_folder` — create or upsert a folder.
+  - **Write modes** via an explicit `mode` arg: `create` (default, strict insert — fails with a conflict error carrying the existing UID/version), `upsert` (idempotent create-or-update), and `update` (dashboards only, strict update). Strict conflict detection uses a GET pre-check (portable across backends), and dashboard creates also send Grafana's native `overwrite=false` as a second safety net. All write tools support `dry_run` and never log secrets.
+  - Docs: README Grafana write-tools section (modes, required token scopes), `MCP_ENABLE_WRITES` in the env-var table and `.env.example`.
+- Test count: 219 → 234. Added `tests/grafana-write.test.ts` (15 tests) covering gating (off by default / on when enabled), all write modes (insert success, insert-conflict, upsert overwrite, strict-update-absent), dry-run, validation, and request shaping. Existing read-only Grafana tests unchanged.
+
 ## [1.3.1] - 2026-06-05
 
 ### Added
