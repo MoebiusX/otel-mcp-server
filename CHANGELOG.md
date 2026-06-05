@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-05
+
 ### Added
 
 - **Grafana write tools (opt-in).** The Grafana skill gains five mutating tools so agents can provision dashboards, folders, and Grafana-managed alert/recording rules, not just read them (#22). Writes are **disabled by default** and only registered/advertised when `MCP_ENABLE_WRITES` is set (`true`/`1`/`yes`/`on`) — read-only stays the default posture.
