@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { metrics, serializeMetrics, instrumentFetcher } from '../src/metrics.js';
+import { VERSION } from '../src/version.js';
 
 describe('metrics registry', () => {
   it('serializes counters', () => {
@@ -43,7 +44,7 @@ describe('metrics registry', () => {
 
   it('includes server info', () => {
     const output = serializeMetrics();
-    expect(output).toContain('mcp_server_info{version="1.2.0"} 1');
+    expect(output).toContain(`mcp_server_info{version="${VERSION}"} 1`);
   });
 
   it('gauge increments and decrements', () => {
