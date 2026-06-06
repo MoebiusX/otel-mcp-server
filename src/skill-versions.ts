@@ -350,6 +350,11 @@ export const SKILL_VERSIONS: Record<string, SkillVersionSupport> = {
     'Application API': backend('app-api', { must: ['1.x'] }),
   },
 
+  // ── Public Exchange (KrystalineX /api/public/* transparency endpoints) ──
+  'public-exchange': {
+    'App API': backend('app-api', { must: ['1.x'] }),
+  },
+
   // ── AgentRelay (hosted /v1 REST messaging) ──
   agentrelay: {
     AgentRelay: backend('agentrelay-http', { must: ['v1'] }),

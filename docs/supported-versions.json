@@ -1630,6 +1630,16 @@
       "versionedFeatures": {},
       "backends": [
         {
+          "skill": "public-exchange",
+          "backend": "App API",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ]
+          },
+          "featuresSince": {}
+        },
+        {
           "skill": "system",
           "backend": "Application API",
           "productVersions": {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Public Exchange skill** (`public-exchange`, 5 read-only tools). Mirrors KrystalineX's `/api/public/*` transparency endpoints for an unauthenticated public MCP deployment — `exchange_status`, `total_volume`, `recent_trades`, `transparency_metrics`, and `verify_trace`. Always available (only needs `APP_API_URL`); every endpoint serves data already public on the transparency website. Zero new runtime dependencies.
+
 ### Fixed
 
 - **HTTP transport no longer crashes on session close.** A client `DELETE` (or any transport close) triggered infinite recursion in `transport.onclose` — `onclose -> mcpServer.close() -> transport.close() -> onclose -> …` — overflowing the stack with `RangeError: Maximum call stack size exceeded` and killing the process. A re-entry guard now makes `onclose` idempotent.

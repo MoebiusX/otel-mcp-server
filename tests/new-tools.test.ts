@@ -333,22 +333,22 @@ describe('combined tool registration', () => {
     process.env = originalEnv;
   });
 
-  it('registers 43 tools when all groups enabled with all backends', async () => {
+  it('registers 48 tools when all groups enabled with all backends', async () => {
     process.env.ELASTICSEARCH_URL = 'http://es:9200';
     process.env.ALERTMANAGER_URL = 'http://am:9093';
     process.env.GRAFANA_URL = 'http://grafana:3000';
     const { client } = await createTestClient();
     const result = await client.listTools();
-    // 5 traces + 6 metrics + 4 logs + 4 zk + 5 system + 5 es + 4 am + 10 grafana = 43
-    expect(result.tools.length).toBe(43);
+    // 5 traces + 6 metrics + 4 logs + 4 zk + 5 system + 5 public-exchange + 5 es + 4 am + 10 grafana = 48
+    expect(result.tools.length).toBe(48);
   });
 
-  it('registers 24 tools when optional backend URLs are empty', async () => {
+  it('registers 29 tools when optional backend URLs are empty', async () => {
     delete process.env.ELASTICSEARCH_URL;
     delete process.env.ALERTMANAGER_URL;
     delete process.env.GRAFANA_URL;
     const { client } = await createTestClient();
     const result = await client.listTools();
-    expect(result.tools.length).toBe(24);
+    expect(result.tools.length).toBe(29);
   });
 });
