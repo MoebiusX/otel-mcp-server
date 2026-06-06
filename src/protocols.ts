@@ -128,6 +128,7 @@ export interface ProtocolFeatureMap {
   'vector-http': never;
   'alloy-http': never;
   'zk-native': never;
+  'agentrelay-http': never;
   'app-api': never;
 }
 
@@ -665,6 +666,16 @@ export const PROTOCOLS: { [P in ProtocolId]: ProtocolAdapter<P> } = {
     queryLanguage: 'App API',
     products: ['Application API'],
     baselineFeatures: ['health', 'info'],
+    versionedFeatures: {},
+  }),
+
+  'agentrelay-http': defineProtocol({
+    id: 'agentrelay-http',
+    name: 'Agent Relay REST API',
+    queryLanguage: 'Agent Relay HTTP',
+    products: ['AgentRelay'],
+    specUrl: 'https://agentrelay.tech/docs',
+    baselineFeatures: ['send', 'agents'],
     versionedFeatures: {},
   }),
 };

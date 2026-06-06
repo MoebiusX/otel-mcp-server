@@ -349,4 +349,9 @@ export const SKILL_VERSIONS: Record<string, SkillVersionSupport> = {
   system: {
     'Application API': backend('app-api', { must: ['1.x'] }),
   },
+
+  // ── AgentRelay (hosted /v1 REST messaging) ──
+  agentrelay: {
+    AgentRelay: backend('agentrelay-http', { must: ['v1'] }),
+  },
 };

@@ -1640,6 +1640,32 @@
           "featuresSince": {}
         }
       ]
+    },
+    {
+      "id": "agentrelay-http",
+      "name": "Agent Relay REST API",
+      "queryLanguage": "Agent Relay HTTP",
+      "products": [
+        "AgentRelay"
+      ],
+      "specUrl": "https://agentrelay.tech/docs",
+      "baselineFeatures": [
+        "send",
+        "agents"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "agentrelay",
+          "backend": "AgentRelay",
+          "productVersions": {
+            "must": [
+              "v1"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
     }
   ]
 }
