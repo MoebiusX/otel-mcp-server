@@ -7,18 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-06
+
 ### Added
 
 - **Public Exchange skill** (`public-exchange`, 5 read-only tools). Mirrors KrystalineX's `/api/public/*` transparency endpoints for an unauthenticated public MCP deployment — `exchange_status`, `total_volume`, `recent_trades`, `transparency_metrics`, and `verify_trace`. Always available (only needs `APP_API_URL`); every endpoint serves data already public on the transparency website. Zero new runtime dependencies.
+- `MCP_SESSION_IDLE_MS` and `MCP_SESSION_SWEEP_MS` environment variables to tune HTTP session reaping.
 
 ### Fixed
 
 - **HTTP transport no longer crashes on session close.** A client `DELETE` (or any transport close) triggered infinite recursion in `transport.onclose` — `onclose -> mcpServer.close() -> transport.close() -> onclose -> …` — overflowing the stack with `RangeError: Maximum call stack size exceeded` and killing the process. A re-entry guard now makes `onclose` idempotent.
 - **HTTP transport no longer leaks sessions.** Sessions were only removed from the in-memory map when the client sent a `DELETE`. Clients that disconnected without one (stateless callers, crashes, synthetic health probes) leaked an `McpServer` + transport pair per handshake, growing memory until the process was OOM-killed. An idle-session reaper now closes sessions inactive beyond `MCP_SESSION_IDLE_MS` (default 5m), swept every `MCP_SESSION_SWEEP_MS` (default 60s).
-
-### Added
-
-- `MCP_SESSION_IDLE_MS` and `MCP_SESSION_SWEEP_MS` environment variables to tune HTTP session reaping.
 
 ## [1.5.0] - 2026-06-06
 
