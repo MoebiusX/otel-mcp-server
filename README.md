@@ -13,8 +13,8 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 │  Claude Desktop │ ◄──────────► │                  │──► Prometheus · InfluxDB · OpenTSDB
 │  GitHub Copilot │ (stdio/HTTP) │  otel-mcp-server │──► Loki · ClickHouse · Graylog (logs)
 │  Custom Agent   │              │                  │──► Pinpoint · Elasticsearch · Alertmanager
-└─────────────────┘              │   22 skills      │──► Grafana · Pyroscope · OPA
-                                 │   100 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
+└─────────────────┘              │   24 skills      │──► Grafana · Pyroscope · OPA
+                                 │   106 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
                                  │   authenticated  │──► Envoy · Consul · Kong · Traefik
                                  └──────────────────┘──► Fluent Bit · Beats · Vector · Alloy
                                                      └─► App API    (ZK/system)
@@ -36,7 +36,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **101 tools** across 23 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health
+- **106 tools** across 24 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
@@ -401,7 +401,7 @@ spec:
 ## Skills
 
 Each telemetry backend is a **skill** — an independent plugin. The core OTel skills
-(`traces`, `metrics`, `logs`) and the app skills (`system`, `zk-proofs`) are **always active**,
+(`traces`, `metrics`, `logs`) and the app skills (`system`, `zk-proofs`, `public-exchange`) are **always active**,
 defaulting to `localhost` backends so the server works out of the box. Every other skill is
 **opt-in**: it activates only when its backend URL is set (e.g. `ELASTICSEARCH_URL`, `CILIUM_URL`,
 `CLICKHOUSE_URL`), and is silently skipped otherwise. Use `--tools` to restrict which skills load
@@ -700,6 +700,18 @@ Coordinate with other agents through the AgentRelay hosted REST API ("headless S
 |------|-------------|
 | `agentrelay_agents` | List the agents currently connected to your AgentRelay organization |
 | `agentrelay_send` | _(write)_ Send a message or task to another agent via `POST /v1/relay/send`. Requires `MCP_ENABLE_WRITES`. Supports `dry_run` |
+
+### Public Exchange — `public-exchange` — 5 tools
+
+> Always available (only needs `APP_API_URL`, which defaults to `http://localhost:5000`). Read-only tools mirroring KrystalineX's `/api/public/*` transparency endpoints — designed for an **unauthenticated** public MCP deployment, since every endpoint already serves data that is public on the transparency website.
+
+| Tool | Description |
+|------|-------------|
+| `exchange_status` | Operational state, uptime, observability posture |
+| `total_volume` | Aggregate 24h / weekly / all-time trading volume |
+| `recent_trades` | Anonymized recent trades feed (limit ≤ 100) |
+| `transparency_metrics` | Full transparency metrics bundle |
+| `verify_trace` | Public-safe distributed trace for a trade ID |
 
 ### Selective Skills
 

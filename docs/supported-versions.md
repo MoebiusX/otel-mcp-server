@@ -617,6 +617,7 @@ Support tiers: **must** = latest major(s) · **should** = previous · **optional
 
 | Skill | Backend | Tiers |
 | --- | --- | --- |
+| `public-exchange` | App API | must: 1.x |
 | `system` | Application API | must: 1.x |
 
 ### Baseline features (always available, ungated)
