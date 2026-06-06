@@ -160,6 +160,8 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `GRAFANA_MAX_ITEMS` | `50` | Default Grafana list/search limit |
 | `MCP_ENABLE_WRITES` | _(off)_ | Enable mutating/write tools (e.g. Grafana dashboard provisioning). Read-only by default |
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
+| `MCP_SESSION_IDLE_MS` | `300000` | HTTP transport only: idle time before an inactive session is reaped (ms). Bounds the session map for clients that disconnect without sending a DELETE |
+| `MCP_SESSION_SWEEP_MS` | `60000` | HTTP transport only: how often the idle-session reaper runs (ms) |
 
 ### Backend Authentication
 
