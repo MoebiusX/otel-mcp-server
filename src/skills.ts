@@ -28,6 +28,7 @@ import { skill as pinpoint } from './tools/pinpoint.js';
 import { skill as pipeline } from './tools/pipeline.js';
 import { skill as zkProofs } from './tools/zk-proofs.js';
 import { skill as system } from './tools/system.js';
+import { skill as agentrelay } from './tools/agentrelay.js';
 import type { Skill } from './skill.js';
 import { SKILL_VERSIONS } from './skill-versions.js';
 
@@ -54,6 +55,7 @@ export const allSkills: Skill[] = [
   pipeline,
   zkProofs,
   system,
+  agentrelay,
 ];
 
 // Attach centralized version-support metadata to each skill (single source of

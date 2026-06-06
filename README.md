@@ -36,7 +36,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **100 tools** across 22 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), ZK proofs, system health
+- **101 tools** across 23 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
@@ -155,6 +155,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `BEATS_URL` | _(disabled)_ | Beats HTTP monitoring endpoint |
 | `VECTOR_URL` | _(disabled)_ | Vector API (GraphQL + health) |
 | `ALLOY_URL` | _(disabled)_ | Grafana Alloy |
+| `AGENTRELAY_URL` | _(disabled)_ | AgentRelay hosted REST API (agent coordination) |
 | `GRAFANA_DEFAULT_FROM` | `now-1h` | Default Grafana query range start |
 | `GRAFANA_MAX_ITEMS` | `50` | Default Grafana list/search limit |
 | `MCP_ENABLE_WRITES` | _(off)_ | Enable mutating/write tools (e.g. Grafana dashboard provisioning). Read-only by default |
@@ -162,7 +163,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 
 ### Backend Authentication
 
-The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `TEMPO_`, `ZIPKIN_`, `SKYWALKING_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`), you can set:
+The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `TEMPO_`, `ZIPKIN_`, `SKYWALKING_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`, `AGENTRELAY_`), you can set:
 
 | Suffix | Effect |
 |--------|--------|
@@ -686,6 +687,17 @@ All write tools accept `dry_run: true` to validate and report the planned action
 | `system_health` | Full health check |
 | `system_topology` | Service dependency topology |
 | `backend_capabilities` | Supported product versions and per-feature availability; optionally classifies a concrete version into its support tier and reports the active gating mode |
+
+### AgentRelay — `agentrelay` — 1 tool (+1 write tool via `MCP_ENABLE_WRITES`)
+
+> Enabled when `AGENTRELAY_URL` is set (e.g. `https://api.agentrelay.tech`). Set `AGENTRELAY_AUTH_TOKEN` for a bearer token, or `AGENTRELAY_AUTH_HEADER` to send a raw header value (e.g. an `X-API-Key` scheme).
+
+Coordinate with other agents through the AgentRelay hosted REST API ("headless Slack for agents"). Read-only by default; the send tool is opt-in behind `MCP_ENABLE_WRITES`.
+
+| Tool | Description |
+|------|-------------|
+| `agentrelay_agents` | List the agents currently connected to your AgentRelay organization |
+| `agentrelay_send` | _(write)_ Send a message or task to another agent via `POST /v1/relay/send`. Requires `MCP_ENABLE_WRITES`. Supports `dry_run` |
 
 ### Selective Skills
 

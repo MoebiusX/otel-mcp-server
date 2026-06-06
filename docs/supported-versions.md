@@ -623,3 +623,19 @@ Support tiers: **must** = latest major(s) · **should** = previous · **optional
 
 `health`, `info`
 
+## Agent Relay REST API (`agentrelay-http`)
+
+- **Query language:** Agent Relay HTTP
+- **Products:** AgentRelay
+- **Spec:** https://agentrelay.tech/docs
+
+### Supported product versions
+
+| Skill | Backend | Tiers |
+| --- | --- | --- |
+| `agentrelay` | AgentRelay | must: v1 |
+
+### Baseline features (always available, ungated)
+
+`send`, `agents`
+
