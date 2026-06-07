@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **vmalert skill** (`vmalert`, 4 read-only tools). Surfaces Victoria Metrics alerting state so agents can query firing alerts, inspect rule evaluation health, and filter by type/group. Tools: `vmalert_rules` (list all alerting/recording rules with optional `type` and `state` filters), `vmalert_alerts` (currently firing alerts), `vmalert_groups` (group-level summary of rule counts and health), `vmalert_rule_health` (surfaces rules whose health is not `ok`). Requires `VMALERT_URL`. Zero new runtime dependencies.
 - **Public Exchange skill** (`public-exchange`, 5 read-only tools). Mirrors KrystalineX's `/api/public/*` transparency endpoints for an unauthenticated public MCP deployment — `exchange_status`, `total_volume`, `recent_trades`, `transparency_metrics`, and `verify_trace`. Always available (only needs `APP_API_URL`); every endpoint serves data already public on the transparency website. Zero new runtime dependencies.
 - `MCP_SESSION_IDLE_MS` and `MCP_SESSION_SWEEP_MS` environment variables to tune HTTP session reaping.
 
