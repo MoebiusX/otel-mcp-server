@@ -319,6 +319,164 @@ describe('alertmanager tools', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  vmalert Tools
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('vmalert tools', () => {
+  const originalEnv = process.env;
+
+  const RULES_RESPONSE = {
+    status: 'success',
+    data: {
+      groups: [
+        {
+          name: 'alerting.rules',
+          file: 'alerts.yaml',
+          interval: 60,
+          concurrency: 1,
+          lastEvaluation: '2026-06-06T10:00:00Z',
+          rules: [
+            {
+              name: 'HighCPU',
+              type: 'alerting',
+              state: 'firing',
+              health: 'ok',
+              query: 'cpu_usage > 0.9',
+              duration: 300,
+              labels: { severity: 'critical' },
+              annotations: { summary: 'CPU too high' },
+              lastEvaluation: '2026-06-06T10:00:00Z',
+              evaluationTime: 0.002,
+              alerts: [{ activeAt: '2026-06-06T09:55:00Z' }],
+            },
+            {
+              name: 'HighMemory',
+              type: 'alerting',
+              state: 'inactive',
+              health: 'err',
+              query: 'memory_usage_invalid',
+              lastError: 'bad query syntax',
+              lastEvaluation: '2026-06-06T10:00:00Z',
+              evaluationTime: 0.001,
+            },
+          ],
+        },
+        {
+          name: 'recording.rules',
+          file: 'recording.yaml',
+          interval: 60,
+          concurrency: 1,
+          lastEvaluation: '2026-06-06T10:00:00Z',
+          rules: [
+            {
+              name: 'job:errors:rate5m',
+              type: 'recording',
+              health: 'ok',
+              query: 'rate(errors_total[5m])',
+              lastEvaluation: '2026-06-06T10:00:00Z',
+              evaluationTime: 0.001,
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  const ALERTS_RESPONSE = {
+    status: 'success',
+    data: {
+      alerts: [
+        {
+          name: 'HighCPU',
+          state: 'firing',
+          value: '0.95',
+          labels: { severity: 'critical', instance: 'host1' },
+          annotations: { summary: 'CPU too high' },
+          activeAt: '2026-06-06T09:55:00Z',
+          source: 'http://vmalert:8880/vmalert/alert',
+        },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    process.env.VMALERT_URL = 'http://vmalert:8880';
+    vi.stubGlobal('fetch', mockFetch({
+      'type=record': { status: 'success', data: { groups: [RULES_RESPONSE.data.groups[1]] } },
+      'type=alert': { status: 'success', data: { groups: [RULES_RESPONSE.data.groups[0]] } },
+      '/api/v1/alerts': ALERTS_RESPONSE,
+      '/api/v1/rules': RULES_RESPONSE,
+    }));
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    vi.unstubAllGlobals();
+  });
+
+  it('registers 4 vmalert tools when URL is configured', async () => {
+    const { client } = await createTestClient(['vmalert']);
+    const result = await client.listTools();
+    expect(result.tools.length).toBe(4);
+    const names = result.tools.map(t => t.name);
+    expect(names).toContain('vmalert_rules');
+    expect(names).toContain('vmalert_alerts');
+    expect(names).toContain('vmalert_groups');
+    expect(names).toContain('vmalert_rule_health');
+  });
+
+  it('registers 0 vmalert tools when URL is empty', async () => {
+    delete process.env.VMALERT_URL;
+    const server = createServer({ tools: ['vmalert'] });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test-client', version: '1.0.0' });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    await expect(client.listTools()).rejects.toThrow();
+  });
+
+  it('vmalert_rules type=recording returns only recording rules', async () => {
+    const { client } = await createTestClient(['vmalert']);
+    const result = await client.callTool({
+      name: 'vmalert_rules',
+      arguments: { type: 'recording' },
+    });
+    const content = JSON.parse((result.content as any)[0].text);
+    expect(content.groups).toHaveLength(1);
+    expect(content.groups[0].name).toBe('recording.rules');
+    expect(content.groups[0].rules[0].name).toBe('job:errors:rate5m');
+    expect(content.groups[0].rules[0].type).toBe('recording');
+  });
+
+  it('vmalert_alerts returns active alerts', async () => {
+    const { client } = await createTestClient(['vmalert']);
+    const result = await client.callTool({
+      name: 'vmalert_alerts',
+      arguments: {},
+    });
+    const content = JSON.parse((result.content as any)[0].text);
+    expect(content.count).toBe(1);
+    expect(content.alerts[0].name).toBe('HighCPU');
+    expect(content.alerts[0].state).toBe('firing');
+    expect(content.alerts[0].value).toBe('0.95');
+  });
+
+  it('vmalert_rule_health returns only unhealthy rules', async () => {
+    const { client } = await createTestClient(['vmalert']);
+    const result = await client.callTool({
+      name: 'vmalert_rule_health',
+      arguments: {},
+    });
+    const content = JSON.parse((result.content as any)[0].text);
+    expect(content.unhealthy).toBe(1);
+    expect(content.rules[0].name).toBe('HighMemory');
+    expect(content.rules[0].health).toBe('err');
+    expect(content.rules[0].lastError).toBe('bad query syntax');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  Combined tool counts
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -333,14 +491,15 @@ describe('combined tool registration', () => {
     process.env = originalEnv;
   });
 
-  it('registers 48 tools when all groups enabled with all backends', async () => {
+  it('registers 52 tools when all groups enabled with all backends', async () => {
     process.env.ELASTICSEARCH_URL = 'http://es:9200';
     process.env.ALERTMANAGER_URL = 'http://am:9093';
     process.env.GRAFANA_URL = 'http://grafana:3000';
+    process.env.VMALERT_URL = 'http://vmalert:8880';
     const { client } = await createTestClient();
     const result = await client.listTools();
-    // 5 traces + 6 metrics + 4 logs + 4 zk + 5 system + 5 public-exchange + 5 es + 4 am + 10 grafana = 48
-    expect(result.tools.length).toBe(48);
+    // 5 traces + 6 metrics + 4 logs + 4 zk + 5 system + 5 public-exchange + 5 es + 4 am + 10 grafana + 4 vmalert = 52
+    expect(result.tools.length).toBe(52);
   });
 
   it('registers 29 tools when optional backend URLs are empty', async () => {

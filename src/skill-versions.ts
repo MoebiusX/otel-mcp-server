@@ -355,6 +355,14 @@ export const SKILL_VERSIONS: Record<string, SkillVersionSupport> = {
     'App API': backend('app-api', { must: ['1.x'] }),
   },
 
+  // ── vmalert (VictoriaMetrics rule evaluator) ──
+  vmalert: {
+    vmalert: backend('vmalert-http', {
+      must: ['1.x'],
+      should: ['0.4x'],
+    }),
+  },
+
   // ── AgentRelay (hosted /v1 REST messaging) ──
   agentrelay: {
     AgentRelay: backend('agentrelay-http', { must: ['v1'] }),

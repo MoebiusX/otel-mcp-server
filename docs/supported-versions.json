@@ -1652,6 +1652,36 @@
       ]
     },
     {
+      "id": "vmalert-http",
+      "name": "vmalert API",
+      "queryLanguage": "vmalert HTTP",
+      "products": [
+        "vmalert"
+      ],
+      "specUrl": "https://docs.victoriametrics.com/vmalert/",
+      "baselineFeatures": [
+        "rules",
+        "alerts",
+        "groups"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "vmalert",
+          "backend": "vmalert",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ],
+            "should": [
+              "0.4x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
       "id": "agentrelay-http",
       "name": "Agent Relay REST API",
       "queryLanguage": "Agent Relay HTTP",

@@ -36,7 +36,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **106 tools** across 24 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
+- **110 tools** across 25 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
@@ -137,6 +137,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `APP_API_URL` | `http://localhost:5000` | Application API (for ZK/system tools) |
 | `ELASTICSEARCH_URL` | _(disabled)_ | Elasticsearch / OpenSearch API |
 | `ALERTMANAGER_URL` | _(disabled)_ | Alertmanager API |
+| `VMALERT_URL` | _(disabled)_ | vmalert rules + alerts API |
 | `GRAFANA_URL` | _(disabled)_ | Grafana API |
 | `CILIUM_URL` | _(disabled)_ | Cilium agent REST API (eBPF networking) |
 | `KUBERNETES_URL` | _(in-cluster)_ | kube-apiserver; auto-detected in-cluster via the ServiceAccount mount |
@@ -165,7 +166,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 
 ### Backend Authentication
 
-The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `TEMPO_`, `ZIPKIN_`, `SKYWALKING_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`, `AGENTRELAY_`), you can set:
+The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `TEMPO_`, `ZIPKIN_`, `SKYWALKING_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`, `AGENTRELAY_`, `VMALERT_`), you can set:
 
 | Suffix | Effect |
 |--------|--------|
@@ -465,6 +466,17 @@ regardless of configuration.
 | `alertmanager_silences` | List active/pending/expired silences with matchers |
 | `alertmanager_groups` | Alert groups by routing rules and receivers |
 | `alertmanager_status` | Cluster status, version, peer count, and live config |
+
+### vmalert — `vmalert` — 4 tools
+
+> Enabled when `VMALERT_URL` is set (e.g. `http://localhost:8880`). vmalert is the rule-evaluation component in a VictoriaMetrics stack — VM single-node stores series but does **not** evaluate rules, so use this skill to query rules and active alerts from vmalert directly.
+
+| Tool | Description |
+|------|-------------|
+| `vmalert_rules` | Alerting and recording rules with state, query, and evaluation health. Filterable by `type` (`all`/`alerting`/`recording`) and `state` (`all`/`firing`/`pending`/`inactive`) |
+| `vmalert_alerts` | Active alerts as vmalert sees them pre-Alertmanager, with labels, value, and deep-link source |
+| `vmalert_groups` | Rule groups with interval, concurrency, and rule counts by type |
+| `vmalert_rule_health` | Rules whose evaluation health is not `ok` — surfaces evaluation errors immediately |
 
 ### Grafana — `grafana` — 10 tools
 
