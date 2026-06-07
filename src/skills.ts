@@ -11,6 +11,7 @@ import { skill as metrics } from './tools/metrics.js';
 import { skill as logs } from './tools/logs.js';
 import { skill as elasticsearch } from './tools/elasticsearch.js';
 import { skill as alertmanager } from './tools/alertmanager.js';
+import { skill as vmalert } from './tools/vmalert.js';
 import { skill as grafana } from './tools/grafana.js';
 import { skill as cilium } from './tools/cilium.js';
 import { skill as kubernetes } from './tools/kubernetes.js';
@@ -28,6 +29,8 @@ import { skill as pinpoint } from './tools/pinpoint.js';
 import { skill as pipeline } from './tools/pipeline.js';
 import { skill as zkProofs } from './tools/zk-proofs.js';
 import { skill as system } from './tools/system.js';
+import { skill as publicExchange } from './tools/public-exchange.js';
+import { skill as agentrelay } from './tools/agentrelay.js';
 import type { Skill } from './skill.js';
 import { SKILL_VERSIONS } from './skill-versions.js';
 
@@ -37,6 +40,7 @@ export const allSkills: Skill[] = [
   logs,
   elasticsearch,
   alertmanager,
+  vmalert,
   grafana,
   cilium,
   kubernetes,
@@ -54,6 +58,8 @@ export const allSkills: Skill[] = [
   pipeline,
   zkProofs,
   system,
+  publicExchange,
+  agentrelay,
 ];
 
 // Attach centralized version-support metadata to each skill (single source of

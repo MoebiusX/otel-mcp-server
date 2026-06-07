@@ -13,8 +13,8 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 │  Claude Desktop │ ◄──────────► │                  │──► Prometheus · InfluxDB · OpenTSDB
 │  GitHub Copilot │ (stdio/HTTP) │  otel-mcp-server │──► Loki · ClickHouse · Graylog (logs)
 │  Custom Agent   │              │                  │──► Pinpoint · Elasticsearch · Alertmanager
-└─────────────────┘              │   22 skills      │──► Grafana · Pyroscope · OPA
-                                 │   100 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
+└─────────────────┘              │   24 skills      │──► Grafana · Pyroscope · OPA
+                                 │   106 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
                                  │   authenticated  │──► Envoy · Consul · Kong · Traefik
                                  └──────────────────┘──► Fluent Bit · Beats · Vector · Alloy
                                                      └─► App API    (ZK/system)
@@ -36,7 +36,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **100 tools** across 22 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), ZK proofs, system health
+- **110 tools** across 25 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
@@ -137,6 +137,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `APP_API_URL` | `http://localhost:5000` | Application API (for ZK/system tools) |
 | `ELASTICSEARCH_URL` | _(disabled)_ | Elasticsearch / OpenSearch API |
 | `ALERTMANAGER_URL` | _(disabled)_ | Alertmanager API |
+| `VMALERT_URL` | _(disabled)_ | vmalert rules + alerts API |
 | `GRAFANA_URL` | _(disabled)_ | Grafana API |
 | `CILIUM_URL` | _(disabled)_ | Cilium agent REST API (eBPF networking) |
 | `KUBERNETES_URL` | _(in-cluster)_ | kube-apiserver; auto-detected in-cluster via the ServiceAccount mount |
@@ -155,14 +156,17 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `BEATS_URL` | _(disabled)_ | Beats HTTP monitoring endpoint |
 | `VECTOR_URL` | _(disabled)_ | Vector API (GraphQL + health) |
 | `ALLOY_URL` | _(disabled)_ | Grafana Alloy |
+| `AGENTRELAY_URL` | _(disabled)_ | AgentRelay hosted REST API (agent coordination) |
 | `GRAFANA_DEFAULT_FROM` | `now-1h` | Default Grafana query range start |
 | `GRAFANA_MAX_ITEMS` | `50` | Default Grafana list/search limit |
 | `MCP_ENABLE_WRITES` | _(off)_ | Enable mutating/write tools (e.g. Grafana dashboard provisioning). Read-only by default |
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
+| `MCP_SESSION_IDLE_MS` | `300000` | HTTP transport only: idle time before an inactive session is reaped (ms). Bounds the session map for clients that disconnect without sending a DELETE |
+| `MCP_SESSION_SWEEP_MS` | `60000` | HTTP transport only: how often the idle-session reaper runs (ms) |
 
 ### Backend Authentication
 
-The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `TEMPO_`, `ZIPKIN_`, `SKYWALKING_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`), you can set:
+The MCP server authenticates to each backend independently. For each backend prefix (`JAEGER_`, `TEMPO_`, `ZIPKIN_`, `SKYWALKING_`, `PROMETHEUS_`, `LOKI_`, `APP_API_`, `ELASTICSEARCH_`, `ALERTMANAGER_`, `GRAFANA_`, `CILIUM_`, `CLICKHOUSE_`, `PYROSCOPE_`, `OPA_`, `ENVOY_`, `CONSUL_`, `KONG_`, `TRAEFIK_`, `INFLUX_`, `OPENTSDB_`, `GRAYLOG_`, `PINPOINT_`, `FLUENTBIT_`, `BEATS_`, `VECTOR_`, `ALLOY_`, `AGENTRELAY_`, `VMALERT_`), you can set:
 
 | Suffix | Effect |
 |--------|--------|
@@ -398,7 +402,7 @@ spec:
 ## Skills
 
 Each telemetry backend is a **skill** — an independent plugin. The core OTel skills
-(`traces`, `metrics`, `logs`) and the app skills (`system`, `zk-proofs`) are **always active**,
+(`traces`, `metrics`, `logs`) and the app skills (`system`, `zk-proofs`, `public-exchange`) are **always active**,
 defaulting to `localhost` backends so the server works out of the box. Every other skill is
 **opt-in**: it activates only when its backend URL is set (e.g. `ELASTICSEARCH_URL`, `CILIUM_URL`,
 `CLICKHOUSE_URL`), and is silently skipped otherwise. Use `--tools` to restrict which skills load
@@ -462,6 +466,17 @@ regardless of configuration.
 | `alertmanager_silences` | List active/pending/expired silences with matchers |
 | `alertmanager_groups` | Alert groups by routing rules and receivers |
 | `alertmanager_status` | Cluster status, version, peer count, and live config |
+
+### vmalert — `vmalert` — 4 tools
+
+> Enabled when `VMALERT_URL` is set (e.g. `http://localhost:8880`). vmalert is the rule-evaluation component in a VictoriaMetrics stack — VM single-node stores series but does **not** evaluate rules, so use this skill to query rules and active alerts from vmalert directly.
+
+| Tool | Description |
+|------|-------------|
+| `vmalert_rules` | Alerting and recording rules with state, query, and evaluation health. Filterable by `type` (`all`/`alerting`/`recording`) and `state` (`all`/`firing`/`pending`/`inactive`) |
+| `vmalert_alerts` | Active alerts as vmalert sees them pre-Alertmanager, with labels, value, and deep-link source |
+| `vmalert_groups` | Rule groups with interval, concurrency, and rule counts by type |
+| `vmalert_rule_health` | Rules whose evaluation health is not `ok` — surfaces evaluation errors immediately |
 
 ### Grafana — `grafana` — 10 tools
 
@@ -686,6 +701,29 @@ All write tools accept `dry_run: true` to validate and report the planned action
 | `system_health` | Full health check |
 | `system_topology` | Service dependency topology |
 | `backend_capabilities` | Supported product versions and per-feature availability; optionally classifies a concrete version into its support tier and reports the active gating mode |
+
+### AgentRelay — `agentrelay` — 1 tool (+1 write tool via `MCP_ENABLE_WRITES`)
+
+> Enabled when `AGENTRELAY_URL` is set (e.g. `https://api.agentrelay.tech`). Set `AGENTRELAY_AUTH_TOKEN` for a bearer token, or `AGENTRELAY_AUTH_HEADER` to send a raw header value (e.g. an `X-API-Key` scheme).
+
+Coordinate with other agents through the AgentRelay hosted REST API ("headless Slack for agents"). Read-only by default; the send tool is opt-in behind `MCP_ENABLE_WRITES`.
+
+| Tool | Description |
+|------|-------------|
+| `agentrelay_agents` | List the agents currently connected to your AgentRelay organization |
+| `agentrelay_send` | _(write)_ Send a message or task to another agent via `POST /v1/relay/send`. Requires `MCP_ENABLE_WRITES`. Supports `dry_run` |
+
+### Public Exchange — `public-exchange` — 5 tools
+
+> Always available (only needs `APP_API_URL`, which defaults to `http://localhost:5000`). Read-only tools mirroring KrystalineX's `/api/public/*` transparency endpoints — designed for an **unauthenticated** public MCP deployment, since every endpoint already serves data that is public on the transparency website.
+
+| Tool | Description |
+|------|-------------|
+| `exchange_status` | Operational state, uptime, observability posture |
+| `total_volume` | Aggregate 24h / weekly / all-time trading volume |
+| `recent_trades` | Anonymized recent trades feed (limit ≤ 100) |
+| `transparency_metrics` | Full transparency metrics bundle |
+| `verify_trace` | Public-safe distributed trace for a trade ID |
 
 ### Selective Skills
 

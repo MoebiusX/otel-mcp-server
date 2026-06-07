@@ -63,7 +63,29 @@ async function main(): Promise<void> {
       // The init request creates a new session; subsequent requests
       // reuse the same pair via the Mcp-Session-Id header.
       const { randomUUID } = await import('node:crypto');
-      const sessions = new Map<string, { transport: InstanceType<typeof StreamableHTTPServerTransport>; server: ReturnType<typeof createServer> }>();
+      const sessions = new Map<string, { transport: InstanceType<typeof StreamableHTTPServerTransport>; server: ReturnType<typeof createServer>; lastActivity: number }>();
+
+      // Idle-session reaper. A session is normally removed when the client
+      // sends an HTTP DELETE, which fires transport.onclose. Clients that
+      // disconnect without DELETE (stateless callers, crashes, synthetic
+      // health probes) would otherwise leave their McpServer + transport pair
+      // in the map forever — one leaked instance per handshake — until the
+      // process runs out of memory. Periodically close any session whose last
+      // activity is older than SESSION_IDLE_MS; closing the transport fires the
+      // (re-entry-guarded) onclose, which removes it and closes its McpServer.
+      const SESSION_IDLE_MS = Number(process.env.MCP_SESSION_IDLE_MS) || 5 * 60_000;
+      const SESSION_SWEEP_MS = Number(process.env.MCP_SESSION_SWEEP_MS) || 60_000;
+      const reaper = setInterval(() => {
+        const cutoff = Date.now() - SESSION_IDLE_MS;
+        const stale: InstanceType<typeof StreamableHTTPServerTransport>[] = [];
+        for (const session of sessions.values()) {
+          if (session.lastActivity < cutoff) stale.push(session.transport);
+        }
+        for (const transport of stale) {
+          try { transport.close(); } catch { /* already closing */ }
+        }
+      }, SESSION_SWEEP_MS);
+      reaper.unref();
 
       const httpServer = http.createServer(async (req, res) => {
         // Health check — always open
@@ -139,6 +161,7 @@ async function main(): Promise<void> {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         if (sessionId && sessions.has(sessionId)) {
           const session = sessions.get(sessionId)!;
+          session.lastActivity = Date.now();
           await session.transport.handleRequest(req, res);
           return;
         }
@@ -149,8 +172,16 @@ async function main(): Promise<void> {
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
         });
+        let closed = false;
 
         transport.onclose = () => {
+          // Re-entry guard: mcpServer.close() closes its transport, which fires
+          // onclose again. Without this guard the call recurses
+          // (onclose -> mcpServer.close() -> transport.close() -> onclose -> …)
+          // until the stack overflows — "RangeError: Maximum call stack size
+          // exceeded" — which happens on every client DELETE.
+          if (closed) return;
+          closed = true;
           const sid = transport.sessionId;
           if (sid) sessions.delete(sid);
           metrics.activeSessions.dec();
@@ -161,7 +192,7 @@ async function main(): Promise<void> {
         await transport.handleRequest(req, res);
 
         if (transport.sessionId) {
-          sessions.set(transport.sessionId, { transport, server: mcpServer });
+          sessions.set(transport.sessionId, { transport, server: mcpServer, lastActivity: Date.now() });
         }
       });
 

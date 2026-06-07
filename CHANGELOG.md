@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-06
+
+### Added
+
+- **vmalert skill** (`vmalert`, 4 read-only tools). Surfaces Victoria Metrics alerting state so agents can query firing alerts, inspect rule evaluation health, and filter by type/group. Tools: `vmalert_rules` (list all alerting/recording rules with optional `type` and `state` filters), `vmalert_alerts` (currently firing alerts), `vmalert_groups` (group-level summary of rule counts and health), `vmalert_rule_health` (surfaces rules whose health is not `ok`). Requires `VMALERT_URL`. Zero new runtime dependencies.
+- **Public Exchange skill** (`public-exchange`, 5 read-only tools). Mirrors KrystalineX's `/api/public/*` transparency endpoints for an unauthenticated public MCP deployment — `exchange_status`, `total_volume`, `recent_trades`, `transparency_metrics`, and `verify_trace`. Always available (only needs `APP_API_URL`); every endpoint serves data already public on the transparency website. Zero new runtime dependencies.
+- `MCP_SESSION_IDLE_MS` and `MCP_SESSION_SWEEP_MS` environment variables to tune HTTP session reaping.
+
+### Fixed
+
+- **HTTP transport no longer crashes on session close.** A client `DELETE` (or any transport close) triggered infinite recursion in `transport.onclose` — `onclose -> mcpServer.close() -> transport.close() -> onclose -> …` — overflowing the stack with `RangeError: Maximum call stack size exceeded` and killing the process. A re-entry guard now makes `onclose` idempotent.
+- **HTTP transport no longer leaks sessions.** Sessions were only removed from the in-memory map when the client sent a `DELETE`. Clients that disconnected without one (stateless callers, crashes, synthetic health probes) leaked an `McpServer` + transport pair per handshake, growing memory until the process was OOM-killed. An idle-session reaper now closes sessions inactive beyond `MCP_SESSION_IDLE_MS` (default 5m), swept every `MCP_SESSION_SWEEP_MS` (default 60s).
+
+## [1.5.0] - 2026-06-06
+
+### Added
+
+- **AgentRelay skill** (`agentrelay`, 1 read + 1 write tool). Integrates the [AgentRelay](https://agentrelay.tech) hosted REST API so agents can coordinate through a shared messaging layer without embedding an external SDK.
+  - `agentrelay_agents` — lists connected agents (handle, status, type) via `GET /v1/agents`. Always available when `AGENTRELAY_URL` is set.
+  - `agentrelay_send` — posts a message or task to another agent via `POST /v1/relay/send`. Gated behind `MCP_ENABLE_WRITES` (same posture as Grafana write tools). Supports `type: message | task`, an optional structured `payload` override, and a `dry_run` mode that reports the planned request without sending.
+  - Auth: `AGENTRELAY_AUTH_TOKEN` (Bearer) or `AGENTRELAY_AUTH_HEADER` (raw header override, e.g. `X-API-Key`).
+  - Zero new runtime dependencies — uses the existing `helpers.createFetcher` HTTP path.
+
 ## [1.4.1] - 2026-06-05
 
 ### Fixed

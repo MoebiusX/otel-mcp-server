@@ -349,4 +349,22 @@ export const SKILL_VERSIONS: Record<string, SkillVersionSupport> = {
   system: {
     'Application API': backend('app-api', { must: ['1.x'] }),
   },
+
+  // ── Public Exchange (KrystalineX /api/public/* transparency endpoints) ──
+  'public-exchange': {
+    'App API': backend('app-api', { must: ['1.x'] }),
+  },
+
+  // ── vmalert (VictoriaMetrics rule evaluator) ──
+  vmalert: {
+    vmalert: backend('vmalert-http', {
+      must: ['1.x'],
+      should: ['0.4x'],
+    }),
+  },
+
+  // ── AgentRelay (hosted /v1 REST messaging) ──
+  agentrelay: {
+    AgentRelay: backend('agentrelay-http', { must: ['v1'] }),
+  },
 };

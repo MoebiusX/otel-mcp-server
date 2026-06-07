@@ -116,6 +116,7 @@ export interface ProtocolFeatureMap {
   // ── Native single-product protocols (no version-gated features yet) ──
   'grafana-http': never;
   'alertmanager-http': never;
+  'vmalert-http': never;
   'k8s-core': never;
   'envoy-admin': never;
   'consul-http': never;
@@ -128,6 +129,7 @@ export interface ProtocolFeatureMap {
   'vector-http': never;
   'alloy-http': never;
   'zk-native': never;
+  'agentrelay-http': never;
   'app-api': never;
 }
 
@@ -665,6 +667,26 @@ export const PROTOCOLS: { [P in ProtocolId]: ProtocolAdapter<P> } = {
     queryLanguage: 'App API',
     products: ['Application API'],
     baselineFeatures: ['health', 'info'],
+    versionedFeatures: {},
+  }),
+
+  'vmalert-http': defineProtocol({
+    id: 'vmalert-http',
+    name: 'vmalert API',
+    queryLanguage: 'vmalert HTTP',
+    products: ['vmalert'],
+    specUrl: 'https://docs.victoriametrics.com/vmalert/',
+    baselineFeatures: ['rules', 'alerts', 'groups'],
+    versionedFeatures: {},
+  }),
+
+  'agentrelay-http': defineProtocol({
+    id: 'agentrelay-http',
+    name: 'Agent Relay REST API',
+    queryLanguage: 'Agent Relay HTTP',
+    products: ['AgentRelay'],
+    specUrl: 'https://agentrelay.tech/docs',
+    baselineFeatures: ['send', 'agents'],
     versionedFeatures: {},
   }),
 };

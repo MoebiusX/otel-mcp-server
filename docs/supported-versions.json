@@ -1630,11 +1630,77 @@
       "versionedFeatures": {},
       "backends": [
         {
+          "skill": "public-exchange",
+          "backend": "App API",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ]
+          },
+          "featuresSince": {}
+        },
+        {
           "skill": "system",
           "backend": "Application API",
           "productVersions": {
             "must": [
               "1.x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "vmalert-http",
+      "name": "vmalert API",
+      "queryLanguage": "vmalert HTTP",
+      "products": [
+        "vmalert"
+      ],
+      "specUrl": "https://docs.victoriametrics.com/vmalert/",
+      "baselineFeatures": [
+        "rules",
+        "alerts",
+        "groups"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "vmalert",
+          "backend": "vmalert",
+          "productVersions": {
+            "must": [
+              "1.x"
+            ],
+            "should": [
+              "0.4x"
+            ]
+          },
+          "featuresSince": {}
+        }
+      ]
+    },
+    {
+      "id": "agentrelay-http",
+      "name": "Agent Relay REST API",
+      "queryLanguage": "Agent Relay HTTP",
+      "products": [
+        "AgentRelay"
+      ],
+      "specUrl": "https://agentrelay.tech/docs",
+      "baselineFeatures": [
+        "send",
+        "agents"
+      ],
+      "versionedFeatures": {},
+      "backends": [
+        {
+          "skill": "agentrelay",
+          "backend": "AgentRelay",
+          "productVersions": {
+            "must": [
+              "v1"
             ]
           },
           "featuresSince": {}
