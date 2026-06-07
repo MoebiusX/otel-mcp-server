@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-06-07
+
+### Changed
+
+- CI release workflow now builds and pushes multi-arch Docker images (`linux/amd64`, `linux/arm64`) to Docker Hub as part of every tagged release.
+
 ## [1.6.0] - 2026-06-06
 
 ### Added
