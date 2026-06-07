@@ -116,6 +116,7 @@ export interface ProtocolFeatureMap {
   // ── Native single-product protocols (no version-gated features yet) ──
   'grafana-http': never;
   'alertmanager-http': never;
+  'vmalert-http': never;
   'k8s-core': never;
   'envoy-admin': never;
   'consul-http': never;
@@ -666,6 +667,16 @@ export const PROTOCOLS: { [P in ProtocolId]: ProtocolAdapter<P> } = {
     queryLanguage: 'App API',
     products: ['Application API'],
     baselineFeatures: ['health', 'info'],
+    versionedFeatures: {},
+  }),
+
+  'vmalert-http': defineProtocol({
+    id: 'vmalert-http',
+    name: 'vmalert API',
+    queryLanguage: 'vmalert HTTP',
+    products: ['vmalert'],
+    specUrl: 'https://docs.victoriametrics.com/vmalert/',
+    baselineFeatures: ['rules', 'alerts', 'groups'],
     versionedFeatures: {},
   }),
 

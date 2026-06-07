@@ -624,6 +624,22 @@ Support tiers: **must** = latest major(s) · **should** = previous · **optional
 
 `health`, `info`
 
+## vmalert API (`vmalert-http`)
+
+- **Query language:** vmalert HTTP
+- **Products:** vmalert
+- **Spec:** https://docs.victoriametrics.com/vmalert/
+
+### Supported product versions
+
+| Skill | Backend | Tiers |
+| --- | --- | --- |
+| `vmalert` | vmalert | must: 1.x · should: 0.4x |
+
+### Baseline features (always available, ungated)
+
+`rules`, `alerts`, `groups`
+
 ## Agent Relay REST API (`agentrelay-http`)
 
 - **Query language:** Agent Relay HTTP
