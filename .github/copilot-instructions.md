@@ -2,12 +2,11 @@
 
 ## Branch Workflow
 
-- Use `develop` as the normal working branch for implementation, documentation, tests, and commits.
-- Do not commit directly to `master` unless the user explicitly asks for an emergency direct change.
-- Keep local `master` aligned with `origin/master`; treat it as the protected integration target.
-- Start new work from the latest `origin/develop` when it exists. If `develop` is missing in a new clone, create it from the latest remote integration branch before making changes.
-- Push completed work to `origin/develop` or to a feature branch based on `develop`, according to the user's request.
-- After validation and CI pass, open a pull request from `develop` to `master` for review and merge.
+- Use `develop` as the default integration branch for implementation, documentation, tests, and pull requests.
+- Start new work from the latest `origin/develop` when it exists. If `develop` is missing in a new clone, create it from `origin/develop` after fetching.
+- Prefer feature branches based on `develop`; push completed work to a feature branch and open a pull request back to `develop`.
+- Do not commit directly to `develop` or `main` unless the user explicitly asks for an emergency direct change.
+- Treat `main` as the long-lived release branch. There is no active `master` branch in this repository; do not target or recreate `master` unless the maintainer explicitly asks.
 
 ## Validation Before Push or PR
 
