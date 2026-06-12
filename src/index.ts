@@ -24,6 +24,7 @@ import { loadClientKeys, validateClientKey } from './auth.js';
 import { metrics, serializeMetrics } from './metrics.js';
 import { createSkillHelpers } from './skill.js';
 import { versionRegistry } from './version-registry.js';
+import { SessionStore } from './transports/session-store.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -63,7 +64,13 @@ async function main(): Promise<void> {
       // The init request creates a new session; subsequent requests
       // reuse the same pair via the Mcp-Session-Id header.
       const { randomUUID } = await import('node:crypto');
-      const sessions = new Map<string, { transport: InstanceType<typeof StreamableHTTPServerTransport>; server: ReturnType<typeof createServer>; lastActivity: number }>();
+      const sessions = new SessionStore<
+        InstanceType<typeof StreamableHTTPServerTransport>,
+        ReturnType<typeof createServer>
+      >({
+        onOpen: () => metrics.activeSessions.inc(),
+        onClose: () => metrics.activeSessions.dec(),
+      });
 
       // Idle-session reaper. A session is normally removed when the client
       // sends an HTTP DELETE, which fires transport.onclose. Clients that
@@ -76,14 +83,7 @@ async function main(): Promise<void> {
       const SESSION_IDLE_MS = Number(process.env.MCP_SESSION_IDLE_MS) || 5 * 60_000;
       const SESSION_SWEEP_MS = Number(process.env.MCP_SESSION_SWEEP_MS) || 60_000;
       const reaper = setInterval(() => {
-        const cutoff = Date.now() - SESSION_IDLE_MS;
-        const stale: InstanceType<typeof StreamableHTTPServerTransport>[] = [];
-        for (const session of sessions.values()) {
-          if (session.lastActivity < cutoff) stale.push(session.transport);
-        }
-        for (const transport of stale) {
-          try { transport.close(); } catch { /* already closing */ }
-        }
+        sessions.sweepIdle(SESSION_IDLE_MS);
       }, SESSION_SWEEP_MS);
       reaper.unref();
 
@@ -159,40 +159,30 @@ async function main(): Promise<void> {
 
         // Look up existing session
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
-        if (sessionId && sessions.has(sessionId)) {
-          const session = sessions.get(sessionId)!;
-          session.lastActivity = Date.now();
-          await session.transport.handleRequest(req, res);
-          return;
+        if (sessionId) {
+          const session = sessions.touch(sessionId);
+          if (!session) {
+            // Fall through to the SDK's initialize handling for unknown session
+            // ids, preserving the previous behavior where non-matching ids were
+            // treated like new requests.
+          } else {
+            await session.transport.handleRequest(req, res);
+            return;
+          }
         }
 
         // New session (initialize request)
-        metrics.activeSessions.inc();
         const mcpServer = createServer(options);
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
         });
-        let closed = false;
-
-        transport.onclose = () => {
-          // Re-entry guard: mcpServer.close() closes its transport, which fires
-          // onclose again. Without this guard the call recurses
-          // (onclose -> mcpServer.close() -> transport.close() -> onclose -> …)
-          // until the stack overflows — "RangeError: Maximum call stack size
-          // exceeded" — which happens on every client DELETE.
-          if (closed) return;
-          closed = true;
-          const sid = transport.sessionId;
-          if (sid) sessions.delete(sid);
-          metrics.activeSessions.dec();
-          mcpServer.close();
-        };
+        sessions.bind(transport, mcpServer);
 
         await mcpServer.connect(transport);
         await transport.handleRequest(req, res);
 
         if (transport.sessionId) {
-          sessions.set(transport.sessionId, { transport, server: mcpServer, lastActivity: Date.now() });
+          sessions.register(transport, mcpServer);
         }
       });
 
