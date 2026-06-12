@@ -32,6 +32,7 @@
     "otel-mcp-server": "dist/index.js"
   },
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "publishConfig": {
     "access": "public",
     "provenance": true
@@ -53,6 +54,9 @@
     "test:live:standard": "node scripts/live-test.mjs --profile standard",
     "lint": "tsc --noEmit",
     "gen:versions": "tsx scripts/gen-version-manifest.ts",
+    "gen:contracts": "tsx scripts/gen-tool-contracts.ts",
+    "gen:api-snapshot": "tsx scripts/gen-api-snapshot.ts",
+    "gen:skills": "tsx scripts/gen-skill-registry.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build"
   },
