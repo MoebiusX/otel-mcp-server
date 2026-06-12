@@ -1044,21 +1044,21 @@ This directory is maintained as a **git subtree** of the standalone repo [`Moebi
 
 ```bash
 cd /path/to/KrystalineX
-git subtree pull --prefix=otel-mcp-server otel-upstream master --squash
+git subtree pull --prefix=otel-mcp-server otel-upstream main --squash
 ```
 
 ### Push monorepo changes back upstream
 
 ```bash
 cd /path/to/KrystalineX
-git subtree push --prefix=otel-mcp-server otel-upstream master
+git subtree push --prefix=otel-mcp-server otel-upstream main
 ```
 
 ### Initial setup (already done)
 
 ```bash
 git remote add otel-upstream https://github.com/MoebiusX/otel-mcp-server.git
-git subtree add --prefix=otel-mcp-server otel-upstream master --squash
+git subtree add --prefix=otel-mcp-server otel-upstream main --squash
 ```
 
 > **Note:** `src/client.ts` is currently monorepo-only. Push it upstream when ready.
