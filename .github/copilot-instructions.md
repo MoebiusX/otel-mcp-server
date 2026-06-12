@@ -17,6 +17,17 @@
 - For documentation-only changes, a full test run is optional unless the user asks for it or the docs affect generated/tested content.
 - If any validation cannot be run, state that clearly in the final summary.
 
+## MCP Contract and Compatibility Guardrails
+
+- Preserve existing MCP tool names, argument schemas, defaults, output shapes, and write-tool opt-in behavior unless a compatibility alias and deprecation path are part of the change.
+- Treat `docs/tool-contracts.json`, `docs/api-snapshot.json`, and `src/skills.generated.ts` as generated guardrails. Do not edit them by hand.
+- When tool contracts change intentionally, run `npm run gen:contracts` and review the JSON diff as a consumer-facing API change.
+- When TypeScript declaration surfaces change intentionally, run `npm run build && npm run gen:api-snapshot` and review the snapshot diff as an npm-facing API change.
+- When adding, removing, or renaming a skill module under `src/tools`, run `npm run gen:skills` and keep `src/skills.ts` as the metadata wrapper only.
+- For compatibility migrations, prefer the facade in `src/compat.ts` for aliases and argument mapping instead of duplicating legacy handling inside individual tool modules.
+- Keep write tools disabled by default. New mutating tools must remain gated behind the repository's write-enable policy and should provide `dry_run` support when practical.
+- Validate compatibility-sensitive changes with `npm run build`, `npm test`, and, for packaging/API work, `npm pack --dry-run`.
+
 ## Git Hygiene
 
 - Check `git status` before staging, committing, rebasing, or pushing.
