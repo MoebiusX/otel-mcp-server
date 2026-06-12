@@ -57,6 +57,7 @@
     "gen:contracts": "tsx scripts/gen-tool-contracts.ts",
     "gen:api-snapshot": "tsx scripts/gen-api-snapshot.ts",
     "gen:skills": "tsx scripts/gen-skill-registry.ts",
+    "check:contracts": "tsx scripts/check-contract-semver.ts --current-generated",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build"
   },
