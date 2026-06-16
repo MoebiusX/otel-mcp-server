@@ -29,6 +29,7 @@ import { skill as zkProofs } from './tools/zk-proofs.js';
 import { skill as system } from './tools/system.js';
 import { skill as publicExchange } from './tools/public-exchange.js';
 import { skill as agentrelay } from './tools/agentrelay.js';
+import { skill as beyla } from './tools/beyla.js';
 
 export const generatedSkills: Skill[] = [
   traces,
@@ -56,4 +57,5 @@ export const generatedSkills: Skill[] = [
   system,
   publicExchange,
   agentrelay,
+  beyla,
 ];

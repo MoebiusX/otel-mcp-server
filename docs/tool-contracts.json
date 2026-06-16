@@ -660,6 +660,7 @@
         "ALLOY_URL": "http://localhost-test/alloy",
         "APP_API_URL": "http://localhost-test/app-api",
         "BEATS_URL": "http://localhost-test/beats",
+        "BEYLA_PROMETHEUS_URL": "http://localhost-test/beyla",
         "CILIUM_URL": "http://localhost-test/cilium",
         "CLICKHOUSE_URL": "http://localhost-test/clickhouse",
         "CONSUL_URL": "http://localhost-test/consul",
@@ -3075,6 +3076,122 @@
             "type": "object"
           },
           "name": "agentrelay_agents"
+        },
+        {
+          "description": "List the services Grafana Beyla is auto-instrumenting (discovered from its HTTP/RPC/DB request-count series), with each one's current request rate.",
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "inputSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "properties": {
+              "window": {
+                "default": "5m",
+                "description": "Rate window for the request rate (e.g. \"1m\", \"5m\")",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "name": "beyla_services"
+        },
+        {
+          "description": "Get RED metrics (request Rate, Error rate, and Duration percentiles) for a Beyla-instrumented service over a window, computed from its OTel duration histogram.",
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "inputSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "properties": {
+              "kind": {
+                "default": "http_server",
+                "description": "Which signal to summarize: inbound HTTP (http_server), outbound HTTP (http_client), gRPC (rpc_server), or DB calls (db_client)",
+                "enum": [
+                  "http_server",
+                  "http_client",
+                  "rpc_server",
+                  "db_client"
+                ],
+                "type": "string"
+              },
+              "service": {
+                "description": "Service name (the `service_name` label, e.g. \"checkout\")",
+                "type": "string"
+              },
+              "window": {
+                "default": "5m",
+                "description": "Rate/quantile window (e.g. \"1m\", \"5m\")",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service"
+            ],
+            "type": "object"
+          },
+          "name": "beyla_red_metrics"
+        },
+        {
+          "description": "List the busiest HTTP routes for a Beyla-instrumented service, each with its request rate and p95 latency. Routes come from the `http_route` label (low-cardinality templated paths).",
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "inputSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "properties": {
+              "max_routes": {
+                "default": 10,
+                "description": "How many top routes to return",
+                "type": "number"
+              },
+              "service": {
+                "description": "Service name (the `service_name` label)",
+                "type": "string"
+              },
+              "side": {
+                "default": "server",
+                "description": "Inbound routes this service serves (server) or outbound calls it makes (client)",
+                "enum": [
+                  "server",
+                  "client"
+                ],
+                "type": "string"
+              },
+              "window": {
+                "default": "5m",
+                "description": "Rate/quantile window",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service"
+            ],
+            "type": "object"
+          },
+          "name": "beyla_top_routes"
+        },
+        {
+          "description": "List the top network flows by throughput from Beyla's eBPF network metrics (beyla_network_flow_bytes_total), grouped by source/destination workload and namespace. Requires Beyla network metrics to be enabled.",
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "inputSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "properties": {
+              "max_flows": {
+                "default": 15,
+                "description": "How many top flows to return",
+                "type": "number"
+              },
+              "window": {
+                "default": "5m",
+                "description": "Rate window for throughput (e.g. \"1m\", \"5m\")",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "name": "beyla_network_flows"
         }
       ]
     },
@@ -3087,6 +3204,7 @@
         "ALLOY_URL": "http://localhost-test/alloy",
         "APP_API_URL": "http://localhost-test/app-api",
         "BEATS_URL": "http://localhost-test/beats",
+        "BEYLA_PROMETHEUS_URL": "http://localhost-test/beyla",
         "CILIUM_URL": "http://localhost-test/cilium",
         "CLICKHOUSE_URL": "http://localhost-test/clickhouse",
         "CONSUL_URL": "http://localhost-test/consul",
@@ -5723,6 +5841,122 @@
             "type": "object"
           },
           "name": "agentrelay_send"
+        },
+        {
+          "description": "List the services Grafana Beyla is auto-instrumenting (discovered from its HTTP/RPC/DB request-count series), with each one's current request rate.",
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "inputSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "properties": {
+              "window": {
+                "default": "5m",
+                "description": "Rate window for the request rate (e.g. \"1m\", \"5m\")",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "name": "beyla_services"
+        },
+        {
+          "description": "Get RED metrics (request Rate, Error rate, and Duration percentiles) for a Beyla-instrumented service over a window, computed from its OTel duration histogram.",
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "inputSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "properties": {
+              "kind": {
+                "default": "http_server",
+                "description": "Which signal to summarize: inbound HTTP (http_server), outbound HTTP (http_client), gRPC (rpc_server), or DB calls (db_client)",
+                "enum": [
+                  "http_server",
+                  "http_client",
+                  "rpc_server",
+                  "db_client"
+                ],
+                "type": "string"
+              },
+              "service": {
+                "description": "Service name (the `service_name` label, e.g. \"checkout\")",
+                "type": "string"
+              },
+              "window": {
+                "default": "5m",
+                "description": "Rate/quantile window (e.g. \"1m\", \"5m\")",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service"
+            ],
+            "type": "object"
+          },
+          "name": "beyla_red_metrics"
+        },
+        {
+          "description": "List the busiest HTTP routes for a Beyla-instrumented service, each with its request rate and p95 latency. Routes come from the `http_route` label (low-cardinality templated paths).",
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "inputSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "properties": {
+              "max_routes": {
+                "default": 10,
+                "description": "How many top routes to return",
+                "type": "number"
+              },
+              "service": {
+                "description": "Service name (the `service_name` label)",
+                "type": "string"
+              },
+              "side": {
+                "default": "server",
+                "description": "Inbound routes this service serves (server) or outbound calls it makes (client)",
+                "enum": [
+                  "server",
+                  "client"
+                ],
+                "type": "string"
+              },
+              "window": {
+                "default": "5m",
+                "description": "Rate/quantile window",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service"
+            ],
+            "type": "object"
+          },
+          "name": "beyla_top_routes"
+        },
+        {
+          "description": "List the top network flows by throughput from Beyla's eBPF network metrics (beyla_network_flow_bytes_total), grouped by source/destination workload and namespace. Requires Beyla network metrics to be enabled.",
+          "execution": {
+            "taskSupport": "forbidden"
+          },
+          "inputSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "properties": {
+              "max_flows": {
+                "default": 15,
+                "description": "How many top flows to return",
+                "type": "number"
+              },
+              "window": {
+                "default": "5m",
+                "description": "Rate window for throughput (e.g. \"1m\", \"5m\")",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "name": "beyla_network_flows"
         }
       ]
     }
