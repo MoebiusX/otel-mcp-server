@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`mcp_build_info` metric.** GET `/metrics` now exposes a constant-1 gauge whose labels (`service`, `version`, `sha`, `ref`, `built_at`) identify the exact build that is running. Values come from `BUILD_*` env baked in at image build time (new `ARG`/`ENV` plumbing in the Dockerfile + `build-args` in the release workflow); outside a built image `version` falls back to the package version. Lets fleet dashboards assert deployed versions across every component after a rollout. Zero new runtime dependencies.
+
 ## [1.7.1] - 2026-06-07
 
 ### Changed

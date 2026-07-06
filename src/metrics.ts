@@ -179,6 +179,11 @@ export const metrics = {
     'mcp_server_info',
     'MCP server metadata',
   ),
+
+  buildInfo: new Gauge(
+    'mcp_build_info',
+    'Build provenance of the running server (constant 1; identity is in the labels)',
+  ),
 };
 
 /** Serialize all metrics to Prometheus text exposition format. */
@@ -201,6 +206,7 @@ export function serializeMetrics(): string {
     metrics.authAttempts.serialize(),
     metrics.activeSessions.serialize(),
     metrics.serverInfo.serialize(),
+    metrics.buildInfo.serialize(),
   ].filter(s => s.includes('\n')); // skip empty metrics
 
   return parts.join('\n\n') + '\n';
@@ -208,6 +214,17 @@ export function serializeMetrics(): string {
 
 // Set server info label
 metrics.serverInfo.set({ version: VERSION }, 1);
+
+// Build provenance — BUILD_* env is baked into the image at build time (see
+// Dockerfile / the release workflow). Outside a built image (local dev, tests)
+// version falls back to the package version and the rest to "unknown".
+metrics.buildInfo.set({
+  service: 'otel-mcp-server',
+  version: process.env.BUILD_VERSION || VERSION,
+  sha: process.env.BUILD_SHA || 'unknown',
+  ref: process.env.BUILD_REF || 'unknown',
+  built_at: process.env.BUILD_TIME || 'unknown',
+}, 1);
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Instrumented fetch wrapper
