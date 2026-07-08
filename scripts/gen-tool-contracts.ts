@@ -53,6 +53,7 @@ const BACKEND_URL_ENV: Record<string, string> = {
   ALERTMANAGER_URL: 'http://localhost-test/alertmanager',
   GRAFANA_URL: 'http://localhost-test/grafana',
   CILIUM_URL: 'http://localhost-test/cilium',
+  BEYLA_PROMETHEUS_URL: 'http://localhost-test/beyla',
   KUBERNETES_URL: 'http://localhost-test/kubernetes',
   CLICKHOUSE_URL: 'http://localhost-test/clickhouse',
   PYROSCOPE_URL: 'http://localhost-test/pyroscope',

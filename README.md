@@ -36,7 +36,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **110 tools** across 25 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
+- **110 tools** across 25 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Grafana Beyla (eBPF auto-instrumentation), Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
@@ -140,6 +140,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `VMALERT_URL` | _(disabled)_ | vmalert rules + alerts API |
 | `GRAFANA_URL` | _(disabled)_ | Grafana API |
 | `CILIUM_URL` | _(disabled)_ | Cilium agent REST API (eBPF networking) |
+| `BEYLA_PROMETHEUS_URL` | _(disabled)_ | Prometheus store holding Grafana Beyla's eBPF metrics |
 | `KUBERNETES_URL` | _(in-cluster)_ | kube-apiserver; auto-detected in-cluster via the ServiceAccount mount |
 | `CLICKHOUSE_URL` | _(disabled)_ | ClickHouse HTTP interface |
 | `PYROSCOPE_URL` | _(disabled)_ | Pyroscope HTTP API (continuous profiling) |
@@ -531,6 +532,20 @@ All write tools accept `dry_run: true` to validate and report the planned action
 | `cilium_services` | eBPF load-balancing services and their backends |
 | `cilium_nodes` | Nodes known to the agent (incl. cluster-mesh peers) |
 
+### Grafana Beyla (eBPF auto-instrumentation) — `beyla` — 4 tools
+
+> Enabled when `BEYLA_PROMETHEUS_URL` is set. Beyla has no query API of its own — it
+> auto-instruments processes with eBPF (zero code changes) and exports OTel/Prometheus
+> metrics, so point this at the **Prometheus-compatible store that scrapes Beyla**. The
+> tools issue Beyla-aware PromQL so you don't need to know its metric/label schema.
+
+| Tool | Description |
+|------|-------------|
+| `beyla_services` | Services Beyla is auto-instrumenting, with each one's request rate |
+| `beyla_red_metrics` | RED for a service — request rate, error %, and p50/p95/p99 latency |
+| `beyla_top_routes` | Busiest HTTP routes for a service, with per-route rate and p95 |
+| `beyla_network_flows` | Top service-to-service network flows by throughput (eBPF network metrics) |
+
 ### Kubernetes (CRD reader) — `kubernetes` — 5 tools
 
 > Auto-enabled in-cluster (ServiceAccount mount), or set `KUBERNETES_URL` + token out-of-cluster.
@@ -839,6 +854,7 @@ src/
 │   ├── alertmanager.ts   # Alertmanager skill (4 tools)
 │   ├── grafana.ts        # Grafana read-only skill (10 tools)
 │   ├── cilium.ts         # Cilium eBPF networking skill (6 tools)
+│   ├── beyla.ts          # Grafana Beyla eBPF auto-instrumentation skill (4 tools)
 │   ├── kubernetes.ts     # Kubernetes CRD reader skill (5 tools)
 │   ├── clickhouse.ts     # ClickHouse logs skill (5 tools)
 │   ├── pyroscope.ts      # Pyroscope profiling skill (4 tools)

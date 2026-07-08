@@ -16,6 +16,7 @@ Support tiers: **must** = latest major(s) · **should** = previous · **optional
 | Skill | Backend | Tiers |
 | --- | --- | --- |
 | `metrics` | Cortex | must: 1.x · should: 0.x |
+| `beyla` | Grafana Beyla | must: 2.x · should: 1.x |
 | `metrics` | Grafana Mimir | must: 2.14, 2.13 · should: 2.10 · optional: 2.0 |
 | `metrics` | Prometheus | must: 3.x · should: 2.55, 2.5x · optional: 2.4x |
 | `metrics` | Thanos | must: 0.37, 0.36 · should: 0.34 · optional: 0.30 |
@@ -27,16 +28,16 @@ Support tiers: **must** = latest major(s) · **should** = previous · **optional
 
 ### Versioned features — since-version by product
 
-| Feature | Cortex | Grafana Mimir | Prometheus | Thanos | VictoriaMetrics |
-| --- | --- | --- | --- | --- | --- |
-| `subqueries`<br/><sub>Subquery range selectors `expr[5m:1m]`.</sub> | 1.0 | 2.0 | 2.7 | 0.10 | 1.0 |
-| `at_modifier`<br/><sub>`@` modifier to fix evaluation timestamp.</sub> | 1.11 | 2.0 | 2.26 | 0.21 | 1.54 |
-| `negative_offset`<br/><sub>Negative `offset` to look ahead.</sub> | 1.11 | 2.0 | 2.26 | 0.21 | 1.54 |
-| `native_histograms`<br/><sub>Native (sparse) histogram queries.</sub> | — | 2.10 | 3.0 | 0.34 | — |
-| `utf8_names`<br/><sub>UTF-8 metric and label names.</sub> | — | 2.14 | 3.0 | 0.37 | — |
-| `sort_by_label`<br/><sub>`sort_by_label` / `sort_by_label_desc`.</sub> | — | 2.13 | 2.55 | 0.36 | 1.93 |
-| `info_func`<br/><sub>`info()` function for metadata joins.</sub> | — | — | 3.0 | — | — |
-| `double_exp_smoothing`<br/><sub>`double_exponential_smoothing` (renamed from `holt_winters` in 3.0).</sub> | — | — | 3.0 | — | — |
+| Feature | Cortex | Grafana Beyla | Grafana Mimir | Prometheus | Thanos | VictoriaMetrics |
+| --- | --- | --- | --- | --- | --- | --- |
+| `subqueries`<br/><sub>Subquery range selectors `expr[5m:1m]`.</sub> | 1.0 | — | 2.0 | 2.7 | 0.10 | 1.0 |
+| `at_modifier`<br/><sub>`@` modifier to fix evaluation timestamp.</sub> | 1.11 | — | 2.0 | 2.26 | 0.21 | 1.54 |
+| `negative_offset`<br/><sub>Negative `offset` to look ahead.</sub> | 1.11 | — | 2.0 | 2.26 | 0.21 | 1.54 |
+| `native_histograms`<br/><sub>Native (sparse) histogram queries.</sub> | — | — | 2.10 | 3.0 | 0.34 | — |
+| `utf8_names`<br/><sub>UTF-8 metric and label names.</sub> | — | — | 2.14 | 3.0 | 0.37 | — |
+| `sort_by_label`<br/><sub>`sort_by_label` / `sort_by_label_desc`.</sub> | — | — | 2.13 | 2.55 | 0.36 | 1.93 |
+| `info_func`<br/><sub>`info()` function for metadata joins.</sub> | — | — | — | 3.0 | — | — |
+| `double_exp_smoothing`<br/><sub>`double_exponential_smoothing` (renamed from `holt_winters` in 3.0).</sub> | — | — | — | 3.0 | — | — |
 
 ## Loki query API (`logql`)
 
