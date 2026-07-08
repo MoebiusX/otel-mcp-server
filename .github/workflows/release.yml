@@ -105,6 +105,11 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
+            BUILD_REF=${{ github.ref_name }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            BUILD_VERSION=${{ github.ref_name }}
           tags: |
             moebiusx/otel-mcp-server:${{ steps.version.outputs.version }}
             moebiusx/otel-mcp-server:latest
