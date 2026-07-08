@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`mcp_build_info` metric.** GET `/metrics` now exposes a constant-1 gauge whose labels (`service`, `version`, `sha`, `ref`, `built_at`) identify the exact build that is running. Values come from `BUILD_*` env baked in at image build time (new `ARG`/`ENV` plumbing in the Dockerfile + `build-args` in the release workflow); outside a built image `version` falls back to the package version. Lets fleet dashboards assert deployed versions across every component after a rollout. Zero new runtime dependencies.
+- **Grafana Beyla skill** (`beyla`, 4 read-only tools). Surfaces the application RED metrics and network flows that Grafana Beyla generates via eBPF auto-instrumentation. Beyla has no query API of its own — it exports OTel/Prometheus metrics — so the skill speaks Beyla-aware PromQL against the Prometheus-compatible store that scrapes Beyla. Tools: `beyla_services` (discover instrumented services and their request rate), `beyla_red_metrics` (rate, error %, and p50/p95/p99 latency for a service, across HTTP/gRPC/DB signals), `beyla_top_routes` (busiest HTTP routes with per-route p95), `beyla_network_flows` (top service-to-service flows by throughput). Requires `BEYLA_PROMETHEUS_URL`; OSS and self-hosted. Zero new runtime dependencies. Pairs with the existing `pyroscope` skill to round out the profiling/eBPF layer.
 
 ## [1.7.1] - 2026-06-07
 
