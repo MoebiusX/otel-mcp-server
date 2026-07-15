@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **EdDSA (Ed25519) ID-JAG signatures.** Enterprise-managed authorization now accepts `EdDSA` (Ed25519, RFC 8037) assertions in addition to RS256/384/512 and ES256/384, verified against `OKP` JWKS keys with `node:crypto` (zero new dependencies). Roadmap Phase 0 — see [docs/enterprise-auth-roadmap.md](docs/enterprise-auth-roadmap.md).
+- **Configurable ID-JAG replay-cache cap + observability.** `MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS` (default 50000) bounds the single-use `jti` replay cache instead of a hardcoded constant, and the new `mcp_jit_idjag_replay_cache_size` gauge on `/metrics` reports its live size so the fail-closed cap can be sized and alerted on. Roadmap Phase 0.
+
 ## [1.8.0] - 2026-07-15
 
 ### Added

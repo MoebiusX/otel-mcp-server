@@ -16,14 +16,17 @@ import {
 const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const rsa2 = generateKeyPairSync('rsa', { modulusLength: 2048 }); // untrusted key
 const ec = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const ed = generateKeyPairSync('ed25519');
 
 const RSA_KID = 'rsa-key-1';
 const EC_KID = 'ec-key-1';
+const ED_KID = 'ed-key-1';
 
 const JWKS = {
   keys: [
     { ...(rsa.publicKey.export({ format: 'jwk' }) as object), kid: RSA_KID, use: 'sig' },
     { ...(ec.publicKey.export({ format: 'jwk' }) as object), kid: EC_KID, use: 'sig' },
+    { ...(ed.publicKey.export({ format: 'jwk' }) as object), kid: ED_KID, use: 'sig' },
   ],
 };
 
@@ -35,6 +38,7 @@ const BASE_CONFIG: EnterpriseAuthConfig = {
   resource: AUDIENCE,
   jwksUrl: `${ISSUER}/jwks`,
   defaultScopes: [],
+  maxRedeemedJtis: 50_000,
 };
 
 const T0 = 1_700_000_000_000;
@@ -46,7 +50,7 @@ function b64u(obj: unknown): string {
 let jtiCounter = 0;
 
 interface JagOptions {
-  alg?: 'RS256' | 'ES256' | 'HS256' | 'none';
+  alg?: 'RS256' | 'ES256' | 'EdDSA' | 'HS256' | 'none';
   kid?: string | undefined;
   typ?: string;
   key?: KeyObject;
@@ -65,6 +69,7 @@ function makeJag(opts: JagOptions = {}): string {
   if ('kid' in opts) {
     if (opts.kid !== undefined) header.kid = opts.kid;
   } else if (alg === 'ES256') header.kid = EC_KID;
+  else if (alg === 'EdDSA') header.kid = ED_KID;
   else header.kid = RSA_KID;
 
   const payload = {
@@ -82,11 +87,17 @@ function makeJag(opts: JagOptions = {}): string {
 
   const signingInput = `${b64u(header)}.${b64u(payload)}`;
   if (alg === 'none') return `${signingInput}.`;
-  const key = opts.key ?? (alg === 'ES256' ? ec.privateKey : rsa.privateKey);
-  const signature =
-    alg === 'ES256'
-      ? cryptoSign('sha256', Buffer.from(signingInput), { key, dsaEncoding: 'ieee-p1363' })
-      : cryptoSign('sha256', Buffer.from(signingInput), key);
+  const defaultKey = alg === 'ES256' ? ec.privateKey : alg === 'EdDSA' ? ed.privateKey : rsa.privateKey;
+  const key = opts.key ?? defaultKey;
+  let signature: Buffer;
+  if (alg === 'ES256') {
+    signature = cryptoSign('sha256', Buffer.from(signingInput), { key, dsaEncoding: 'ieee-p1363' });
+  } else if (alg === 'EdDSA') {
+    // Ed25519: null algorithm, hash is intrinsic.
+    signature = cryptoSign(null, Buffer.from(signingInput), key);
+  } else {
+    signature = cryptoSign('sha256', Buffer.from(signingInput), key);
+  }
   return `${signingInput}.${signature.toString('base64url')}`;
 }
 
@@ -153,6 +164,21 @@ describe('readEnterpriseAuthConfig', () => {
     expect(cfg!.jwksUrl).toBeUndefined();
     expect(cfg!.defaultScopes).toEqual(['traces', 'metrics', 'logs']);
   });
+
+  it('defaults and env-drives the redeemed-jti cap', () => {
+    const base = { MCP_ENTERPRISE_AUTH_ISSUER: ISSUER, MCP_ENTERPRISE_AUTH_AUDIENCE: AUDIENCE };
+    expect(readEnterpriseAuthConfig(env(base))!.maxRedeemedJtis).toBe(50_000);
+    expect(
+      readEnterpriseAuthConfig(env({ ...base, MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS: '250' }))!.maxRedeemedJtis,
+    ).toBe(250);
+    // Garbage / out-of-range falls back to the default.
+    expect(
+      readEnterpriseAuthConfig(env({ ...base, MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS: '0' }))!.maxRedeemedJtis,
+    ).toBe(50_000);
+    expect(
+      readEnterpriseAuthConfig(env({ ...base, MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS: 'lots' }))!.maxRedeemedJtis,
+    ).toBe(50_000);
+  });
 });
 
 // ─── Happy paths ─────────────────────────────────────────────────────────────
@@ -172,6 +198,29 @@ describe('EnterpriseAuthService.verifyIdJag', () => {
     const { service } = rig();
     const verified = await service.verifyIdJag(makeJag({ alg: 'ES256' }));
     expect(verified.sub).toBe('user-42');
+  });
+
+  it('accepts a valid EdDSA (Ed25519) assertion', async () => {
+    const { service } = rig();
+    const verified = await service.verifyIdJag(makeJag({ alg: 'EdDSA' }));
+    expect(verified.sub).toBe('user-42');
+    expect(verified.scopes).toEqual(['traces', 'metrics']);
+  });
+
+  it('verifies an EdDSA assertion with no kid against a single OKP key', async () => {
+    const single = rig();
+    single.setJwks({ keys: [{ ...(ed.publicKey.export({ format: 'jwk' }) as object), use: 'sig' }] });
+    const verified = await single.service.verifyIdJag(makeJag({ alg: 'EdDSA', kid: undefined }));
+    expect(verified.sub).toBe('user-42');
+  });
+
+  it('rejects an EdDSA assertion signed by an untrusted Ed25519 key', async () => {
+    const other = generateKeyPairSync('ed25519');
+    const { service } = rig();
+    await expectOAuthError(
+      service.verifyIdJag(makeJag({ alg: 'EdDSA', key: other.privateKey })),
+      'idjag_bad_signature',
+    );
   });
 
   it('accepts aud as an array containing the audience, and application/-prefixed typ', async () => {
@@ -328,6 +377,14 @@ describe('verifyIdJag rejections', () => {
     await service.verifyIdJag(jag);
     clock.now = T0 + 300_000 + 61_000; // past exp + 60s skew
     await expectOAuthError(service.verifyIdJag(jag), 'idjag_expired');
+  });
+
+  it('fails closed (server_error) when the redeemed-jti cap is reached', async () => {
+    const { service } = rig({ maxRedeemedJtis: 1 });
+    await service.verifyIdJag(makeJag()); // fills the single slot
+    const err = await expectOAuthError(service.verifyIdJag(makeJag()), 'idjag_replay_cache_full');
+    expect(err.code).toBe('server_error');
+    expect(err.status).toBe(500);
   });
 
   it('sweep drops redeemed jtis once their assertion expires', async () => {

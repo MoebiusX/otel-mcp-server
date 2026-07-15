@@ -113,6 +113,7 @@ const ENTERPRISE_CONFIG: EnterpriseAuthConfig = {
   resource: AUDIENCE,
   jwksUrl: `${ISSUER}/jwks`,
   defaultScopes: [],
+  maxRedeemedJtis: 50_000,
 };
 
 function ctx(overrides: { withEnterprise?: boolean; noService?: boolean; clock?: { now: number } } = {}) {

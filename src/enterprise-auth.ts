@@ -55,6 +55,12 @@ export interface EnterpriseAuthConfig {
    * skills enabled on this instance (the IdP authorized the server as a whole).
    */
   defaultScopes: string[];
+  /**
+   * Hard cap on remembered redeemed `jti`s (replay protection). At the cap,
+   * verification fails closed. Size it above `peak assertion rate × assertion
+   * TTL` for your IdP. Default {@link DEFAULT_MAX_REDEEMED_JTIS}.
+   */
+  maxRedeemedJtis: number;
 }
 
 /**
@@ -66,8 +72,9 @@ export interface EnterpriseAuthConfig {
  *   MCP_ENTERPRISE_AUTH_ISSUER          — trusted IdP issuer URL (required)
  *   MCP_ENTERPRISE_AUTH_AUDIENCE        — this server's issuer id (required)
  *   MCP_ENTERPRISE_AUTH_RESOURCE        — resource id (default: audience)
- *   MCP_ENTERPRISE_AUTH_JWKS_URL        — explicit JWKS (default: OIDC discovery)
- *   MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES  — comma/space-separated fallback scopes
+ *   MCP_ENTERPRISE_AUTH_JWKS_URL           — explicit JWKS (default: OIDC discovery)
+ *   MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES     — comma/space-separated fallback scopes
+ *   MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS  — replay-cache cap (default 50000)
  */
 export function readEnterpriseAuthConfig(
   env: (k: string) => string | undefined = (k) => process.env[k],
@@ -82,8 +89,11 @@ export function readEnterpriseAuthConfig(
     .split(/[\s,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+  const rawCap = Number(env('MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS'));
+  const maxRedeemedJtis =
+    Number.isFinite(rawCap) && rawCap >= 1 ? Math.floor(rawCap) : DEFAULT_MAX_REDEEMED_JTIS;
 
-  return { issuer, audience, resource, jwksUrl, defaultScopes };
+  return { issuer, audience, resource, jwksUrl, defaultScopes, maxRedeemedJtis };
 }
 
 // ─── Grant / profile identifiers (normative values from the extension spec) ──
@@ -94,14 +104,25 @@ export const ID_JAG_TYP = 'oauth-id-jag+jwt';
 export const ENTERPRISE_AUTH_EXTENSION_ID =
   'io.modelcontextprotocol/enterprise-managed-authorization';
 
-/** Accepted asymmetric JWS algorithms and their node:crypto parameters. */
-const ALGS: Record<string, { hash: string; kty: 'RSA' | 'EC'; dsaEncoding?: 'ieee-p1363'; curve?: string }> = {
+/**
+ * Accepted asymmetric JWS algorithms and their node:crypto parameters.
+ *
+ * `hash` is `null` for EdDSA — Ed25519 has an intrinsic hash (SHA-512), so
+ * `crypto.verify` is called with a `null` algorithm and the OKP key.
+ */
+type JwsKeyType = 'RSA' | 'EC' | 'OKP';
+const ALGS: Record<string, { hash: string | null; kty: JwsKeyType; dsaEncoding?: 'ieee-p1363' }> = {
   RS256: { hash: 'sha256', kty: 'RSA' },
   RS384: { hash: 'sha384', kty: 'RSA' },
   RS512: { hash: 'sha512', kty: 'RSA' },
-  ES256: { hash: 'sha256', kty: 'EC', dsaEncoding: 'ieee-p1363', curve: 'P-256' },
-  ES384: { hash: 'sha384', kty: 'EC', dsaEncoding: 'ieee-p1363', curve: 'P-384' },
+  ES256: { hash: 'sha256', kty: 'EC', dsaEncoding: 'ieee-p1363' },
+  ES384: { hash: 'sha384', kty: 'EC', dsaEncoding: 'ieee-p1363' },
+  // RFC 8037 — Ed25519 (OKP). Hash is intrinsic; no DSA re-encoding needed.
+  EdDSA: { hash: null, kty: 'OKP' },
 };
+
+/** node:crypto `asymmetricKeyType` for each accepted JWS key type. */
+const ASYM_KEY_TYPE: Record<JwsKeyType, string> = { RSA: 'rsa', EC: 'ec', OKP: 'ed25519' };
 
 /** Allowed clock skew when checking exp / iat / nbf. */
 const CLOCK_SKEW_MS = 60_000;
@@ -109,8 +130,8 @@ const CLOCK_SKEW_MS = 60_000;
 const JWKS_TTL_MS = 5 * 60_000;
 /** Minimum interval between JWKS refetches (negative-cache for unknown kids). */
 const JWKS_MIN_FETCH_INTERVAL_MS = 30_000;
-/** Redeemed-jti replay cache hard cap (entries expire with their assertion). */
-const MAX_REDEEMED_JTIS = 50_000;
+/** Default redeemed-jti replay cache hard cap (entries expire with their assertion). */
+const DEFAULT_MAX_REDEEMED_JTIS = 50_000;
 
 // ─── Result types ────────────────────────────────────────────────────────────
 
@@ -258,6 +279,9 @@ export class EnterpriseAuthService {
     }
     const signed = Buffer.from(`${parts[0]}.${parts[1]}`, 'utf-8');
     const signature = Buffer.from(parts[2]!, 'base64url');
+    // EdDSA (hash === null): pass a null algorithm — the hash is intrinsic to
+    // Ed25519. RSA/EC use their named hash; EC also needs IEEE-P1363 encoding
+    // (JWS raw r||s) rather than crypto's default DER.
     const ok = cryptoVerify(
       algSpec.hash,
       signed,
@@ -317,7 +341,7 @@ export class EnterpriseAuthService {
     if (this.redeemedJtis.has(jti)) {
       throw new OAuthTokenError('invalid_grant', 'idjag_replayed', 'Assertion has already been redeemed');
     }
-    if (this.redeemedJtis.size >= MAX_REDEEMED_JTIS) {
+    if (this.redeemedJtis.size >= this.config.maxRedeemedJtis) {
       // Only successfully validated assertions are remembered, so hitting the
       // cap means an extraordinary volume of legitimate grants. Fail closed.
       throw new OAuthTokenError('server_error', 'idjag_replay_cache_full', 'Assertion replay cache is full');
@@ -367,7 +391,7 @@ export class EnterpriseAuthService {
   }
 
   /** Fetch (or re-use cached) JWKS and return the key for `kid`. */
-  private async keyFor(kid: string | undefined, kty: 'RSA' | 'EC'): Promise<KeyObject | undefined> {
+  private async keyFor(kid: string | undefined, kty: JwsKeyType): Promise<KeyObject | undefined> {
     const now = this.now();
     const fresh = now - this.keysFetchedAt < JWKS_TTL_MS;
 
@@ -375,7 +399,7 @@ export class EnterpriseAuthService {
       if (kid) return this.keys.get(kid);
       // No kid: only unambiguous when exactly one key of the right type exists.
       const candidates = [...this.keys.values()].filter(
-        (k) => k.asymmetricKeyType === (kty === 'RSA' ? 'rsa' : 'ec'),
+        (k) => k.asymmetricKeyType === ASYM_KEY_TYPE[kty],
       );
       return candidates.length === 1 ? candidates[0] : undefined;
     };
@@ -421,7 +445,7 @@ export class EnterpriseAuthService {
     const next = new Map<string, KeyObject>();
     for (const jwk of jwks.keys) {
       if (jwk.use && jwk.use !== 'sig') continue;
-      if (jwk.kty !== 'RSA' && jwk.kty !== 'EC') continue;
+      if (jwk.kty !== 'RSA' && jwk.kty !== 'EC' && jwk.kty !== 'OKP') continue;
       try {
         const key = createPublicKey({ key: jwk as never, format: 'jwk' });
         next.set(jwk.kid ?? `__nokid_${next.size}`, key);
