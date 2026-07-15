@@ -7,10 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-07-15
+
 ### Added
 
 - **`mcp_build_info` metric.** GET `/metrics` now exposes a constant-1 gauge whose labels (`service`, `version`, `sha`, `ref`, `built_at`) identify the exact build that is running. Values come from `BUILD_*` env baked in at image build time (new `ARG`/`ENV` plumbing in the Dockerfile + `build-args` in the release workflow); outside a built image `version` falls back to the package version. Lets fleet dashboards assert deployed versions across every component after a rollout. Zero new runtime dependencies.
 - **Grafana Beyla skill** (`beyla`, 4 read-only tools). Surfaces the application RED metrics and network flows that Grafana Beyla generates via eBPF auto-instrumentation. Beyla has no query API of its own — it exports OTel/Prometheus metrics — so the skill speaks Beyla-aware PromQL against the Prometheus-compatible store that scrapes Beyla. Tools: `beyla_services` (discover instrumented services and their request rate), `beyla_red_metrics` (rate, error %, and p50/p95/p99 latency for a service, across HTTP/gRPC/DB signals), `beyla_top_routes` (busiest HTTP routes with per-route p95), `beyla_network_flows` (top service-to-service flows by throughput). Requires `BEYLA_PROMETHEUS_URL`; OSS and self-hosted. Zero new runtime dependencies. Pairs with the existing `pyroscope` skill to round out the profiling/eBPF layer.
+
+### Security
+
+- **`allowedTools` on client keys is now enforced.** It was previously declarative only — every authenticated key got a session with *all* enabled skills. The MCP session's server now registers only the skills the credential is scoped to (the key's `allowedTools`, or a JIT token's `scopes`), so out-of-scope tools do not exist for that session.
+- **MCP sessions are bound to the credential that created them.** Any valid key could previously attach to any live session id. A session now records its creating principal (static key id or JIT token lineage), and a different credential presenting the session id gets `403` (JIT rotation preserves the lineage, so refreshed tokens keep their session).
+- **JIT refresh cannot be used to exhaust memory.** An adversarial review found that `POST /auth/token/refresh` bypassed the active-token capacity guard and left every rotated token alive for its grace window, so a refresh loop could grow the token store without bound. A rotated token can no longer refresh again (`409`), and each rotation now hard-drops the lineage's earlier grace records — a lineage holds at most its current token plus one in-grace predecessor, keeping the store bounded by `MCP_JIT_MAX_ACTIVE_TOKENS`.
+- **ID-JAG assertions stay single-use through the clock-skew tail.** The redeemed-`jti` replay record was evicted at the assertion's `exp`, but assertions remain acceptable until `exp + 60 s` skew — a window in which a captured, already-redeemed assertion could be replayed to mint a second token. Redeemed ids are now retained until `exp + skew`, closing the window.
 
 ## [1.7.1] - 2026-06-07
 

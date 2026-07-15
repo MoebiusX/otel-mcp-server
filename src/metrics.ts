@@ -184,6 +184,32 @@ export const metrics = {
     'mcp_build_info',
     'Build provenance of the running server (constant 1; identity is in the labels)',
   ),
+
+  // ── JIT privileged identity (see jit.ts) — OWASP MCP08 audit surface ──
+  jitTokensIssued: new Counter(
+    'mcp_jit_tokens_issued_total',
+    'JIT ephemeral session tokens minted, by parent static key',
+  ),
+
+  jitRotations: new Counter(
+    'mcp_jit_rotations_total',
+    'JIT token rotations (refresh grants)',
+  ),
+
+  jitRevocations: new Counter(
+    'mcp_jit_revocations_total',
+    'JIT token revocations, by source (self|admin)',
+  ),
+
+  jitDenials: new Counter(
+    'mcp_jit_denials_total',
+    'JIT identity denials, by reason',
+  ),
+
+  jitActiveTokens: new Gauge(
+    'mcp_jit_active_tokens',
+    'Currently active (unexpired, unrevoked) JIT tokens',
+  ),
 };
 
 /** Serialize all metrics to Prometheus text exposition format. */
@@ -207,6 +233,11 @@ export function serializeMetrics(): string {
     metrics.activeSessions.serialize(),
     metrics.serverInfo.serialize(),
     metrics.buildInfo.serialize(),
+    metrics.jitTokensIssued.serialize(),
+    metrics.jitRotations.serialize(),
+    metrics.jitRevocations.serialize(),
+    metrics.jitDenials.serialize(),
+    metrics.jitActiveTokens.serialize(),
   ].filter(s => s.includes('\n')); // skip empty metrics
 
   return parts.join('\n\n') + '\n';

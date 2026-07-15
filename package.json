@@ -1,6 +1,6 @@
 {
   "name": "@moebiusx/otel-mcp-server",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "OpenTelemetry MCP Server — expose traces, metrics, logs, Elasticsearch, Alertmanager, and ZK proofs to AI agents via the Model Context Protocol",
   "type": "module",
   "license": "Apache-2.0",
@@ -50,6 +50,7 @@
     "dev:http": "tsx src/index.ts --http 3001",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:live": "node scripts/live-test.mjs",
     "test:live:standard": "node scripts/live-test.mjs --profile standard",
     "lint": "tsc --noEmit",

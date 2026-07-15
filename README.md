@@ -39,11 +39,11 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 - **110 tools** across 25 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Grafana Beyla (eBPF auto-instrumentation), Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
-- **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
+- **Layered auth** — backend credentials (Bearer/Basic/OAuth client-credentials/custom headers per backend) and client identity via static API keys, **Just-in-Time scoped ephemeral tokens** (OWASP MCP Top 10), or **enterprise-managed authorization** through your corporate IdP (MCP ext-auth ID-JAG). `allowedTools` scopes are enforced per session (see [Client Authentication](#client-authentication-http-mode))
 - **Selective skills** — enable only the skills you need (`--tools traces,metrics,logs`)
 - **Multi-version aware** — a typed `capability → product → protocol-adapter` model tracks which versions and protocol features each backend supports; runtime detection surfaces live product/version on `/health`, and `MCP_VERSION_GATING` (`off`/`warn`/`enforce`) can guard version-sensitive features (unknown versions always pass optimistically)
 - **Multi-backend & failover** — a single skill can address multiple named instances and fail over across replicas; tools accept an optional SSRF-safe `target` argument (see [Multi-backend instances & failover](#multi-backend-instances--failover))
-- **Self-metrics** — `GET /metrics` endpoint with tool call counts, backend latencies, auth attempts
+- **Self-metrics** — `GET /metrics` endpoint with tool call counts, backend latencies, auth attempts, and JIT token issuance/rotation/revocation/denial counters
 - **Container-native** — env-var config, K8s Secret mounting, multi-stage Dockerfile
 - **Zero dependencies** beyond the MCP SDK and Zod
 
@@ -164,6 +164,15 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
 | `MCP_SESSION_IDLE_MS` | `300000` | HTTP transport only: idle time before an inactive session is reaped (ms). Bounds the session map for clients that disconnect without sending a DELETE |
 | `MCP_SESSION_SWEEP_MS` | `60000` | HTTP transport only: how often the idle-session reaper runs (ms) |
+| `MCP_JIT_MODE` | `off` | JIT privileged identity: `off` \| `enabled` (migration) \| `required` (static keys may only mint tokens). See [Just-in-Time (JIT) Privileged Identity](#just-in-time-jit-privileged-identity) |
+| `MCP_JIT_TTL_SECONDS` | `900` | JIT token TTL and the cap for a requested `ttlSeconds` (clamped 60–3600) |
+| `MCP_JIT_MAX_LIFETIME_SECONDS` | `28800` | Hard cap per JIT token lineage (clamped ttl–86400) |
+| `MCP_JIT_MAX_ACTIVE_TOKENS` | `1000` | Active-token capacity guard |
+| `MCP_ENTERPRISE_AUTH_ISSUER` | _(disabled)_ | Trusted enterprise IdP issuer URL. Set with `_AUDIENCE` to enable [Enterprise-Managed Authorization](#enterprise-managed-authorization-mcp-extension) |
+| `MCP_ENTERPRISE_AUTH_AUDIENCE` | _(disabled)_ | This server's issuer identifier — the ID-JAG `aud` must contain it |
+| `MCP_ENTERPRISE_AUTH_RESOURCE` | _(= audience)_ | This server's resource identifier — the ID-JAG `resource` must match it |
+| `MCP_ENTERPRISE_AUTH_JWKS_URL` | _(OIDC discovery)_ | Explicit IdP JWKS endpoint; defaults to discovery from the issuer |
+| `MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES` | _(all enabled)_ | Scopes granted when an ID-JAG carries no `scope` claim |
 
 ### Backend Authentication
 
@@ -305,6 +314,136 @@ Clients authenticate via either header:
 - `X-API-Key: sk-my-secret-key-here`
 
 The `/health` endpoint is always unauthenticated.
+
+`allowedTools` is enforced at session creation: the MCP session only registers
+the listed skills, so out-of-scope tools do not exist for that session.
+
+### Just-in-Time (JIT) Privileged Identity
+
+A static API key is standing privilege — whoever holds it holds it until
+someone rotates it. JIT identity treats the AI agent like a human employee:
+the static key becomes a *role definition* used only to sign in, and real
+access happens through short-lived, scoped, rotatable session tokens. Maps to
+the [OWASP MCP Top 10](https://owasp.org/www-project-mcp-top-10/) mitigations
+for MCP01 (token mismanagement), MCP02 (scope creep), MCP07 (authn/z), and
+MCP08 (audit & telemetry).
+
+Enable with `MCP_JIT_MODE`:
+
+| Mode | Static keys | JIT tokens |
+|------|-------------|------------|
+| `off` (default) | full access | — (`/auth/*` answers 404) |
+| `enabled` | full access (migration) | accepted |
+| `required` | may **only** mint tokens | required for all MCP calls |
+
+**Token lifecycle** (the "badge" flow):
+
+```bash
+# 1. Exchange the static key for a scoped, ephemeral token (default TTL 15 min)
+curl -X POST http://localhost:3001/auth/token \
+  -H "Authorization: Bearer sk-my-static-key" \
+  -d '{"scopes": ["traces", "metrics"], "ttlSeconds": 600}'
+# → 201 { "token": "mcpj_<id>.<secret>", "token_id": "<id>", "scopes": [...],
+#         "expires_at": "...", "not_after": "...", "generation": 0 }
+
+# 2. Call MCP with the ephemeral token instead of the key
+curl -X POST http://localhost:3001/mcp \
+  -H "Authorization: Bearer mcpj_..." ...
+
+# 3. Rotate before expiry — same scopes, same session, next generation.
+#    The old token stays valid for a 30 s grace window.
+curl -X POST http://localhost:3001/auth/token/refresh \
+  -H "Authorization: Bearer mcpj_..."
+
+# 4. Hand the badge back (self), or kill-switch by id with a static key
+curl -X POST http://localhost:3001/auth/token/revoke -H "Authorization: Bearer mcpj_..."
+curl -X POST http://localhost:3001/auth/token/revoke \
+  -H "Authorization: Bearer sk-admin-key" -d '{"token_id": "<id>"}'
+```
+
+Guarantees:
+
+- **Least privilege** — requested scopes must be a subset of the parent key's
+  `allowedTools` (escalation → `403 scope_violation`); omitting `scopes`
+  inherits the parent's full grant. Tokens cannot mint further tokens, so
+  every lineage is one auditable hop from a named key.
+- **Ephemeral** — per-token TTL is clamped to 60 s–1 h; rotation never extends
+  a lineage past `MCP_JIT_MAX_LIFETIME_SECONDS` (default 8 h — end of shift),
+  after which the agent must re-authenticate with its static key.
+- **Session binding** — an MCP session can only be reused by the credential
+  lineage that created it (rotation preserves it; any other key or token gets
+  403). Tokens are held server-side as SHA-256 hashes only, and a restart
+  invalidates everything outstanding.
+- **Auditable** — every issuance, rotation, revocation, and denial is logged
+  with the public token id (never the secret) and exported on `/metrics`:
+  `mcp_jit_tokens_issued_total{parent_key}`, `mcp_jit_rotations_total`,
+  `mcp_jit_revocations_total{source}`, `mcp_jit_denials_total{reason}`,
+  `mcp_jit_active_tokens`.
+
+Configuration:
+
+| Env var | Default | Meaning |
+|---------|---------|---------|
+| `MCP_JIT_MODE` | `off` | `off` \| `enabled` \| `required` |
+| `MCP_JIT_TTL_SECONDS` | `900` | Token TTL; also the cap for requested `ttlSeconds` (60–3600) |
+| `MCP_JIT_MAX_LIFETIME_SECONDS` | `28800` | Hard cap per token lineage (ttl–86400) |
+| `MCP_JIT_MAX_ACTIVE_TOKENS` | `1000` | Active-token capacity guard |
+
+JIT applies to the HTTP transport only — stdio is a local, single-user
+channel with no network credential to steal.
+
+### Enterprise-Managed Authorization (MCP extension)
+
+Implements the server side of the MCP
+[Enterprise-Managed Authorization](https://modelcontextprotocol.io/extensions/auth/enterprise-managed-authorization)
+extension (`io.modelcontextprotocol/enterprise-managed-authorization`): your
+**identity provider** (Okta, Entra ID, corporate SSO) decides who may use this
+MCP server, instead of locally provisioned API keys. The MCP client logs the
+employee in via SSO, obtains an **ID-JAG** (Identity Assertion JWT
+Authorization Grant) from the IdP, and exchanges it at this server's token
+endpoint for a scoped JIT session token — enterprise identities ride the same
+least-privilege, rotation, and audit rails as key-minted tokens. Onboarding,
+offboarding, and access policy live in the IdP admin console.
+
+```bash
+MCP_ENTERPRISE_AUTH_ISSUER=https://idp.example.com      # trusted IdP (required)
+MCP_ENTERPRISE_AUTH_AUDIENCE=https://mcp.example.com    # this server's issuer id (required)
+# optional:
+MCP_ENTERPRISE_AUTH_RESOURCE=https://mcp.example.com    # resource id (default: audience)
+MCP_ENTERPRISE_AUTH_JWKS_URL=https://idp.example.com/jwks  # default: OIDC discovery
+MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES=traces,metrics       # when the ID-JAG has no scope claim
+```
+
+Configuring it auto-enables the JIT token infrastructure (and counts as
+client auth being "on" — an enterprise-only deployment is never open), and:
+
+- **Discovery** — serves RFC 8414 metadata at
+  `/.well-known/oauth-authorization-server` advertising
+  `urn:ietf:params:oauth:grant-profile:id-jag` in
+  `authorization_grant_profiles_supported`, plus RFC 9728
+  `/.well-known/oauth-protected-resource`; MCP 401s carry a
+  `WWW-Authenticate: Bearer resource_metadata="…"` challenge.
+- **Token exchange** — `POST /auth/token` with
+  `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` and the ID-JAG as
+  `assertion` (form-encoded or JSON) answers with an RFC 6749 token response
+  whose `access_token` is a JIT session token scoped to the assertion's
+  `scope` claim (intersected with enabled skills).
+- **Validation** per the ID-JAG profile — `typ: oauth-id-jag+jwt`; RS256/384/512
+  or ES256/384 signature against the IdP JWKS (cached, kid-aware, stale-cache
+  fallback); `iss`/`aud`/`resource` binding; `exp`/`iat`/`nbf` with 60 s skew;
+  **single-use `jti`** (replay → `invalid_grant`); `client_id` claim/request
+  binding. Errors are RFC 6749 §5.2 token errors, counted in
+  `mcp_jit_denials_total{reason="idjag_*"}`.
+- **Account linking** — the assertion `sub` is the audit identity (logged on
+  issuance); tokens mint under `parent_key="enterprise-idp"` in metrics.
+
+```bash
+# Client-side exchange (the MCP client does this automatically)
+curl -X POST https://mcp.example.com/auth/token \
+  -d grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer \
+  -d assertion="$ID_JAG" -d client_id=my-mcp-client
+# → { "access_token": "mcpj_…", "token_type": "Bearer", "expires_in": 900, "scope": "metrics traces" }
+```
 
 ### Kubernetes Deployment
 
@@ -844,6 +983,9 @@ src/
 ├── skills.ts             # Skill registry (one import per backend)
 ├── config.ts             # env() helper
 ├── auth.ts               # Backend + client authentication
+├── oauth.ts              # Backend OAuth 2.0 client-credentials
+├── jit.ts                # JIT privileged identity — scoped ephemeral tokens
+├── enterprise-auth.ts    # Enterprise-managed authorization (MCP ext-auth ID-JAG)
 ├── helpers.ts            # fetchJSON, createFetcher, utilities
 ├── metrics.ts            # Self-metrics (Prometheus format)
 ├── tools/
@@ -877,8 +1019,11 @@ src/
 │       ├── tempo.ts      # Grafana Tempo TraceQL provider
 │       ├── zipkin.ts     # Zipkin v2 provider
 │       └── skywalking.ts # SkyWalking OAP GraphQL provider
-└── resources/
-    └── overview.ts       # MCP resource: auto-generated overview
+├── resources/
+│   └── overview.ts       # MCP resource: auto-generated overview
+└── transports/
+    ├── session-store.ts  # HTTP session lifecycle + principal binding
+    └── jit-endpoints.ts  # /auth/token mint · refresh · revoke handlers
 ```
 
 ### Adding a new skill
@@ -923,6 +1068,15 @@ Client → [API Key] → MCP Server → [Backend Credentials] → Jaeger/Prometh
                                X-Scope-OrgID: <LOKI_TENANT_ID>
 ```
 
+With JIT identity enabled, the static key only signs in; tools are reached
+with a scoped, expiring token (see *Just-in-Time (JIT) Privileged Identity*):
+
+```
+Client → [API Key] → POST /auth/token ──► mcpj_… (scoped, TTL, rotatable)
+Client → [mcpj_…]  → MCP Server (session bound to the token lineage)
+                          └── refresh before expiry / revoke when done
+```
+
 ## Development
 
 ```bash
@@ -936,8 +1090,11 @@ npm run lint
 # Build
 npm run build
 
-# Tests (162 tests across 12 suites)
+# Tests
 npm test
+
+# Tests with coverage (thresholds enforced on the auth surface)
+npm run test:coverage
 
 # Run a single test file
 npx vitest run tests/auth.test.ts
