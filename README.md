@@ -173,6 +173,7 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `MCP_ENTERPRISE_AUTH_RESOURCE` | _(= audience)_ | This server's resource identifier — the ID-JAG `resource` must match it |
 | `MCP_ENTERPRISE_AUTH_JWKS_URL` | _(OIDC discovery)_ | Explicit IdP JWKS endpoint; defaults to discovery from the issuer |
 | `MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES` | _(all enabled)_ | Scopes granted when an ID-JAG carries no `scope` claim |
+| `MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS` | `50000` | Redeemed-`jti` replay-cache cap (fail-closed at the cap); size above peak assertion-rate × TTL |
 
 ### Backend Authentication
 
@@ -412,6 +413,7 @@ MCP_ENTERPRISE_AUTH_AUDIENCE=https://mcp.example.com    # this server's issuer i
 MCP_ENTERPRISE_AUTH_RESOURCE=https://mcp.example.com    # resource id (default: audience)
 MCP_ENTERPRISE_AUTH_JWKS_URL=https://idp.example.com/jwks  # default: OIDC discovery
 MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES=traces,metrics       # when the ID-JAG has no scope claim
+MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS=50000             # replay-cache cap (fail-closed)
 ```
 
 Configuring it auto-enables the JIT token infrastructure (and counts as
@@ -428,11 +430,14 @@ client auth being "on" — an enterprise-only deployment is never open), and:
   `assertion` (form-encoded or JSON) answers with an RFC 6749 token response
   whose `access_token` is a JIT session token scoped to the assertion's
   `scope` claim (intersected with enabled skills).
-- **Validation** per the ID-JAG profile — `typ: oauth-id-jag+jwt`; RS256/384/512
-  or ES256/384 signature against the IdP JWKS (cached, kid-aware, stale-cache
-  fallback); `iss`/`aud`/`resource` binding; `exp`/`iat`/`nbf` with 60 s skew;
-  **single-use `jti`** (replay → `invalid_grant`); `client_id` claim/request
-  binding. Errors are RFC 6749 §5.2 token errors, counted in
+- **Validation** per the ID-JAG profile — `typ: oauth-id-jag+jwt`; RS256/384/512,
+  ES256/384, or EdDSA (Ed25519) signature against the IdP JWKS (cached,
+  kid-aware, stale-cache fallback); `iss`/`aud`/`resource` binding;
+  `exp`/`iat`/`nbf` with 60 s skew; **single-use `jti`** (replay →
+  `invalid_grant`; the replay cache is bounded by
+  `MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS` and surfaced as the
+  `mcp_jit_idjag_replay_cache_size` gauge); `client_id` claim/request binding.
+  Errors are RFC 6749 §5.2 token errors, counted in
   `mcp_jit_denials_total{reason="idjag_*"}`.
 - **Account linking** — the assertion `sub` is the audit identity (logged on
   issuance); tokens mint under `parent_key="enterprise-idp"` in metrics.

@@ -136,7 +136,10 @@ async function main(): Promise<void> {
           jitService.sweep();
           metrics.jitActiveTokens.set({}, jitService.activeCount());
         }
-        enterpriseService?.sweep();
+        if (enterpriseService) {
+          enterpriseService.sweep();
+          metrics.jitIdjagReplayCacheSize.set({}, enterpriseService.redeemedCount());
+        }
       }, SESSION_SWEEP_MS);
       reaper.unref();
 

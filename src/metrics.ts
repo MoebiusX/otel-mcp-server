@@ -210,6 +210,11 @@ export const metrics = {
     'mcp_jit_active_tokens',
     'Currently active (unexpired, unrevoked) JIT tokens',
   ),
+
+  jitIdjagReplayCacheSize: new Gauge(
+    'mcp_jit_idjag_replay_cache_size',
+    'Remembered redeemed ID-JAG jtis (enterprise-managed authorization replay cache)',
+  ),
 };
 
 /** Serialize all metrics to Prometheus text exposition format. */
@@ -238,6 +243,7 @@ export function serializeMetrics(): string {
     metrics.jitRevocations.serialize(),
     metrics.jitDenials.serialize(),
     metrics.jitActiveTokens.serialize(),
+    metrics.jitIdjagReplayCacheSize.serialize(),
   ].filter(s => s.includes('\n')); // skip empty metrics
 
   return parts.join('\n\n') + '\n';
