@@ -39,11 +39,11 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 - **110 tools** across 25 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Grafana Beyla (eBPF auto-instrumentation), Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
-- **Two-layer auth** — backend credentials (Bearer/Basic/custom headers per backend) and client API keys (env var, mounted file, or local file)
+- **Layered auth** — backend credentials (Bearer/Basic/OAuth client-credentials/custom headers per backend) and client identity via static API keys, **Just-in-Time scoped ephemeral tokens** (OWASP MCP Top 10), or **enterprise-managed authorization** through your corporate IdP (MCP ext-auth ID-JAG). `allowedTools` scopes are enforced per session (see [Client Authentication](#client-authentication-http-mode))
 - **Selective skills** — enable only the skills you need (`--tools traces,metrics,logs`)
 - **Multi-version aware** — a typed `capability → product → protocol-adapter` model tracks which versions and protocol features each backend supports; runtime detection surfaces live product/version on `/health`, and `MCP_VERSION_GATING` (`off`/`warn`/`enforce`) can guard version-sensitive features (unknown versions always pass optimistically)
 - **Multi-backend & failover** — a single skill can address multiple named instances and fail over across replicas; tools accept an optional SSRF-safe `target` argument (see [Multi-backend instances & failover](#multi-backend-instances--failover))
-- **Self-metrics** — `GET /metrics` endpoint with tool call counts, backend latencies, auth attempts
+- **Self-metrics** — `GET /metrics` endpoint with tool call counts, backend latencies, auth attempts, and JIT token issuance/rotation/revocation/denial counters
 - **Container-native** — env-var config, K8s Secret mounting, multi-stage Dockerfile
 - **Zero dependencies** beyond the MCP SDK and Zod
 
@@ -164,6 +164,15 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `MCP_TIMEOUT_MS` | `15000` | Backend query timeout (ms) |
 | `MCP_SESSION_IDLE_MS` | `300000` | HTTP transport only: idle time before an inactive session is reaped (ms). Bounds the session map for clients that disconnect without sending a DELETE |
 | `MCP_SESSION_SWEEP_MS` | `60000` | HTTP transport only: how often the idle-session reaper runs (ms) |
+| `MCP_JIT_MODE` | `off` | JIT privileged identity: `off` \| `enabled` (migration) \| `required` (static keys may only mint tokens). See [Just-in-Time (JIT) Privileged Identity](#just-in-time-jit-privileged-identity) |
+| `MCP_JIT_TTL_SECONDS` | `900` | JIT token TTL and the cap for a requested `ttlSeconds` (clamped 60–3600) |
+| `MCP_JIT_MAX_LIFETIME_SECONDS` | `28800` | Hard cap per JIT token lineage (clamped ttl–86400) |
+| `MCP_JIT_MAX_ACTIVE_TOKENS` | `1000` | Active-token capacity guard |
+| `MCP_ENTERPRISE_AUTH_ISSUER` | _(disabled)_ | Trusted enterprise IdP issuer URL. Set with `_AUDIENCE` to enable [Enterprise-Managed Authorization](#enterprise-managed-authorization-mcp-extension) |
+| `MCP_ENTERPRISE_AUTH_AUDIENCE` | _(disabled)_ | This server's issuer identifier — the ID-JAG `aud` must contain it |
+| `MCP_ENTERPRISE_AUTH_RESOURCE` | _(= audience)_ | This server's resource identifier — the ID-JAG `resource` must match it |
+| `MCP_ENTERPRISE_AUTH_JWKS_URL` | _(OIDC discovery)_ | Explicit IdP JWKS endpoint; defaults to discovery from the issuer |
+| `MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES` | _(all enabled)_ | Scopes granted when an ID-JAG carries no `scope` claim |
 
 ### Backend Authentication
 
@@ -974,6 +983,9 @@ src/
 ├── skills.ts             # Skill registry (one import per backend)
 ├── config.ts             # env() helper
 ├── auth.ts               # Backend + client authentication
+├── oauth.ts              # Backend OAuth 2.0 client-credentials
+├── jit.ts                # JIT privileged identity — scoped ephemeral tokens
+├── enterprise-auth.ts    # Enterprise-managed authorization (MCP ext-auth ID-JAG)
 ├── helpers.ts            # fetchJSON, createFetcher, utilities
 ├── metrics.ts            # Self-metrics (Prometheus format)
 ├── tools/
@@ -1007,8 +1019,11 @@ src/
 │       ├── tempo.ts      # Grafana Tempo TraceQL provider
 │       ├── zipkin.ts     # Zipkin v2 provider
 │       └── skywalking.ts # SkyWalking OAP GraphQL provider
-└── resources/
-    └── overview.ts       # MCP resource: auto-generated overview
+├── resources/
+│   └── overview.ts       # MCP resource: auto-generated overview
+└── transports/
+    ├── session-store.ts  # HTTP session lifecycle + principal binding
+    └── jit-endpoints.ts  # /auth/token mint · refresh · revoke handlers
 ```
 
 ### Adding a new skill
@@ -1075,8 +1090,11 @@ npm run lint
 # Build
 npm run build
 
-# Tests (162 tests across 12 suites)
+# Tests
 npm test
+
+# Tests with coverage (thresholds enforced on the auth surface)
+npm run test:coverage
 
 # Run a single test file
 npx vitest run tests/auth.test.ts

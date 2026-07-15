@@ -60,8 +60,11 @@ function makeJag(opts: JagOptions = {}): string {
     alg,
     typ: opts.typ ?? 'oauth-id-jag+jwt',
   };
-  if (opts.kid !== undefined) header.kid = opts.kid;
-  else if (alg === 'ES256') header.kid = EC_KID;
+  // `'kid' in opts` (even = undefined) means the caller wants to control it;
+  // passing `{ kid: undefined }` omits the kid header entirely.
+  if ('kid' in opts) {
+    if (opts.kid !== undefined) header.kid = opts.kid;
+  } else if (alg === 'ES256') header.kid = EC_KID;
   else header.kid = RSA_KID;
 
   const payload = {
@@ -192,6 +195,25 @@ describe('EnterpriseAuthService.verifyIdJag', () => {
     expect(fetches[0]).toBe(`${ISSUER}/.well-known/openid-configuration`);
     expect(fetches[1]).toBe(`${ISSUER}/jwks`);
   });
+
+  it('verifies an assertion with no kid against a single unambiguous key', async () => {
+    const single = rig();
+    single.setJwks({ keys: [{ ...(rsa.publicKey.export({ format: 'jwk' }) as object), use: 'sig' }] });
+    const verified = await single.service.verifyIdJag(makeJag({ kid: undefined }));
+    expect(verified.sub).toBe('user-42');
+  });
+
+  it('extracts the email claim for account linking', async () => {
+    const { service } = rig();
+    const verified = await service.verifyIdJag(makeJag({ payload: { email: 'user@corp.example' } }));
+    expect(verified.email).toBe('user@corp.example');
+  });
+
+  it('carries the request client_id through when the claim omits it', async () => {
+    const { service } = rig();
+    const verified = await service.verifyIdJag(makeJag({ payload: { client_id: undefined } }), 'req-client');
+    expect(verified.clientId).toBe('req-client');
+  });
 });
 
 // ─── Rejections ──────────────────────────────────────────────────────────────
@@ -287,6 +309,25 @@ describe('verifyIdJag rejections', () => {
     const jag = makeJag();
     await service.verifyIdJag(jag);
     await expectOAuthError(service.verifyIdJag(jag), 'idjag_replayed');
+  });
+
+  it('still rejects replay in the clock-skew tail after exp (no single-use bypass)', async () => {
+    // Regression: the jti was evicted at `exp`, but the assertion stays
+    // acceptable until exp + skew — leaving a window to replay a redeemed
+    // assertion. The redeemed entry must survive as long as the assertion can.
+    const { service, clock } = rig();
+    const jag = makeJag(); // exp = T0/1000 + 300 → T0 + 300_000
+    await service.verifyIdJag(jag);
+    clock.now = T0 + 300_000 + 30_000; // 30s past exp, within the 60s skew tail
+    await expectOAuthError(service.verifyIdJag(jag), 'idjag_replayed');
+  });
+
+  it('rejects the assertion as expired once past exp + skew', async () => {
+    const { service, clock } = rig();
+    const jag = makeJag();
+    await service.verifyIdJag(jag);
+    clock.now = T0 + 300_000 + 61_000; // past exp + 60s skew
+    await expectOAuthError(service.verifyIdJag(jag), 'idjag_expired');
   });
 
   it('sweep drops redeemed jtis once their assertion expires', async () => {

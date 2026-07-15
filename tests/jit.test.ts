@@ -267,6 +267,42 @@ describe('JitTokenService.refresh', () => {
     const first = service.issue(ISSUE_DEFAULTS);
     expect(() => service.refresh(first.token)).not.toThrow();
   });
+
+  it('rejects re-refreshing an already-rotated token (no lineage branching)', () => {
+    const { service } = rig();
+    const first = service.issue(ISSUE_DEFAULTS);
+    service.refresh(first.token);
+    try {
+      service.refresh(first.token);
+      expect.unreachable('re-refresh of a rotated token must throw');
+    } catch (err) {
+      expect((err as JitError).code).toBe('rotated');
+      expect((err as JitError).status).toBe(409);
+    }
+  });
+
+  it('bounds a lineage across a rapid refresh loop (no unbounded accumulation)', () => {
+    // Regression: refresh() previously skipped the capacity guard AND left every
+    // rotated token in the store for its grace window, so a refresh loop grew
+    // the token map without bound. The lineage must stay at {current, 1 grace}.
+    const { clock, service } = rig({ maxActiveTokens: 1000 });
+    let token = service.issue(ISSUE_DEFAULTS).token;
+    for (let i = 0; i < 200; i++) {
+      clock.now += 1_000; // 1s between refreshes — grace corpses would pile up
+      token = service.refresh(token).token;
+    }
+    // Only the current token + at most one in-grace predecessor remain live.
+    expect(service.activeCount()).toBeLessThanOrEqual(2);
+    // And the surviving token still works.
+    expect(service.validate(token).ok).toBe(true);
+  });
+
+  it('bounds the lineage even when refreshed at a frozen clock', () => {
+    const { service } = rig();
+    let token = service.issue(ISSUE_DEFAULTS).token;
+    for (let i = 0; i < 100; i++) token = service.refresh(token).token;
+    expect(service.activeCount()).toBeLessThanOrEqual(2);
+  });
 });
 
 // ─── Revocation & sweep ──────────────────────────────────────────────────────

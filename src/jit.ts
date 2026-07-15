@@ -152,6 +152,7 @@ export type JitDenialReason =
   | 'unknown'
   | 'expired'
   | 'revoked'
+  | 'rotated'
   | 'scope_violation'
   | 'capacity'
   | 'lifetime_exhausted'
@@ -230,6 +231,8 @@ export interface JitTokenServiceOptions {
 
 export class JitTokenService {
   private readonly tokens = new Map<string, JitTokenRecord>();
+  /** rootId → live record ids in that lineage (bounds refresh accumulation). */
+  private readonly lineageMembers = new Map<string, Set<string>>();
   private readonly now: () => number;
 
   constructor(
@@ -330,6 +333,18 @@ export class JitTokenService {
     const old = v.record;
     const now = this.now();
 
+    // Only the current generation may refresh. A rotated token still
+    // authenticates in-flight requests during its grace window, but letting it
+    // mint again would let one lineage branch — and, looped within the grace
+    // window, grow the store without bound past the capacity guard.
+    if (old.rotated) {
+      throw new JitError(
+        'rotated',
+        409,
+        'Token already rotated; use the current token returned by the latest refresh',
+      );
+    }
+
     const expiresAt = Math.min(now + this.config.ttlSeconds * 1_000, old.notAfter);
     if (expiresAt <= now) {
       throw new JitError(
@@ -352,6 +367,19 @@ export class JitTokenService {
 
     old.rotated = true;
     old.expiresAt = Math.min(old.expiresAt, now + JIT_ROTATION_GRACE_MS);
+
+    // Keep the lineage to {current, single grace token}: hard-drop any earlier
+    // grace corpses so a rapid refresh loop cannot accumulate records past the
+    // capacity guard. Safe because a rotated token can no longer refresh, so
+    // nothing in-flight advances from a pre-`old` generation.
+    const members = this.lineageMembers.get(old.rootId);
+    if (members) {
+      for (const memberId of [...members]) {
+        if (memberId === old.id || memberId === issued.record.id) continue;
+        this.tokens.delete(memberId);
+        members.delete(memberId);
+      }
+    }
     return issued;
   }
 
@@ -377,6 +405,7 @@ export class JitTokenService {
     for (const [id, rec] of this.tokens) {
       if (rec.revoked || now >= rec.expiresAt) {
         this.tokens.delete(id);
+        this.dropFromLineage(rec);
         removed++;
       }
     }
@@ -387,6 +416,14 @@ export class JitTokenService {
     record.revoked = true;
     record.expiresAt = Math.min(record.expiresAt, this.now());
     return record;
+  }
+
+  /** Remove a record from its lineage index, pruning empty lineages. */
+  private dropFromLineage(rec: JitTokenRecord): void {
+    const members = this.lineageMembers.get(rec.rootId);
+    if (!members) return;
+    members.delete(rec.id);
+    if (members.size === 0) this.lineageMembers.delete(rec.rootId);
   }
 
   private mint(args: {
@@ -417,6 +454,14 @@ export class JitTokenService {
       rotated: false,
     };
     this.tokens.set(id, record);
+
+    let members = this.lineageMembers.get(record.rootId);
+    if (!members) {
+      members = new Set();
+      this.lineageMembers.set(record.rootId, members);
+    }
+    members.add(id);
+
     return { token, record };
   }
 }

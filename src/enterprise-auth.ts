@@ -322,7 +322,11 @@ export class EnterpriseAuthService {
       // cap means an extraordinary volume of legitimate grants. Fail closed.
       throw new OAuthTokenError('server_error', 'idjag_replay_cache_full', 'Assertion replay cache is full');
     }
-    this.redeemedJtis.set(jti, exp);
+    // Remember the jti for as long as the assertion can still be accepted. The
+    // exp check above passes while now < exp + CLOCK_SKEW_MS, so evicting at
+    // `exp` would leave a skew-length window where a redeemed assertion still
+    // verifies but its jti is gone — a single-use bypass. Retain to exp+skew.
+    this.redeemedJtis.set(jti, exp + CLOCK_SKEW_MS);
 
     const scopes =
       typeof payload.scope === 'string'
