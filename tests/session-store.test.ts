@@ -73,6 +73,18 @@ describe('SessionStore', () => {
     expect(store.size).toBe(0);
   });
 
+  it('stores the creating principal for session binding', () => {
+    const store = new SessionStore<FakeTransport, FakeServer>();
+    const bound = new FakeTransport('bound');
+    const anonymous = new FakeTransport('anonymous');
+
+    store.register(bound, new FakeServer(), 'jit:root-token-id');
+    store.register(anonymous, new FakeServer());
+
+    expect(store.get('bound')?.principal).toBe('jit:root-token-id');
+    expect(store.get('anonymous')?.principal).toBeUndefined();
+  });
+
   it('sweeps idle sessions and keeps active sessions', () => {
     let now = 10_000;
     let closed = 0;

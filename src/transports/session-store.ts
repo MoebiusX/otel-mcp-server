@@ -20,6 +20,12 @@ export interface SessionRecord<TTransport, TServer> {
   transport: TTransport;
   server: TServer;
   lastActivity: number;
+  /**
+   * Authenticated principal that created the session (e.g. `key:<id>` or
+   * `jit:<rootId>`). Requests presenting a different principal must not reuse
+   * the session (OWASP MCP07). Undefined when auth is disabled.
+   */
+  principal?: string;
 }
 
 export interface SessionStoreOptions {
@@ -58,13 +64,14 @@ export class SessionStore<
   }
 
   /** Register a transport once the SDK has assigned its MCP session id. */
-  register(transport: TTransport, server: TServer): boolean {
+  register(transport: TTransport, server: TServer, principal?: string): boolean {
     const sid = transport.sessionId;
     if (!sid) return false;
     this.sessions.set(sid, {
       transport,
       server,
       lastActivity: this.now(),
+      principal,
     });
     return true;
   }
