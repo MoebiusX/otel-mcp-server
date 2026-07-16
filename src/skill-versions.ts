@@ -187,6 +187,14 @@ export const SKILL_VERSIONS: Record<string, SkillVersionSupport> = {
     }),
   },
 
+  // ── Beyla (eBPF auto-instrumentation; queried via PromQL over its metrics) ──
+  beyla: {
+    'Grafana Beyla': backend('promql', {
+      must: ['2.x'],
+      should: ['1.x'],
+    }),
+  },
+
   // ── Kubernetes (core API) ──
   kubernetes: {
     Kubernetes: backend('k8s-core', {

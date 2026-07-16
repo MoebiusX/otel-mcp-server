@@ -17,6 +17,17 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=builder /app/dist dist/
 
+# Build provenance (baked at release build time; exposed as the
+# mcp_build_info metric on GET /metrics)
+ARG BUILD_SHA=unknown
+ARG BUILD_REF=unknown
+ARG BUILD_TIME=unknown
+ARG BUILD_VERSION=unknown
+ENV BUILD_SHA=$BUILD_SHA \
+    BUILD_REF=$BUILD_REF \
+    BUILD_TIME=$BUILD_TIME \
+    BUILD_VERSION=$BUILD_VERSION
+
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD node -e "fetch('http://localhost:3001/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))"

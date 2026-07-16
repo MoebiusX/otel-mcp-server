@@ -130,6 +130,19 @@
           }
         },
         {
+          "skill": "beyla",
+          "backend": "Grafana Beyla",
+          "productVersions": {
+            "must": [
+              "2.x"
+            ],
+            "should": [
+              "1.x"
+            ]
+          },
+          "featuresSince": {}
+        },
+        {
           "skill": "metrics",
           "backend": "Grafana Mimir",
           "productVersions": {

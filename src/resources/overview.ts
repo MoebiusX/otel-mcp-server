@@ -77,6 +77,12 @@ capabilities the chosen backend doesn't support return a clear error.
 3. \`cilium_services\` for eBPF load-balancer programming
 4. \`cilium_policy\` to see the enforced network policy
 
+### Triage a service with eBPF auto-instrumentation (Beyla)
+1. \`beyla_services\` to see which services Beyla is instrumenting and their request rates
+2. \`beyla_red_metrics\` for one service's rate, error %, and p50/p95/p99 latency
+3. \`beyla_top_routes\` to find which HTTP routes are slow or hot
+4. \`beyla_network_flows\` for top service-to-service traffic (network metrics enabled)
+
 ### Inspect control-plane state via Kubernetes CRDs
 1. \`k8s_api_resources\` to discover which products/CRDs are installed
 2. \`k8s_list\` with the group/version/plural (e.g. group="argoproj.io" plural="rollouts")

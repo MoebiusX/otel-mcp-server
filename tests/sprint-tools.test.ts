@@ -44,6 +44,7 @@ afterEach(() => { process.env = originalEnv; vi.unstubAllGlobals(); });
 describe('new skill registration', () => {
   const cases: Array<[string, string, number]> = [
     ['cilium', 'CILIUM_URL', 6],
+    ['beyla', 'BEYLA_PROMETHEUS_URL', 4],
     ['kubernetes', 'KUBERNETES_URL', 5],
     ['clickhouse', 'CLICKHOUSE_URL', 5],
     ['pyroscope', 'PYROSCOPE_URL', 4],
@@ -149,6 +150,38 @@ describe('pyroscope', () => {
     expect(out.totalSamples).toBe(100);
     expect(out.topFunctions[0]).toMatchObject({ name: 'funcA', self: 90, selfPct: 90 });
     expect(out.topFunctions[1]).toMatchObject({ name: 'funcB', self: 40 });
+  });
+});
+
+// ─── Beyla (RED metrics + network flows over PromQL) ────────────────────────
+
+describe('beyla', () => {
+  beforeEach(() => {
+    process.env.BEYLA_PROMETHEUS_URL = 'http://prom-test:9090';
+    vi.stubGlobal('fetch', mockFetch({
+      '/api/v1/query': {
+        data: { result: [{ metric: { service_name: 'checkout' }, value: [0, '12.5'] }] },
+      },
+    }));
+  });
+
+  it('discovers instrumented services with their request rate', async () => {
+    const { client } = await createTestClient(['beyla']);
+    const out = parse(await client.callTool({ name: 'beyla_services', arguments: {} }));
+    expect(out.count).toBe(1);
+    expect(out.services[0]).toMatchObject({ service: 'checkout', requestRate: 12.5 });
+  });
+
+  it('computes RED metrics for a service', async () => {
+    const { client } = await createTestClient(['beyla']);
+    const out = parse(await client.callTool({
+      name: 'beyla_red_metrics', arguments: { service: 'checkout' },
+    }));
+    expect(out.service).toBe('checkout');
+    expect(out.requestRate).toBe(12.5);
+    // error count == request count in the canned response → 100%
+    expect(out.errorPct).toBe(100);
+    expect(out.latencySeconds.p95).toBe(12.5);
   });
 });
 

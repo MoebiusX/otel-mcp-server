@@ -1,6 +1,6 @@
 {
   "name": "@moebiusx/otel-mcp-server",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "OpenTelemetry MCP Server — expose traces, metrics, logs, Elasticsearch, Alertmanager, and ZK proofs to AI agents via the Model Context Protocol",
   "type": "module",
   "license": "Apache-2.0",
@@ -32,6 +32,7 @@
     "otel-mcp-server": "dist/index.js"
   },
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "publishConfig": {
     "access": "public",
     "provenance": true
@@ -49,10 +50,15 @@
     "dev:http": "tsx src/index.ts --http 3001",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:live": "node scripts/live-test.mjs",
     "test:live:standard": "node scripts/live-test.mjs --profile standard",
     "lint": "tsc --noEmit",
     "gen:versions": "tsx scripts/gen-version-manifest.ts",
+    "gen:contracts": "tsx scripts/gen-tool-contracts.ts",
+    "gen:api-snapshot": "tsx scripts/gen-api-snapshot.ts",
+    "gen:skills": "tsx scripts/gen-skill-registry.ts",
+    "check:contracts": "tsx scripts/check-contract-semver.ts --current-generated",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build"
   },
@@ -61,9 +67,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.1.1",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.8"
   },
   "engines": {

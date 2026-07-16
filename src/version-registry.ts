@@ -145,6 +145,8 @@ export const BACKEND_INSTANCES: BackendInstance[] = [
   single('alertmanager', 'Alertmanager', 'alertmanager-http', 'ALERTMANAGER', ['ALERTMANAGER_URL'], undefined, 'Alertmanager'),
   single('grafana', 'Grafana', 'grafana-http', 'GRAFANA', ['GRAFANA_URL'], undefined, 'Grafana'),
   single('cilium', 'Cilium', 'cilium-http', 'CILIUM', ['CILIUM_URL'], 'http://localhost:9234', 'Cilium'),
+  // beyla: eBPF auto-instrumentation queried via PromQL over its exported metrics.
+  single('beyla', 'Grafana Beyla', 'promql', 'BEYLA', ['BEYLA_PROMETHEUS_URL'], 'http://localhost:9090', 'Grafana Beyla'),
   single('kubernetes', 'Kubernetes', 'k8s-core', 'KUBERNETES', ['KUBERNETES_URL'], 'https://kubernetes.default.svc', 'Kubernetes'),
   single('clickhouse', 'ClickHouse', 'clickhouse', 'CLICKHOUSE', ['CLICKHOUSE_URL'], 'http://localhost:8123', 'ClickHouse'),
   single('pyroscope', 'Grafana Pyroscope', 'pyroscope', 'PYROSCOPE', ['PYROSCOPE_URL'], 'http://localhost:4040', 'Grafana Pyroscope'),

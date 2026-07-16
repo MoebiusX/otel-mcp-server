@@ -179,6 +179,42 @@ export const metrics = {
     'mcp_server_info',
     'MCP server metadata',
   ),
+
+  buildInfo: new Gauge(
+    'mcp_build_info',
+    'Build provenance of the running server (constant 1; identity is in the labels)',
+  ),
+
+  // ── JIT privileged identity (see jit.ts) — OWASP MCP08 audit surface ──
+  jitTokensIssued: new Counter(
+    'mcp_jit_tokens_issued_total',
+    'JIT ephemeral session tokens minted, by parent static key',
+  ),
+
+  jitRotations: new Counter(
+    'mcp_jit_rotations_total',
+    'JIT token rotations (refresh grants)',
+  ),
+
+  jitRevocations: new Counter(
+    'mcp_jit_revocations_total',
+    'JIT token revocations, by source (self|admin)',
+  ),
+
+  jitDenials: new Counter(
+    'mcp_jit_denials_total',
+    'JIT identity denials, by reason',
+  ),
+
+  jitActiveTokens: new Gauge(
+    'mcp_jit_active_tokens',
+    'Currently active (unexpired, unrevoked) JIT tokens',
+  ),
+
+  jitIdjagReplayCacheSize: new Gauge(
+    'mcp_jit_idjag_replay_cache_size',
+    'Remembered redeemed ID-JAG jtis (enterprise-managed authorization replay cache)',
+  ),
 };
 
 /** Serialize all metrics to Prometheus text exposition format. */
@@ -201,6 +237,13 @@ export function serializeMetrics(): string {
     metrics.authAttempts.serialize(),
     metrics.activeSessions.serialize(),
     metrics.serverInfo.serialize(),
+    metrics.buildInfo.serialize(),
+    metrics.jitTokensIssued.serialize(),
+    metrics.jitRotations.serialize(),
+    metrics.jitRevocations.serialize(),
+    metrics.jitDenials.serialize(),
+    metrics.jitActiveTokens.serialize(),
+    metrics.jitIdjagReplayCacheSize.serialize(),
   ].filter(s => s.includes('\n')); // skip empty metrics
 
   return parts.join('\n\n') + '\n';
@@ -208,6 +251,17 @@ export function serializeMetrics(): string {
 
 // Set server info label
 metrics.serverInfo.set({ version: VERSION }, 1);
+
+// Build provenance — BUILD_* env is baked into the image at build time (see
+// Dockerfile / the release workflow). Outside a built image (local dev, tests)
+// version falls back to the package version and the rest to "unknown".
+metrics.buildInfo.set({
+  service: 'otel-mcp-server',
+  version: process.env.BUILD_VERSION || VERSION,
+  sha: process.env.BUILD_SHA || 'unknown',
+  ref: process.env.BUILD_REF || 'unknown',
+  built_at: process.env.BUILD_TIME || 'unknown',
+}, 1);
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Instrumented fetch wrapper

@@ -172,6 +172,22 @@ export function loadClientKeys(): ClientKey[] {
 }
 
 /**
+ * Extract the raw credential a client presented, from:
+ *   1. Authorization: Bearer <credential>
+ *   2. X-API-Key: <credential>
+ *
+ * The value may be a static API key or a JIT session token (see jit.ts) —
+ * callers route on `looksLikeJitToken` before validating.
+ */
+export function extractCredential(
+  authHeader?: string,
+  apiKeyHeader?: string,
+): string | undefined {
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7);
+  return apiKeyHeader || undefined;
+}
+
+/**
  * Validate an incoming request's API key.
  *
  * Extracts the key from:
@@ -187,13 +203,7 @@ export function validateClientKey(
 ): ClientKey | null {
   if (keys.length === 0) return null; // auth disabled — allow all
 
-  let providedKey: string | undefined;
-
-  if (authHeader?.startsWith('Bearer ')) {
-    providedKey = authHeader.slice(7);
-  } else if (apiKeyHeader) {
-    providedKey = apiKeyHeader;
-  }
+  const providedKey = extractCredential(authHeader, apiKeyHeader);
 
   if (!providedKey) return null;
 

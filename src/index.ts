@@ -20,10 +20,19 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createServer, VERSION, allSkills } from './server.js';
 import type { ServerOptions } from './server.js';
-import { loadClientKeys, validateClientKey } from './auth.js';
+import { loadClientKeys, validateClientKey, extractCredential } from './auth.js';
+import { readJitConfig, JitTokenService, looksLikeJitToken, jitPrincipal } from './jit.js';
+import {
+  readEnterpriseAuthConfig,
+  EnterpriseAuthService,
+  authorizationServerMetadata,
+  protectedResourceMetadata,
+} from './enterprise-auth.js';
+import { handleJitRequest } from './transports/jit-endpoints.js';
 import { metrics, serializeMetrics } from './metrics.js';
 import { createSkillHelpers } from './skill.js';
 import { versionRegistry } from './version-registry.js';
+import { SessionStore } from './transports/session-store.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -46,12 +55,52 @@ async function main(): Promise<void> {
     // ── HTTP transport ────────────────────────────────────────────────────
     const port = parseInt(args[httpIndex + 1]!, 10);
     const clientKeys = loadClientKeys();
-    const authEnabled = clientKeys.length > 0;
+
+    // Enterprise-managed authorization (MCP ext-auth): the corporate IdP
+    // decides who may use this server; ID-JAG assertions are exchanged for
+    // JIT session tokens at POST /auth/token.
+    const enterpriseConfig = readEnterpriseAuthConfig();
+
+    // Auth is on when local keys exist or an enterprise IdP is trusted — an
+    // enterprise-only deployment must not leave the MCP endpoints open.
+    const authEnabled = clientKeys.length > 0 || !!enterpriseConfig;
 
     if (!authEnabled) {
       console.error('  Auth:    ⚠ No client keys configured — HTTP server is OPEN');
       console.error('           Set MCP_AUTH_KEYS env or mount auth-keys.json');
     }
+
+    // JIT privileged identity — exchange static keys (or enterprise ID-JAGs)
+    // for scoped, ephemeral, rotatable session tokens (OWASP MCP Top 10:
+    // MCP01/MCP02/MCP07/MCP08). Enterprise auth mints through the same
+    // service, so configuring it auto-enables the token infrastructure.
+    const jitConfig = readJitConfig();
+    let jitService: JitTokenService | null = null;
+    if (jitConfig.mode !== 'off' || enterpriseConfig) {
+      if (!authEnabled && !enterpriseConfig) {
+        console.error('  JIT:     ⚠ MCP_JIT_MODE is set but no client keys exist to mint from — JIT identity disabled');
+      } else {
+        jitService = new JitTokenService(jitConfig);
+        console.error(
+          `  JIT:     mode=${jitConfig.mode} ttl=${jitConfig.ttlSeconds}s ` +
+          `maxLifetime=${jitConfig.maxLifetimeSeconds}s — POST /auth/token to mint scoped session tokens`,
+        );
+      }
+    }
+
+    const enterpriseService =
+      enterpriseConfig && jitService ? new EnterpriseAuthService(enterpriseConfig) : null;
+    if (enterpriseService) {
+      console.error(
+        `  IdP:     enterprise-managed authorization — issuer=${enterpriseConfig!.issuer} ` +
+        `audience=${enterpriseConfig!.audience}`,
+      );
+    }
+    // Clients discover the resource's authorization server via RFC 9728
+    // metadata referenced from 401 challenges (MCP core authorization spec).
+    const wwwAuthenticate = enterpriseConfig
+      ? `Bearer resource_metadata="${enterpriseConfig.resource.replace(/\/$/, '')}/.well-known/oauth-protected-resource"`
+      : undefined;
 
     const { StreamableHTTPServerTransport } = await import(
       '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -63,7 +112,13 @@ async function main(): Promise<void> {
       // The init request creates a new session; subsequent requests
       // reuse the same pair via the Mcp-Session-Id header.
       const { randomUUID } = await import('node:crypto');
-      const sessions = new Map<string, { transport: InstanceType<typeof StreamableHTTPServerTransport>; server: ReturnType<typeof createServer>; lastActivity: number }>();
+      const sessions = new SessionStore<
+        InstanceType<typeof StreamableHTTPServerTransport>,
+        ReturnType<typeof createServer>
+      >({
+        onOpen: () => metrics.activeSessions.inc(),
+        onClose: () => metrics.activeSessions.dec(),
+      });
 
       // Idle-session reaper. A session is normally removed when the client
       // sends an HTTP DELETE, which fires transport.onclose. Clients that
@@ -76,13 +131,14 @@ async function main(): Promise<void> {
       const SESSION_IDLE_MS = Number(process.env.MCP_SESSION_IDLE_MS) || 5 * 60_000;
       const SESSION_SWEEP_MS = Number(process.env.MCP_SESSION_SWEEP_MS) || 60_000;
       const reaper = setInterval(() => {
-        const cutoff = Date.now() - SESSION_IDLE_MS;
-        const stale: InstanceType<typeof StreamableHTTPServerTransport>[] = [];
-        for (const session of sessions.values()) {
-          if (session.lastActivity < cutoff) stale.push(session.transport);
+        sessions.sweepIdle(SESSION_IDLE_MS);
+        if (jitService) {
+          jitService.sweep();
+          metrics.jitActiveTokens.set({}, jitService.activeCount());
         }
-        for (const transport of stale) {
-          try { transport.close(); } catch { /* already closing */ }
+        if (enterpriseService) {
+          enterpriseService.sweep();
+          metrics.jitIdjagReplayCacheSize.set({}, enterpriseService.redeemedCount());
         }
       }, SESSION_SWEEP_MS);
       reaper.unref();
@@ -110,6 +166,12 @@ async function main(): Promise<void> {
             server: 'otel-mcp-server',
             version: VERSION,
             auth: authEnabled ? 'enabled' : 'disabled',
+            jit: jitService
+              ? { mode: jitConfig.mode, activeTokens: jitService.activeCount() }
+              : { mode: 'off' },
+            enterpriseAuth: enterpriseService
+              ? { configured: true, issuer: enterpriseConfig!.issuer }
+              : { configured: false },
             skills: allSkills
               .filter(s => enabledIds.has(s.id))
               .map(s => ({ id: s.id, available: s.isAvailable(), tools: s.tools })),
@@ -127,6 +189,23 @@ async function main(): Promise<void> {
           return;
         }
 
+        // OAuth discovery documents (enterprise-managed authorization) —
+        // always open, like /health. RFC 8414 metadata advertises the ID-JAG
+        // grant profile; RFC 9728 points clients at this authorization server.
+        if (enterpriseConfig && req.method === 'GET') {
+          const path = req.url?.split('?')[0];
+          if (path === '/.well-known/oauth-authorization-server') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(authorizationServerMetadata(enterpriseConfig, [...enabledIds])));
+            return;
+          }
+          if (path === '/.well-known/oauth-protected-resource') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(protectedResourceMetadata(enterpriseConfig, [...enabledIds])));
+            return;
+          }
+        }
+
         // CORS preflight — always open
         if (req.method === 'OPTIONS') {
           res.writeHead(204, {
@@ -139,60 +218,127 @@ async function main(): Promise<void> {
           return;
         }
 
-        // Client authentication
+        // JIT identity lifecycle — mint / refresh / revoke session tokens.
+        // Handles all /auth/* paths (404 with a hint when JIT is disabled).
+        if (
+          await handleJitRequest(req, res, {
+            service: jitService,
+            enterprise: enterpriseService,
+            clientKeys,
+            enabledSkillIds: [...enabledIds],
+          })
+        ) {
+          return;
+        }
+
+        // Client authentication — static API key or JIT session token.
+        // `principal` binds the MCP session to the identity that created it;
+        // `scopes` restricts which skills the session may activate (null =
+        // unrestricted).
+        let principal: string | undefined;
+        let scopes: string[] | null = null;
         if (authEnabled) {
           const authHeader = req.headers['authorization'] as string | undefined;
           const apiKeyHeader = req.headers['x-api-key'] as string | undefined;
-          const clientKey = validateClientKey(clientKeys, authHeader, apiKeyHeader);
+          const credential = extractCredential(authHeader, apiKeyHeader);
 
-          if (!clientKey) {
-            metrics.authAttempts.inc({ result: 'rejected' });
-            res.writeHead(401, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              error: 'Unauthorized',
-              message: 'Valid API key required. Pass via Authorization: Bearer <key> or X-API-Key header.',
-            }));
-            return;
+          if (jitService && credential && looksLikeJitToken(credential)) {
+            // Ephemeral session token
+            const validation = jitService.validate(credential);
+            if (!validation.ok) {
+              metrics.authAttempts.inc({ result: 'rejected' });
+              metrics.jitDenials.inc({ reason: validation.reason });
+              res.writeHead(401, {
+                'Content-Type': 'application/json',
+                ...(wwwAuthenticate ? { 'WWW-Authenticate': wwwAuthenticate } : {}),
+              });
+              res.end(JSON.stringify({
+                error: 'Unauthorized',
+                message: `Session token is ${validation.reason}. Rotate live tokens via POST /auth/token/refresh, or mint a new one via POST /auth/token.`,
+              }));
+              return;
+            }
+            metrics.authAttempts.inc({ result: 'accepted' });
+            principal = jitPrincipal(validation.record);
+            scopes = validation.record.scopes;
+          } else {
+            // Static API key
+            const clientKey = validateClientKey(clientKeys, authHeader, apiKeyHeader);
+
+            if (!clientKey) {
+              metrics.authAttempts.inc({ result: 'rejected' });
+              res.writeHead(401, {
+                'Content-Type': 'application/json',
+                ...(wwwAuthenticate ? { 'WWW-Authenticate': wwwAuthenticate } : {}),
+              });
+              res.end(JSON.stringify({
+                error: 'Unauthorized',
+                message: 'Valid API key required. Pass via Authorization: Bearer <key> or X-API-Key header.',
+              }));
+              return;
+            }
+
+            if (jitService && jitService.config.mode === 'required') {
+              // Zero standing privilege: static keys may only mint tokens.
+              metrics.authAttempts.inc({ result: 'rejected' });
+              metrics.jitDenials.inc({ reason: 'static_key_blocked' });
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                error: 'Forbidden',
+                message: 'MCP_JIT_MODE=required — static API keys may only mint session tokens. POST /auth/token, then authenticate with the returned token.',
+              }));
+              return;
+            }
+
+            metrics.authAttempts.inc({ result: 'accepted' });
+            principal = `key:${clientKey.id}`;
+            scopes = clientKey.allowedTools ?? null;
           }
-          metrics.authAttempts.inc({ result: 'accepted' });
         }
 
         // Look up existing session
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
-        if (sessionId && sessions.has(sessionId)) {
-          const session = sessions.get(sessionId)!;
-          session.lastActivity = Date.now();
-          await session.transport.handleRequest(req, res);
-          return;
+        if (sessionId) {
+          const session = sessions.touch(sessionId);
+          if (!session) {
+            // Fall through to the SDK's initialize handling for unknown session
+            // ids, preserving the previous behavior where non-matching ids were
+            // treated like new requests.
+          } else if (session.principal && session.principal !== principal) {
+            // A different credential may not reuse this session (OWASP MCP07).
+            // JIT rotation is unaffected: the principal is the token lineage's
+            // root id, which refresh preserves.
+            metrics.jitDenials.inc({ reason: 'session_principal_mismatch' });
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              error: 'Forbidden',
+              message: 'This MCP session belongs to a different credential. Initialize a new session.',
+            }));
+            return;
+          } else {
+            await session.transport.handleRequest(req, res);
+            return;
+          }
         }
 
-        // New session (initialize request)
-        metrics.activeSessions.inc();
-        const mcpServer = createServer(options);
+        // New session (initialize request). The session's McpServer registers
+        // only the skills the presented credential is scoped to — out-of-scope
+        // tools do not exist for this session.
+        const sessionScopes = scopes;
+        const sessionOptions = sessionScopes
+          ? { tools: [...enabledIds].filter((id) => sessionScopes.includes(id)) }
+          : options;
+        const mcpServer = createServer(sessionOptions);
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
         });
-        let closed = false;
-
-        transport.onclose = () => {
-          // Re-entry guard: mcpServer.close() closes its transport, which fires
-          // onclose again. Without this guard the call recurses
-          // (onclose -> mcpServer.close() -> transport.close() -> onclose -> …)
-          // until the stack overflows — "RangeError: Maximum call stack size
-          // exceeded" — which happens on every client DELETE.
-          if (closed) return;
-          closed = true;
-          const sid = transport.sessionId;
-          if (sid) sessions.delete(sid);
-          metrics.activeSessions.dec();
-          mcpServer.close();
-        };
+        sessions.bind(transport, mcpServer);
 
         await mcpServer.connect(transport);
         await transport.handleRequest(req, res);
 
         if (transport.sessionId) {
-          sessions.set(transport.sessionId, { transport, server: mcpServer, lastActivity: Date.now() });
+          sessions.register(transport, mcpServer, principal);
         }
       });
 

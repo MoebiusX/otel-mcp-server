@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   buildAuth,
   loadClientKeys,
   validateClientKey,
   backendHeaders,
+  resolveAuthHeaders,
+  extractCredential,
   type ClientKey,
   type BackendAuth,
 } from '../src/auth.js';
@@ -34,6 +39,71 @@ describe('backendHeaders', () => {
       Authorization: 'Bearer xyz',
       'X-Custom': 'val',
     });
+  });
+});
+
+// ─── resolveAuthHeaders ─────────────────────────────────────────────────────
+
+describe('resolveAuthHeaders', () => {
+  it('resolves the static authorization when no async resolver is set', async () => {
+    const headers = await resolveAuthHeaders({ authorization: 'Bearer static' });
+    expect(headers).toEqual({ Authorization: 'Bearer static' });
+  });
+
+  it('prefers the async getAuthorization result over the static value', async () => {
+    const auth: BackendAuth = {
+      authorization: 'Bearer stale',
+      getAuthorization: async () => 'Bearer fresh',
+    };
+    expect(await resolveAuthHeaders(auth)).toEqual({ Authorization: 'Bearer fresh' });
+  });
+
+  it('falls back to the static value when the resolver yields undefined', async () => {
+    const auth: BackendAuth = {
+      authorization: 'Bearer fallback',
+      getAuthorization: async () => undefined,
+    };
+    expect(await resolveAuthHeaders(auth)).toEqual({ Authorization: 'Bearer fallback' });
+  });
+
+  it('merges extra headers', async () => {
+    const auth: BackendAuth = {
+      getAuthorization: async () => 'Bearer x',
+      extraHeaders: { 'X-Scope-OrgID': 'tenant-9' },
+    };
+    expect(await resolveAuthHeaders(auth)).toEqual({
+      Authorization: 'Bearer x',
+      'X-Scope-OrgID': 'tenant-9',
+    });
+  });
+
+  it('returns an empty object when nothing resolves', async () => {
+    expect(await resolveAuthHeaders({})).toEqual({});
+  });
+});
+
+// ─── extractCredential ──────────────────────────────────────────────────────
+
+describe('extractCredential', () => {
+  it('extracts a Bearer credential', () => {
+    expect(extractCredential('Bearer abc123')).toBe('abc123');
+  });
+
+  it('extracts the X-API-Key credential', () => {
+    expect(extractCredential(undefined, 'apikey-xyz')).toBe('apikey-xyz');
+  });
+
+  it('prefers the Authorization header', () => {
+    expect(extractCredential('Bearer from-auth', 'from-apikey')).toBe('from-auth');
+  });
+
+  it('ignores non-Bearer Authorization schemes', () => {
+    expect(extractCredential('Basic abc')).toBeUndefined();
+  });
+
+  it('returns undefined when nothing is present', () => {
+    expect(extractCredential()).toBeUndefined();
+    expect(extractCredential(undefined, '')).toBeUndefined();
   });
 });
 
@@ -139,6 +209,34 @@ describe('loadClientKeys', () => {
     const keys = loadClientKeys();
     // Empty keys array doesn't count as "found"
     expect(Array.isArray(keys)).toBe(true);
+  });
+
+  it('loads keys from MCP_AUTH_KEYS_FILE', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'otel-mcp-keys-'));
+    const file = join(dir, 'auth-keys.json');
+    try {
+      delete process.env.MCP_AUTH_KEYS;
+      writeFileSync(file, JSON.stringify({ keys: [{ id: 'file-1', key: 'sk-file' }] }));
+      process.env.MCP_AUTH_KEYS_FILE = file;
+      const keys = loadClientKeys();
+      expect(keys).toHaveLength(1);
+      expect(keys[0].id).toBe('file-1');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('tolerates a malformed key file and returns an array', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'otel-mcp-keys-'));
+    const file = join(dir, 'auth-keys.json');
+    try {
+      delete process.env.MCP_AUTH_KEYS;
+      writeFileSync(file, '{ broken json');
+      process.env.MCP_AUTH_KEYS_FILE = file;
+      expect(Array.isArray(loadClientKeys())).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

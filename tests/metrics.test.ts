@@ -67,6 +67,12 @@ describe('metrics registry', () => {
     expect(output).toContain('mcp_auth_attempts_total{result="rejected"}');
   });
 
+  it('exposes the ID-JAG replay-cache size gauge', () => {
+    metrics.jitIdjagReplayCacheSize.set({}, 3);
+    const output = serializeMetrics();
+    expect(output).toContain('mcp_jit_idjag_replay_cache_size 3');
+  });
+
   it('produces valid Prometheus text format', () => {
     const output = serializeMetrics();
     // Must end with newline
