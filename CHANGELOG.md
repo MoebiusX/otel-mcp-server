@@ -9,8 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **HA-deployable JIT token store (roadmap Phase 1).** JIT token state and the ID-JAG single-use replay cache now live behind an async, pluggable store (`src/jit-store.ts`) selected with `MCP_JIT_STORE` (default `memory`, unchanged semantics; any other value dynamically imports an operator-supplied adapter module — external clients never enter this package's dependencies). The store exposes **atomic compound primitives** (`insert` with capacity check, compare-and-set `rotate`, `revokeLineage`, denylist `addIfAbsent`), so the capacity gate, once-only rotation, and assertion single-use hold under concurrency and across replicas behind a load balancer. New HA correctness tests assert: a token minted on instance A validates/refreshes/revokes on B; concurrent refresh of one token on A and B mints exactly one successor; concurrent mints never exceed `MCP_JIT_MAX_ACTIVE_TOKENS`; an ID-JAG redeemed on A is rejected as replayed on B. `/health` now reports the active store.
+- **Whole-lineage revocation.** `POST /auth/token/revoke` accepts `root_id` to kill an entire rotation lineage (current generation plus any in-grace predecessor) without chasing the latest token id through the audit log.
 - **EdDSA (Ed25519) ID-JAG signatures.** Enterprise-managed authorization now accepts `EdDSA` (Ed25519, RFC 8037) assertions in addition to RS256/384/512 and ES256/384, verified against `OKP` JWKS keys with `node:crypto` (zero new dependencies). Roadmap Phase 0 — see [docs/enterprise-auth-roadmap.md](docs/enterprise-auth-roadmap.md).
 - **Configurable ID-JAG replay-cache cap + observability.** `MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS` (default 50000) bounds the single-use `jti` replay cache instead of a hardcoded constant, and the new `mcp_jit_idjag_replay_cache_size` gauge on `/metrics` reports its live size so the fail-closed cap can be sized and alerted on. Roadmap Phase 0.
+
+### Security
+
+- **Static-key comparison is now constant-time.** `validateClientKey` compares SHA-256 digests with `crypto.timingSafeEqual` (and checks every key even after a match), removing the byte-by-byte early-exit timing oracle of the previous string comparison (OWASP MCP01).
+- **Access review now cascades into live JIT lineages (OWASP MCP02).** `POST /auth/token/refresh` re-validates the parent static key: a removed key can no longer renew its lineages (`parent_key_revoked`), and a narrowed key cannot renew tokens whose scopes exceed the key's current grant — the lineage dies at its current TTL instead of surviving to `notAfter`.
+- **Least-privilege admin revocation.** A scope-restricted static key may only revoke tokens minted from itself; unrestricted keys retain the global kill-switch. Previously any valid key — however narrow — could revoke any tenant's tokens by id.
+- **Enterprise IdP endpoints must be https.** `MCP_ENTERPRISE_AUTH_ISSUER`, `MCP_ENTERPRISE_AUTH_JWKS_URL`, and any discovery-derived `jwks_uri` are rejected unless https (loopback http allowed for local IdP simulators) — a plaintext JWKS fetch is a key-injection MITM, i.e. full authentication bypass. JWKS/discovery responses are also size-bounded (1 MB).
+- **A failed ID-JAG exchange no longer burns the assertion.** If token issuance fails after the assertion verified (e.g. the capacity guard), the single-use `jti` is un-redeemed, so the client can retry the same still-valid assertion instead of round-tripping the IdP for a new one.
+- **JWKS `kid` lookups check the key type.** A `kid` that resolves to a key of a different type than the assertion's algorithm is now treated as unknown (algorithm-confusion hygiene).
 
 ## [1.8.0] - 2026-07-15
 

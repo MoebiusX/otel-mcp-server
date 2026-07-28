@@ -22,6 +22,7 @@ import { createServer, VERSION, allSkills } from './server.js';
 import type { ServerOptions } from './server.js';
 import { loadClientKeys, validateClientKey, extractCredential } from './auth.js';
 import { readJitConfig, JitTokenService, looksLikeJitToken, jitPrincipal } from './jit.js';
+import { createJitStores, type JitStoreBundle } from './jit-store.js';
 import {
   readEnterpriseAuthConfig,
   EnterpriseAuthService,
@@ -76,20 +77,28 @@ async function main(): Promise<void> {
     // service, so configuring it auto-enables the token infrastructure.
     const jitConfig = readJitConfig();
     let jitService: JitTokenService | null = null;
+    let jitStores: JitStoreBundle | null = null;
     if (jitConfig.mode !== 'off' || enterpriseConfig) {
       if (!authEnabled && !enterpriseConfig) {
         console.error('  JIT:     ⚠ MCP_JIT_MODE is set but no client keys exist to mint from — JIT identity disabled');
       } else {
-        jitService = new JitTokenService(jitConfig);
+        // Token + single-use replay state live behind MCP_JIT_STORE (default:
+        // in-process memory). A shared adapter makes validation, revocation,
+        // and ID-JAG single-use correct across replicas (roadmap Phase 1).
+        jitStores = await createJitStores();
+        jitService = new JitTokenService(jitConfig, { store: jitStores.tokens });
         console.error(
           `  JIT:     mode=${jitConfig.mode} ttl=${jitConfig.ttlSeconds}s ` +
-          `maxLifetime=${jitConfig.maxLifetimeSeconds}s — POST /auth/token to mint scoped session tokens`,
+          `maxLifetime=${jitConfig.maxLifetimeSeconds}s store=${jitStores.description} ` +
+          `— POST /auth/token to mint scoped session tokens`,
         );
       }
     }
 
     const enterpriseService =
-      enterpriseConfig && jitService ? new EnterpriseAuthService(enterpriseConfig) : null;
+      enterpriseConfig && jitService && jitStores
+        ? new EnterpriseAuthService(enterpriseConfig, { denylist: jitStores.denylist })
+        : null;
     if (enterpriseService) {
       console.error(
         `  IdP:     enterprise-managed authorization — issuer=${enterpriseConfig!.issuer} ` +
@@ -132,14 +141,23 @@ async function main(): Promise<void> {
       const SESSION_SWEEP_MS = Number(process.env.MCP_SESSION_SWEEP_MS) || 60_000;
       const reaper = setInterval(() => {
         sessions.sweepIdle(SESSION_IDLE_MS);
-        if (jitService) {
-          jitService.sweep();
-          metrics.jitActiveTokens.set({}, jitService.activeCount());
-        }
-        if (enterpriseService) {
-          enterpriseService.sweep();
-          metrics.jitIdjagReplayCacheSize.set({}, enterpriseService.redeemedCount());
-        }
+        // Store calls are async; a rejection here must never become an
+        // unhandled rejection that kills the process on a sweep tick (e.g. a
+        // transient outage of an external MCP_JIT_STORE backend).
+        void (async () => {
+          if (jitService) {
+            await jitService.sweep();
+            metrics.jitActiveTokens.set({}, await jitService.activeCount());
+          }
+          if (enterpriseService) {
+            await enterpriseService.sweep();
+            metrics.jitIdjagReplayCacheSize.set({}, await enterpriseService.redeemedCount());
+          }
+        })().catch((err) => {
+          console.error(
+            `  JIT:     ⚠ store sweep failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
       }, SESSION_SWEEP_MS);
       reaper.unref();
 
@@ -167,7 +185,11 @@ async function main(): Promise<void> {
             version: VERSION,
             auth: authEnabled ? 'enabled' : 'disabled',
             jit: jitService
-              ? { mode: jitConfig.mode, activeTokens: jitService.activeCount() }
+              ? {
+                  mode: jitConfig.mode,
+                  activeTokens: await jitService.activeCount(),
+                  store: jitStores?.description ?? 'memory',
+                }
               : { mode: 'off' },
             enterpriseAuth: enterpriseService
               ? { configured: true, issuer: enterpriseConfig!.issuer }
@@ -244,7 +266,7 @@ async function main(): Promise<void> {
 
           if (jitService && credential && looksLikeJitToken(credential)) {
             // Ephemeral session token
-            const validation = jitService.validate(credential);
+            const validation = await jitService.validate(credential);
             if (!validation.ok) {
               metrics.authAttempts.inc({ result: 'rejected' });
               metrics.jitDenials.inc({ reason: validation.reason });
