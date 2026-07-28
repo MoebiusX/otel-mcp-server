@@ -480,16 +480,7 @@ async function main(): Promise<void> {
       console.error(`✓ otel-mcp-server v${VERSION} listening on http://0.0.0.0:${port}`);
       console.error(`  Health:  http://localhost:${port}/health`);
       console.error(`  Metrics: http://localhost:${port}/metrics`);
-      console.error(`  Skills:`);
-      for (const skill of allSkills) {
-        if (!enabledIds.has(skill.id)) continue;
-        const available = skill.isAvailable();
-        const icon = available ? '✓' : '✗';
-        const detail = available
-          ? `${skill.name} (${skill.tools} tools) [${skill.backends.join(', ')}]`
-          : 'not configured';
-        console.error(`    ${icon} ${skill.id.padEnd(14)} — ${detail}`);
-      }
+      printSkillInventory(enabledIds);
     });
   } else {
     // ── stdio transport (default) ─────────────────────────────────────────
@@ -497,6 +488,32 @@ async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error(`✓ otel-mcp-server v${VERSION} running on stdio`);
+    printSkillInventory(enabledIds);
+  }
+}
+
+/**
+ * Report which skills registered and which backends they reached.
+ *
+ * Printed for **both** transports. stdio is the default and the one every
+ * Claude Desktop / Copilot user hits, and without this a misconfigured backend
+ * is invisible — the client just shows a short tool list with no explanation.
+ * Goes to stderr, so it cannot corrupt the stdio JSON-RPC stream on stdout;
+ * MCP clients surface stderr in their logs.
+ */
+function printSkillInventory(enabledIds: Set<string>): void {
+  const shown = allSkills.filter((s) => enabledIds.has(s.id));
+  const ready = shown.filter((s) => s.isAvailable());
+  const tools = ready.reduce((sum, s) => sum + s.tools, 0);
+
+  console.error(`  Skills:  ${ready.length}/${shown.length} configured — ${tools} tools registered`);
+  for (const skill of shown) {
+    const available = skill.isAvailable();
+    const icon = available ? '✓' : '✗';
+    const detail = available
+      ? `${skill.name} (${skill.tools} tools) [${skill.backends.join(', ')}]`
+      : 'not configured';
+    console.error(`    ${icon} ${skill.id.padEnd(14)} — ${detail}`);
   }
 }
 

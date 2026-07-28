@@ -13,8 +13,8 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 │  Claude Desktop │ ◄──────────► │                  │──► Prometheus · InfluxDB · OpenTSDB
 │  GitHub Copilot │ (stdio/HTTP) │  otel-mcp-server │──► Loki · ClickHouse · Graylog (logs)
 │  Custom Agent   │              │                  │──► Pinpoint · Elasticsearch · Alertmanager
-└─────────────────┘              │   24 skills      │──► Grafana · Pyroscope · OPA
-                                 │   106 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
+└─────────────────┘              │   26 skills      │──► Grafana · Pyroscope · OPA
+                                 │   114 tools      │──► Cilium · Kubernetes (eBPF/CRDs)
                                  │   authenticated  │──► Envoy · Consul · Kong · Traefik
                                  └──────────────────┘──► Fluent Bit · Beats · Vector · Alloy
                                                      └─► App API    (ZK/system)
@@ -36,7 +36,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 
 ## Features
 
-- **110 tools** across 25 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Grafana Beyla (eBPF auto-instrumentation), Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
+- **114 tools** across 26 skills (+6 opt-in write tools) — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Grafana Beyla (eBPF auto-instrumentation), Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
 - **MCP 2026-07-28 ready** — serves the stateless protocol core (no handshake, no session id) alongside ≤2025-11-25 clients on the same endpoint, validates the `Mcp-Method`/`Mcp-Name` routing headers, emits `ttlMs`/`cacheScope` cache hints, answers `server/discover`, and propagates W3C trace context from `_meta` into backend queries (see [MCP 2026-07-28 support](#mcp-2026-07-28-support))
@@ -51,6 +51,11 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 For role-based Studio workflows, see [docs/studio-user-journeys.md](docs/studio-user-journeys.md).
 
 ## Quick Start
+
+> **New here?** [**docs/getting-started.md**](docs/getting-started.md) walks the
+> whole flow end to end — install, point at your backends, wire up Claude
+> Desktop, and the first questions to ask — in about five minutes. The rest of
+> this section is the condensed reference.
 
 ### Install
 
@@ -94,16 +99,40 @@ node dist/index.js
 
 ```bash
 node dist/index.js --http 3001
-# ✓ otel-mcp-server v1.4.0 listening on http://0.0.0.0:3001
-#   Skills:
+# ✓ otel-mcp-server v1.8.0 listening on http://0.0.0.0:3001
+#   Health:  http://localhost:3001/health
+#   Metrics: http://localhost:3001/metrics
+#   Skills:  6/26 configured — 29 tools registered
 #     ✓ traces         — Distributed Traces (5 tools) [Jaeger]
 #     ✓ metrics        — Prometheus Metrics (6 tools) [Prometheus]
 #     ✓ logs           — Structured Logs (4 tools) [Loki]
+#     ✗ elasticsearch  — not configured
+#     …
 #     ✓ zk-proofs      — ZK Proofs (4 tools) [App API]
-#     ✓ system         — System Health (4 tools) [App API, Jaeger]
+#     ✓ system         — System Health (5 tools) [App API, Jaeger]
+#     ✓ public-exchange — Public Exchange (5 tools) [App API]
 ```
 
+The same inventory is printed on stdio (to stderr, where MCP clients log it),
+so a missing backend is visible in either transport.
+
 ### Docker
+
+Published multi-arch images (amd64/arm64) — the entrypoint defaults to
+`--http 3001`:
+
+```bash
+docker run --rm -p 3001:3001 \
+  -e PROMETHEUS_URL=http://host.docker.internal:9090 \
+  moebiusx/otel-mcp-server:latest
+```
+
+`localhost` inside the container is the container — use
+`host.docker.internal` (Docker Desktop) or a compose/K8s service name to reach
+backends on the host or in the cluster.
+
+<details>
+<summary>Build the image yourself</summary>
 
 ```bash
 docker build -t otel-mcp-server .
@@ -118,6 +147,8 @@ docker run -p 3001:3001 \
   -e MCP_AUTH_KEYS='{"keys":[{"id":"agent-1","key":"sk-my-secret-key"}]}' \
   otel-mcp-server
 ```
+
+</details>
 
 ## Configuration
 
@@ -555,12 +586,17 @@ kind: Deployment
 metadata:
   name: otel-mcp-server
 spec:
+  # Safe to scale past 1 once every client speaks MCP 2026-07-28 (stateless —
+  # any replica serves any request). While pre-2026 clients remain, either keep
+  # one replica or enable sticky routing on Mcp-Session-Id at the ingress; and
+  # if JIT identity is enabled, set MCP_JIT_STORE to a shared adapter so tokens
+  # and revocations are visible across replicas. See "High availability".
   replicas: 1
   template:
     spec:
       containers:
         - name: otel-mcp-server
-          image: otel-mcp-server:latest
+          image: moebiusx/otel-mcp-server:latest
           ports:
             - containerPort: 3001
           env:
@@ -988,12 +1024,35 @@ In HTTP mode, `GET /metrics` exposes Prometheus-format metrics about the MCP ser
 |--------|------|-------------|
 | `mcp_tool_calls_total{tool,status}` | Counter | Tool invocation count |
 | `mcp_tool_duration_seconds{tool}` | Histogram | Tool call latency |
+| `mcp_tool_errors_total{tool}` | Counter | Tool call errors |
 | `mcp_backend_requests_total{backend,status}` | Counter | Outbound backend HTTP requests |
 | `mcp_backend_duration_seconds{backend}` | Histogram | Backend request latency |
 | `mcp_auth_attempts_total{result}` | Counter | Client auth attempts (accepted/rejected) |
-| `mcp_active_sessions` | Gauge | Currently connected MCP sessions |
+| `mcp_active_sessions` | Gauge | Currently connected MCP sessions (pre-2026 clients) |
 | `mcp_uptime_seconds` | Gauge | Server uptime |
-| `mcp_server_info{version}` | Info | Server version metadata |
+| `mcp_server_info{version}` | Gauge | Server version metadata (constant 1) |
+| `mcp_build_info{service,version,sha,ref,built_at}` | Gauge | Build provenance of the running image (constant 1) |
+
+Protocol and request shape — use these to see which MCP revision clients speak,
+and whether callers are propagating trace context:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `mcp_spec_requests_total{version,mode}` | Counter | Requests by negotiated spec revision and lifecycle (`stateless` / `session`). Watch the mix to know when every client has moved to 2026-07-28 |
+| `mcp_trace_context_propagated_total{source}` | Counter | Inbound requests by trace-context source (`meta` / `http` / `none`) |
+| `mcp_routing_header_rejections_total{header}` | Counter | Requests rejected because `Mcp-Method`/`Mcp-Name` disagreed with the body — a nonzero rate means a broken gateway or an attempted smuggle |
+
+JIT privileged identity (see [above](#just-in-time-jit-privileged-identity)) —
+only populated when `MCP_JIT_MODE` is set or enterprise auth is configured:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `mcp_jit_tokens_issued_total{parent_key}` | Counter | Session tokens minted, by parent key |
+| `mcp_jit_rotations_total` | Counter | Token rotations (refresh grants) |
+| `mcp_jit_revocations_total{source}` | Counter | Revocations, by source (`self` / `admin`) |
+| `mcp_jit_denials_total{reason}` | Counter | Denials by reason (`expired`, `revoked`, `scope_violation`, `parent_key_revoked`, `idjag_*`, …) |
+| `mcp_jit_active_tokens` | Gauge | Active (unexpired, unrevoked) tokens |
+| `mcp_jit_idjag_replay_cache_size` | Gauge | Remembered redeemed ID-JAG `jti`s |
 
 Scrape with Prometheus:
 
@@ -1049,15 +1108,26 @@ Add to `.vscode/mcp.json`:
 ### HTTP Client (any agent)
 
 ```bash
-# Health check
-curl http://localhost:3001/health
+# Health check — skills, backend versions, supported MCP revisions
+curl -s http://localhost:3001/health
 
-# MCP request with auth
-curl -X POST http://localhost:3001/mcp \
-  -H "Authorization: Bearer sk-my-key" \
+# List tools. MCP 2026-07-28 is stateless, so this is a single POST:
+# no initialize handshake, no session id.
+curl -s -X POST http://localhost:3001/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "MCP-Protocol-Version: 2026-07-28" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# Add the credential when MCP_AUTH_KEYS is set
+#   -H "Authorization: Bearer sk-my-key"
 ```
+
+Older clients that send `initialize` and carry an `Mcp-Session-Id` are served
+on the same endpoint unchanged — see [MCP 2026-07-28 support](#mcp-2026-07-28-support).
+Omitting `MCP-Protocol-Version` puts the request on the pre-2026 path, where a
+bare `tools/list` is rejected with `Server not initialized` until the handshake
+completes.
 
 ## Architecture
 
@@ -1069,14 +1139,23 @@ src/
 ├── index.ts              # CLI entry point (stdio / HTTP transport)
 ├── server.ts             # MCP server factory (iterates skills)
 ├── skill.ts              # Skill interface + SkillHelpers factory
-├── skills.ts             # Skill registry (one import per backend)
+├── skills.ts             # Skill registry wrapper (+ version metadata)
+├── skills.generated.ts   # GENERATED by `npm run gen:skills` — do not edit
 ├── config.ts             # env() helper
 ├── auth.ts               # Backend + client authentication
 ├── oauth.ts              # Backend OAuth 2.0 client-credentials
 ├── jit.ts                # JIT privileged identity — scoped ephemeral tokens
+├── jit-store.ts          # Pluggable token/denylist store (MCP_JIT_STORE) — HA
 ├── enterprise-auth.ts    # Enterprise-managed authorization (MCP ext-auth ID-JAG)
+├── mcp-spec.ts           # MCP spec revisions + per-revision feature flags
+├── request-context.ts    # Per-request context (W3C trace propagation)
 ├── helpers.ts            # fetchJSON, createFetcher, utilities
 ├── metrics.ts            # Self-metrics (Prometheus format)
+├── versions.ts           # Backend version-support model + feature gates
+├── version-registry.ts   # Live backend version detection (TTL-cached)
+├── protocols.ts          # Query-protocol catalog (PromQL, LogQL, …)
+├── gating.ts             # MCP_VERSION_GATING enforcement
+├── compat.ts             # Tool alias / argument-mapping facade
 ├── tools/
 │   ├── traces.ts         # Traces layer — dispatches to a provider per TRACES_PROVIDER (5 tools)
 │   ├── metrics.ts        # Prometheus metrics skill (6 tools)
@@ -1111,7 +1190,8 @@ src/
 ├── resources/
 │   └── overview.ts       # MCP resource: auto-generated overview
 └── transports/
-    ├── session-store.ts  # HTTP session lifecycle + principal binding
+    ├── session-store.ts  # HTTP session lifecycle + principal binding (pre-2026)
+    ├── mcp-2026.ts       # MCP 2026-07-28 request handling (stateless, headers)
     └── jit-endpoints.ts  # /auth/token mint · refresh · revoke handlers
 ```
 
