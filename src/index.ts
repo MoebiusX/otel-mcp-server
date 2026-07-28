@@ -22,13 +22,25 @@ import { createServer, VERSION, allSkills } from './server.js';
 import type { ServerOptions } from './server.js';
 import { loadClientKeys, validateClientKey, extractCredential } from './auth.js';
 import { readJitConfig, JitTokenService, looksLikeJitToken, jitPrincipal } from './jit.js';
+import { createJitStores, type JitStoreBundle } from './jit-store.js';
 import {
   readEnterpriseAuthConfig,
   EnterpriseAuthService,
   authorizationServerMetadata,
   protectedResourceMetadata,
+  ENTERPRISE_AUTH_EXTENSION_ID,
 } from './enterprise-auth.js';
 import { handleJitRequest } from './transports/jit-endpoints.js';
+import {
+  parseMcpRequest,
+  checkRoutingHeaders,
+  rejectRoutingMismatch,
+  adaptHeadersForSdk,
+  withRequestContext,
+  decorateWithCacheHints,
+  type ParsedMcpRequest,
+} from './transports/mcp-2026.js';
+import { specFeatures, MCP_SPEC_LATEST, MCP_SPEC_VERSIONS } from './mcp-spec.js';
 import { metrics, serializeMetrics } from './metrics.js';
 import { createSkillHelpers } from './skill.js';
 import { versionRegistry } from './version-registry.js';
@@ -76,20 +88,28 @@ async function main(): Promise<void> {
     // service, so configuring it auto-enables the token infrastructure.
     const jitConfig = readJitConfig();
     let jitService: JitTokenService | null = null;
+    let jitStores: JitStoreBundle | null = null;
     if (jitConfig.mode !== 'off' || enterpriseConfig) {
       if (!authEnabled && !enterpriseConfig) {
         console.error('  JIT:     ⚠ MCP_JIT_MODE is set but no client keys exist to mint from — JIT identity disabled');
       } else {
-        jitService = new JitTokenService(jitConfig);
+        // Token + single-use replay state live behind MCP_JIT_STORE (default:
+        // in-process memory). A shared adapter makes validation, revocation,
+        // and ID-JAG single-use correct across replicas (roadmap Phase 1).
+        jitStores = await createJitStores();
+        jitService = new JitTokenService(jitConfig, { store: jitStores.tokens });
         console.error(
           `  JIT:     mode=${jitConfig.mode} ttl=${jitConfig.ttlSeconds}s ` +
-          `maxLifetime=${jitConfig.maxLifetimeSeconds}s — POST /auth/token to mint scoped session tokens`,
+          `maxLifetime=${jitConfig.maxLifetimeSeconds}s store=${jitStores.description} ` +
+          `— POST /auth/token to mint scoped session tokens`,
         );
       }
     }
 
     const enterpriseService =
-      enterpriseConfig && jitService ? new EnterpriseAuthService(enterpriseConfig) : null;
+      enterpriseConfig && jitService && jitStores
+        ? new EnterpriseAuthService(enterpriseConfig, { denylist: jitStores.denylist })
+        : null;
     if (enterpriseService) {
       console.error(
         `  IdP:     enterprise-managed authorization — issuer=${enterpriseConfig!.issuer} ` +
@@ -132,14 +152,23 @@ async function main(): Promise<void> {
       const SESSION_SWEEP_MS = Number(process.env.MCP_SESSION_SWEEP_MS) || 60_000;
       const reaper = setInterval(() => {
         sessions.sweepIdle(SESSION_IDLE_MS);
-        if (jitService) {
-          jitService.sweep();
-          metrics.jitActiveTokens.set({}, jitService.activeCount());
-        }
-        if (enterpriseService) {
-          enterpriseService.sweep();
-          metrics.jitIdjagReplayCacheSize.set({}, enterpriseService.redeemedCount());
-        }
+        // Store calls are async; a rejection here must never become an
+        // unhandled rejection that kills the process on a sweep tick (e.g. a
+        // transient outage of an external MCP_JIT_STORE backend).
+        void (async () => {
+          if (jitService) {
+            await jitService.sweep();
+            metrics.jitActiveTokens.set({}, await jitService.activeCount());
+          }
+          if (enterpriseService) {
+            await enterpriseService.sweep();
+            metrics.jitIdjagReplayCacheSize.set({}, await enterpriseService.redeemedCount());
+          }
+        })().catch((err) => {
+          console.error(
+            `  JIT:     ⚠ store sweep failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
       }, SESSION_SWEEP_MS);
       reaper.unref();
 
@@ -167,11 +196,23 @@ async function main(): Promise<void> {
             version: VERSION,
             auth: authEnabled ? 'enabled' : 'disabled',
             jit: jitService
-              ? { mode: jitConfig.mode, activeTokens: jitService.activeCount() }
+              ? {
+                  mode: jitConfig.mode,
+                  activeTokens: await jitService.activeCount(),
+                  store: jitStores?.description ?? 'memory',
+                }
               : { mode: 'off' },
             enterpriseAuth: enterpriseService
               ? { configured: true, issuer: enterpriseConfig!.issuer }
               : { configured: false },
+            mcpSpec: {
+              latest: MCP_SPEC_LATEST,
+              supported: [...MCP_SPEC_VERSIONS],
+              // Stateless serving is selected per request from the client's
+              // declared revision — both eras are served concurrently.
+              statelessFrom: '2026-07-28',
+              extensions: enterpriseConfig ? [ENTERPRISE_AUTH_EXTENSION_ID] : [],
+            },
             skills: allSkills
               .filter(s => enabledIds.has(s.id))
               .map(s => ({ id: s.id, available: s.isAvailable(), tools: s.tools })),
@@ -206,13 +247,17 @@ async function main(): Promise<void> {
           }
         }
 
-        // CORS preflight — always open
+        // CORS preflight — always open. The allow-list covers both protocol
+        // eras: Mcp-Session-Id for ≤2025-11-25 clients, and the 2026-07-28
+        // routing/version headers (SEP-2243, SEP-2575) for newer ones.
         if (req.method === 'OPTIONS') {
           res.writeHead(204, {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
             'Access-Control-Allow-Headers':
-              'Content-Type, Authorization, X-API-Key, Mcp-Session-Id',
+              'Content-Type, Authorization, X-API-Key, Mcp-Session-Id, ' +
+              'MCP-Protocol-Version, Mcp-Method, Mcp-Name, traceparent, tracestate, baggage',
+            'Access-Control-Expose-Headers': 'Mcp-Session-Id, MCP-Protocol-Version',
           });
           res.end();
           return;
@@ -244,7 +289,7 @@ async function main(): Promise<void> {
 
           if (jitService && credential && looksLikeJitToken(credential)) {
             // Ephemeral session token
-            const validation = jitService.validate(credential);
+            const validation = await jitService.validate(credential);
             if (!validation.ok) {
               metrics.authAttempts.inc({ result: 'rejected' });
               metrics.jitDenials.inc({ reason: validation.reason });
@@ -296,6 +341,91 @@ async function main(): Promise<void> {
           }
         }
 
+        // ── MCP request pre-processing (2026-07-28 readiness) ──────────
+        // Buffer the body once here: it is what makes the SEP-2243 header/
+        // body cross-check possible and what carries _meta trace context.
+        // The SDK accepts it as `parsedBody` so nothing re-reads the stream.
+        let parsed: ParsedMcpRequest;
+        try {
+          parsed = await parseMcpRequest(req, principal);
+        } catch (err) {
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Payload Too Large',
+            message: err instanceof Error ? err.message : 'Request body too large',
+          }));
+          return;
+        }
+
+        const features = specFeatures(parsed.specVersion);
+
+        // SEP-2243: a gateway may have routed or rate-limited on these
+        // headers, so a body that disagrees means that decision was made on
+        // false information. The spec requires rejection.
+        const routing = checkRoutingHeaders(req, parsed.body);
+        if (!routing.ok) {
+          rejectRoutingMismatch(res, routing);
+          return;
+        }
+
+        // SDK v1 hard-rejects protocol versions it does not know and demands
+        // both Accept media types; translate before it ever sees the request.
+        adaptHeadersForSdk(req, parsed.specVersion);
+
+        const sessionScopes = scopes;
+        const serverOptions = {
+          ...(sessionScopes
+            ? { tools: [...enabledIds].filter((id) => sessionScopes.includes(id)) }
+            : options),
+          ...(enterpriseConfig ? { extensions: [ENTERPRISE_AUTH_EXTENSION_ID] } : {}),
+        };
+
+        // ── Stateless path (MCP 2026-07-28) ────────────────────────────
+        // No handshake, no session id: a fresh Server+transport pair serves
+        // one request and is discarded, so any replica can answer any
+        // request (SEP-2567). Scope enforcement is unchanged — the per-
+        // request server registers only the credential's skills.
+        if (features.statelessLifecycle) {
+          // Only POST carries meaning without a session. A GET would open the
+          // SDK's standalone SSE stream, whose body never ends — the await
+          // below would never resolve, the cleanup in `finally` would never
+          // run, and every such request would pin an McpServer for the life of
+          // the process. DELETE is equally meaningless: there is no session to
+          // close. 2026-07-28 removed SSE-delivered server requests anyway.
+          if (req.method !== 'POST') {
+            res.writeHead(405, { 'Content-Type': 'application/json', Allow: 'POST' });
+            res.end(JSON.stringify({
+              jsonrpc: '2.0',
+              id: null,
+              error: {
+                code: -32600,
+                message: `${req.method} is not supported for MCP ${parsed.specVersion}; the protocol is stateless — send requests as POST`,
+              },
+            }));
+            return;
+          }
+
+          await withRequestContext(parsed, async () => {
+            const mcpServer = createServer(serverOptions);
+            const transport = new StreamableHTTPServerTransport({
+              sessionIdGenerator: undefined,
+              enableJsonResponse: true,
+            });
+            if (features.cacheHints) decorateWithCacheHints(transport, parsed.body);
+            try {
+              await mcpServer.connect(transport);
+              await transport.handleRequest(req, res, parsed.body);
+            } finally {
+              // One-shot by design: the SDK refuses to reuse a stateless
+              // transport, and nothing here may outlive the response.
+              try { await transport.close(); } catch { /* already closed */ }
+              try { await mcpServer.close(); } catch { /* already closed */ }
+            }
+          });
+          return;
+        }
+
+        // ── Session path (≤ 2025-11-25 clients) ────────────────────────
         // Look up existing session
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         if (sessionId) {
@@ -316,7 +446,9 @@ async function main(): Promise<void> {
             }));
             return;
           } else {
-            await session.transport.handleRequest(req, res);
+            await withRequestContext(parsed, () =>
+              session.transport.handleRequest(req, res, parsed.body),
+            );
             return;
           }
         }
@@ -324,21 +456,23 @@ async function main(): Promise<void> {
         // New session (initialize request). The session's McpServer registers
         // only the skills the presented credential is scoped to — out-of-scope
         // tools do not exist for this session.
-        const sessionScopes = scopes;
-        const sessionOptions = sessionScopes
-          ? { tools: [...enabledIds].filter((id) => sessionScopes.includes(id)) }
-          : options;
-        const mcpServer = createServer(sessionOptions);
+        const mcpServer = createServer(serverOptions);
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
         });
         sessions.bind(transport, mcpServer);
 
         await mcpServer.connect(transport);
-        await transport.handleRequest(req, res);
+        await withRequestContext(parsed, () => transport.handleRequest(req, res, parsed.body));
 
         if (transport.sessionId) {
           sessions.register(transport, mcpServer, principal);
+        } else {
+          // No session id was assigned (e.g. a non-initialize request with an
+          // unknown session id). Nothing will ever close this pair otherwise,
+          // so the active-sessions gauge would drift up permanently and the
+          // McpServer would leak until GC.
+          try { transport.close(); } catch { /* already closing */ }
         }
       });
 
@@ -346,16 +480,7 @@ async function main(): Promise<void> {
       console.error(`✓ otel-mcp-server v${VERSION} listening on http://0.0.0.0:${port}`);
       console.error(`  Health:  http://localhost:${port}/health`);
       console.error(`  Metrics: http://localhost:${port}/metrics`);
-      console.error(`  Skills:`);
-      for (const skill of allSkills) {
-        if (!enabledIds.has(skill.id)) continue;
-        const available = skill.isAvailable();
-        const icon = available ? '✓' : '✗';
-        const detail = available
-          ? `${skill.name} (${skill.tools} tools) [${skill.backends.join(', ')}]`
-          : 'not configured';
-        console.error(`    ${icon} ${skill.id.padEnd(14)} — ${detail}`);
-      }
+      printSkillInventory(enabledIds);
     });
   } else {
     // ── stdio transport (default) ─────────────────────────────────────────
@@ -363,6 +488,32 @@ async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error(`✓ otel-mcp-server v${VERSION} running on stdio`);
+    printSkillInventory(enabledIds);
+  }
+}
+
+/**
+ * Report which skills registered and which backends they reached.
+ *
+ * Printed for **both** transports. stdio is the default and the one every
+ * Claude Desktop / Copilot user hits, and without this a misconfigured backend
+ * is invisible — the client just shows a short tool list with no explanation.
+ * Goes to stderr, so it cannot corrupt the stdio JSON-RPC stream on stdout;
+ * MCP clients surface stderr in their logs.
+ */
+function printSkillInventory(enabledIds: Set<string>): void {
+  const shown = allSkills.filter((s) => enabledIds.has(s.id));
+  const ready = shown.filter((s) => s.isAvailable());
+  const tools = ready.reduce((sum, s) => sum + s.tools, 0);
+
+  console.error(`  Skills:  ${ready.length}/${shown.length} configured — ${tools} tools registered`);
+  for (const skill of shown) {
+    const available = skill.isAvailable();
+    const icon = available ? '✓' : '✗';
+    const detail = available
+      ? `${skill.name} (${skill.tools} tools) [${skill.backends.join(', ')}]`
+      : 'not configured';
+    console.error(`    ${icon} ${skill.id.padEnd(14)} — ${detail}`);
   }
 }
 

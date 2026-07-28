@@ -38,6 +38,7 @@
  */
 
 import { createPublicKey, verify as cryptoVerify, type KeyObject } from 'node:crypto';
+import { MemoryDenylist, type BoundedDenylist } from './jit-store.js';
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -85,6 +86,10 @@ export function readEnterpriseAuthConfig(
 
   const resource = env('MCP_ENTERPRISE_AUTH_RESOURCE')?.trim() || audience;
   const jwksUrl = env('MCP_ENTERPRISE_AUTH_JWKS_URL')?.trim() || undefined;
+  // A plaintext IdP endpoint would let a MITM inject attacker keys — that is
+  // full authentication bypass, so misconfiguration fails at startup.
+  assertSecureUrl(issuer, 'MCP_ENTERPRISE_AUTH_ISSUER');
+  if (jwksUrl) assertSecureUrl(jwksUrl, 'MCP_ENTERPRISE_AUTH_JWKS_URL');
   const defaultScopes = (env('MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES') || '')
     .split(/[\s,]+/)
     .map((s) => s.trim())
@@ -186,12 +191,45 @@ export interface EnterpriseAuthServiceOptions {
   now?: () => number;
   /** Injectable JWKS document fetcher for tests: url → { keys: [...] }. */
   fetchJson?: (url: string) => Promise<unknown>;
+  /**
+   * Single-use jti denylist. Defaults to an in-process {@link MemoryDenylist};
+   * inject the shared store bundle's denylist (jit-store.ts) so ID-JAG
+   * single-use semantics hold across replicas behind a load balancer.
+   */
+  denylist?: BoundedDenylist;
+}
+
+/** Upper bound for JWKS / discovery documents — far above any sane key set. */
+const MAX_METADATA_BYTES = 1024 * 1024;
+
+/**
+ * Require https for IdP-facing URLs; plain http is allowed only for loopback
+ * hosts (local IdP simulators in dev/test).
+ */
+export function assertSecureUrl(raw: string, label: string): void {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`${label} is not a valid URL: "${raw}"`);
+  }
+  if (url.protocol === 'https:') return;
+  const host = url.hostname;
+  const loopback = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  if (url.protocol === 'http:' && loopback) return;
+  throw new Error(
+    `${label} must use https (got "${raw}") — a plaintext IdP endpoint allows key-injection MITM`,
+  );
 }
 
 async function defaultFetchJson(url: string): Promise<unknown> {
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — ${url}`);
-  return res.json();
+  const text = await res.text();
+  if (text.length > MAX_METADATA_BYTES) {
+    throw new Error(`Metadata document exceeds ${MAX_METADATA_BYTES} bytes — ${url}`);
+  }
+  return JSON.parse(text);
 }
 
 function b64urlJson(segment: string): Record<string, unknown> {
@@ -211,8 +249,13 @@ export class EnterpriseAuthService {
   private keys = new Map<string, KeyObject>(); // kid → key
   private keysFetchedAt = 0;
   private jwksUrlResolved?: string;
-  /** jti → assertion exp (epoch ms); entries removed once expired. */
-  private redeemedJtis = new Map<string, number>();
+  /**
+   * Single-use jti denylist (jti → assertion exp + skew). Shared across
+   * replicas when the operator configures a shared store (MCP_JIT_STORE) —
+   * a per-process cache would let the same assertion be redeemed once per
+   * replica behind a load balancer.
+   */
+  private readonly redeemedJtis: BoundedDenylist;
 
   constructor(
     readonly config: EnterpriseAuthConfig,
@@ -220,24 +263,26 @@ export class EnterpriseAuthService {
   ) {
     this.now = options.now ?? Date.now;
     this.fetchJson = options.fetchJson ?? defaultFetchJson;
+    this.redeemedJtis = options.denylist ?? new MemoryDenylist();
   }
 
   /** Number of redeemed (unexpired) assertion ids currently remembered. */
-  redeemedCount(): number {
-    return this.redeemedJtis.size;
+  redeemedCount(): Promise<number> {
+    return this.redeemedJtis.size(this.now());
   }
 
   /** Drop expired entries from the replay cache. Returns how many were removed. */
-  sweep(): number {
-    const now = this.now();
-    let removed = 0;
-    for (const [jti, exp] of this.redeemedJtis) {
-      if (now >= exp) {
-        this.redeemedJtis.delete(jti);
-        removed++;
-      }
-    }
-    return removed;
+  sweep(): Promise<number> {
+    return this.redeemedJtis.sweep(this.now());
+  }
+
+  /**
+   * Forget a redeemed jti. Called when token issuance fails *after* the
+   * assertion verified — the client got nothing, so the single-use grant must
+   * not stay burned (it would force a pointless IdP round-trip on retry).
+   */
+  unredeem(jti: string): Promise<void> {
+    return this.redeemedJtis.remove(jti);
   }
 
   /**
@@ -337,20 +382,24 @@ export class EnterpriseAuthService {
     }
 
     // ── Replay protection (record only after everything else passed) ──────
-    this.sweep();
-    if (this.redeemedJtis.has(jti)) {
+    // Check-and-record is a single atomic denylist operation: a has()-then-
+    // set() sequence would be a cross-replica TOCTOU under a shared store.
+    // The jti is retained for as long as the assertion can still be accepted:
+    // the exp check above passes while now < exp + CLOCK_SKEW_MS, so evicting
+    // at `exp` would leave a skew-length window where a redeemed assertion
+    // still verifies but its jti is gone — a single-use bypass.
+    const replay = await this.redeemedJtis.addIfAbsent(jti, exp + CLOCK_SKEW_MS, {
+      cap: this.config.maxRedeemedJtis,
+      now,
+    });
+    if (replay === 'exists') {
       throw new OAuthTokenError('invalid_grant', 'idjag_replayed', 'Assertion has already been redeemed');
     }
-    if (this.redeemedJtis.size >= this.config.maxRedeemedJtis) {
+    if (replay === 'full') {
       // Only successfully validated assertions are remembered, so hitting the
       // cap means an extraordinary volume of legitimate grants. Fail closed.
       throw new OAuthTokenError('server_error', 'idjag_replay_cache_full', 'Assertion replay cache is full');
     }
-    // Remember the jti for as long as the assertion can still be accepted. The
-    // exp check above passes while now < exp + CLOCK_SKEW_MS, so evicting at
-    // `exp` would leave a skew-length window where a redeemed assertion still
-    // verifies but its jti is gone — a single-use bypass. Retain to exp+skew.
-    this.redeemedJtis.set(jti, exp + CLOCK_SKEW_MS);
 
     const scopes =
       typeof payload.scope === 'string'
@@ -396,7 +445,12 @@ export class EnterpriseAuthService {
     const fresh = now - this.keysFetchedAt < JWKS_TTL_MS;
 
     const lookup = (): KeyObject | undefined => {
-      if (kid) return this.keys.get(kid);
+      if (kid) {
+        // The key must match the alg's key type — a kid pointing at a key of
+        // another type is a mismatch, not a candidate (algorithm-confusion hygiene).
+        const key = this.keys.get(kid);
+        return key && key.asymmetricKeyType === ASYM_KEY_TYPE[kty] ? key : undefined;
+      }
       // No kid: only unambiguous when exactly one key of the right type exists.
       const candidates = [...this.keys.values()].filter(
         (k) => k.asymmetricKeyType === ASYM_KEY_TYPE[kty],
@@ -435,6 +489,10 @@ export class EnterpriseAuthService {
         const discoveryUrl = `${this.config.issuer.replace(/\/$/, '')}/.well-known/openid-configuration`;
         const doc = (await this.fetchJson(discoveryUrl)) as { jwks_uri?: string };
         if (!doc?.jwks_uri) throw new Error(`No jwks_uri in ${discoveryUrl}`);
+        // The discovered endpoint gets the same transport bar as configured
+        // ones — a downgraded jwks_uri in a tampered discovery document must
+        // not silently bypass the https requirement.
+        assertSecureUrl(doc.jwks_uri, `jwks_uri discovered from ${discoveryUrl}`);
         this.jwksUrlResolved = doc.jwks_uri;
       }
     }

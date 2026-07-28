@@ -10,6 +10,7 @@ import {
   JWT_BEARER_GRANT,
   type EnterpriseAuthConfig,
 } from '../src/enterprise-auth.js';
+import { MemoryDenylist } from '../src/jit-store.js';
 
 // ─── Key material & assertion factory ────────────────────────────────────────
 
@@ -165,6 +166,23 @@ describe('readEnterpriseAuthConfig', () => {
     expect(cfg!.defaultScopes).toEqual(['traces', 'metrics', 'logs']);
   });
 
+  it('requires https for issuer and JWKS URLs (loopback http allowed)', () => {
+    const base = { MCP_ENTERPRISE_AUTH_ISSUER: ISSUER, MCP_ENTERPRISE_AUTH_AUDIENCE: AUDIENCE };
+    expect(() =>
+      readEnterpriseAuthConfig(env({ ...base, MCP_ENTERPRISE_AUTH_ISSUER: 'http://idp.example.com' })),
+    ).toThrow(/https/);
+    expect(() =>
+      readEnterpriseAuthConfig(env({ ...base, MCP_ENTERPRISE_AUTH_JWKS_URL: 'http://idp.example.com/jwks' })),
+    ).toThrow(/https/);
+    // Loopback http is fine for local IdP simulators.
+    expect(
+      readEnterpriseAuthConfig(env({ ...base, MCP_ENTERPRISE_AUTH_ISSUER: 'http://localhost:8080' })),
+    ).not.toBeNull();
+    expect(
+      readEnterpriseAuthConfig(env({ ...base, MCP_ENTERPRISE_AUTH_JWKS_URL: 'http://127.0.0.1:8080/jwks' })),
+    ).not.toBeNull();
+  });
+
   it('defaults and env-drives the redeemed-jti cap', () => {
     const base = { MCP_ENTERPRISE_AUTH_ISSUER: ISSUER, MCP_ENTERPRISE_AUTH_AUDIENCE: AUDIENCE };
     expect(readEnterpriseAuthConfig(env(base))!.maxRedeemedJtis).toBe(50_000);
@@ -191,7 +209,7 @@ describe('EnterpriseAuthService.verifyIdJag', () => {
     expect(verified.iss).toBe(ISSUER);
     expect(verified.clientId).toBe('mcp-client-1');
     expect(verified.scopes).toEqual(['traces', 'metrics']);
-    expect(service.redeemedCount()).toBe(1);
+    expect(await service.redeemedCount()).toBe(1);
   });
 
   it('accepts a valid ES256 assertion', async () => {
@@ -390,10 +408,18 @@ describe('verifyIdJag rejections', () => {
   it('sweep drops redeemed jtis once their assertion expires', async () => {
     const { service, clock } = rig();
     await service.verifyIdJag(makeJag());
-    expect(service.redeemedCount()).toBe(1);
+    expect(await service.redeemedCount()).toBe(1);
     clock.now = T0 + 400_000;
-    expect(service.sweep()).toBe(1);
-    expect(service.redeemedCount()).toBe(0);
+    expect(await service.sweep()).toBe(1);
+    expect(await service.redeemedCount()).toBe(0);
+  });
+
+  it('unredeem un-burns a jti so a failed exchange can be retried', async () => {
+    const { service } = rig();
+    const jag = makeJag();
+    const verified = await service.verifyIdJag(jag);
+    await service.unredeem(verified.jti);
+    await expect(service.verifyIdJag(jag)).resolves.toBeTruthy();
   });
 
   it('serves from the stale JWKS cache when the endpoint goes down', async () => {
@@ -410,6 +436,34 @@ describe('verifyIdJag rejections', () => {
     const err = await expectOAuthError(service.verifyIdJag(makeJag()), 'jwks_unavailable');
     expect(err.code).toBe('server_error');
     expect(err.status).toBe(500);
+  });
+});
+
+// ─── HA: shared single-use denylist across instances ─────────────────────────
+
+describe('cross-replica single-use semantics', () => {
+  it('an ID-JAG redeemed on instance A is rejected as replayed on instance B', async () => {
+    // Roadmap Phase 1 acceptance (d): two services (replicas) sharing one
+    // denylist must enforce single-use across the pair — a per-process cache
+    // would accept the same assertion once per replica.
+    const denylist = new MemoryDenylist();
+    const clock = { now: T0 };
+    const opts = {
+      now: () => clock.now,
+      fetchJson: async () => JWKS,
+      denylist,
+    };
+    const instanceA = new EnterpriseAuthService(BASE_CONFIG, opts);
+    const instanceB = new EnterpriseAuthService(BASE_CONFIG, opts);
+
+    const jag = makeJag();
+    await instanceA.verifyIdJag(jag);
+    try {
+      await instanceB.verifyIdJag(jag);
+      expect.unreachable('replay on the second replica must be rejected');
+    } catch (err) {
+      expect((err as OAuthTokenError).reason).toBe('idjag_replayed');
+    }
   });
 });
 
