@@ -168,10 +168,11 @@ All configuration is via environment variables. The commonly used backend, auth,
 | `MCP_JIT_TTL_SECONDS` | `900` | JIT token TTL and the cap for a requested `ttlSeconds` (clamped 60–3600) |
 | `MCP_JIT_MAX_LIFETIME_SECONDS` | `28800` | Hard cap per JIT token lineage (clamped ttl–86400) |
 | `MCP_JIT_MAX_ACTIVE_TOKENS` | `1000` | Active-token capacity guard |
-| `MCP_ENTERPRISE_AUTH_ISSUER` | _(disabled)_ | Trusted enterprise IdP issuer URL. Set with `_AUDIENCE` to enable [Enterprise-Managed Authorization](#enterprise-managed-authorization-mcp-extension) |
+| `MCP_JIT_STORE` | `memory` | Where JIT token + single-use replay state lives. `memory` is in-process (a restart invalidates outstanding tokens). Any other value is a module specifier for an operator-supplied shared-store adapter, needed for multi-replica deployments — see [High availability](#high-availability-multiple-replicas) |
+| `MCP_ENTERPRISE_AUTH_ISSUER` | _(disabled)_ | Trusted enterprise IdP issuer URL (**https required**; loopback http allowed for local IdP simulators). Set with `_AUDIENCE` to enable [Enterprise-Managed Authorization](#enterprise-managed-authorization-mcp-extension) |
 | `MCP_ENTERPRISE_AUTH_AUDIENCE` | _(disabled)_ | This server's issuer identifier — the ID-JAG `aud` must contain it |
 | `MCP_ENTERPRISE_AUTH_RESOURCE` | _(= audience)_ | This server's resource identifier — the ID-JAG `resource` must match it |
-| `MCP_ENTERPRISE_AUTH_JWKS_URL` | _(OIDC discovery)_ | Explicit IdP JWKS endpoint; defaults to discovery from the issuer |
+| `MCP_ENTERPRISE_AUTH_JWKS_URL` | _(OIDC discovery)_ | Explicit IdP JWKS endpoint (**https required**); defaults to discovery from the issuer |
 | `MCP_ENTERPRISE_AUTH_DEFAULT_SCOPES` | _(all enabled)_ | Scopes granted when an ID-JAG carries no `scope` claim |
 | `MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS` | `50000` | Redeemed-`jti` replay-cache cap (fail-closed at the cap); size above peak assertion-rate × TTL |
 
@@ -389,9 +390,46 @@ Configuration:
 | `MCP_JIT_TTL_SECONDS` | `900` | Token TTL; also the cap for requested `ttlSeconds` (60–3600) |
 | `MCP_JIT_MAX_LIFETIME_SECONDS` | `28800` | Hard cap per token lineage (ttl–86400) |
 | `MCP_JIT_MAX_ACTIVE_TOKENS` | `1000` | Active-token capacity guard |
+| `MCP_JIT_STORE` | `memory` | State backend (see below) |
+
+Revocation has three forms: a token holder revokes itself by presenting the
+token; an operator revokes one generation with `token_id`; or an operator kills
+an entire rotation lineage with `root_id` (useful when a credential leaked and
+the current generation's id is unknown). A scope-restricted static key may only
+revoke tokens it minted; unrestricted keys revoke anything.
+
+Renewal re-checks the parent key, so access review cascades: remove a key and
+its live lineages can no longer refresh (they die at their current TTL);
+narrow a key's `allowedTools` and lineages holding wider scopes stop renewing.
 
 JIT applies to the HTTP transport only — stdio is a local, single-user
 channel with no network credential to steal.
+
+#### High availability (multiple replicas)
+
+By default (`MCP_JIT_STORE=memory`) token state is in-process. That is the
+right failure mode for a single instance — a restart invalidates outstanding
+tokens and clients re-mint — but behind a load balancer it means a token minted
+on one replica is unknown on another, revocation only takes effect where it was
+processed, and an ID-JAG assertion could be redeemed once per replica.
+
+For multi-replica deployments, point `MCP_JIT_STORE` at a module that exports
+`createJitStore()` returning `{ tokens, denylist }` implementing the
+`JitTokenStore` and `BoundedDenylist` interfaces in
+[`src/jit-store.ts`](src/jit-store.ts). Adapters are operator-supplied so no
+network client (Redis, a database driver) ever enters this package's
+dependencies. The interfaces are deliberately built from **atomic compound
+primitives** rather than get/set — `insert` performs the capacity check and the
+insert as one operation, `rotate` is a compare-and-set, and the denylist's
+`addIfAbsent` is a single check-and-record — so implement them with your
+backend's transactional facility (`MULTI`, a Lua script, a conditional write).
+A get/set implementation would reintroduce cross-replica races on the capacity
+cap, once-only rotation, and assertion single-use.
+
+MCP *sessions* are a separate matter: they hold live transport objects and
+cannot be shared. Use sticky routing on `Mcp-Session-Id`, or the stateless
+transport mode, so any replica can serve any request. The principal binding is
+recomputed per request and survives either choice.
 
 ### Enterprise-Managed Authorization (MCP extension)
 
@@ -435,10 +473,13 @@ client auth being "on" — an enterprise-only deployment is never open), and:
   kid-aware, stale-cache fallback); `iss`/`aud`/`resource` binding;
   `exp`/`iat`/`nbf` with 60 s skew; **single-use `jti`** (replay →
   `invalid_grant`; the replay cache is bounded by
-  `MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS` and surfaced as the
+  `MCP_ENTERPRISE_AUTH_MAX_REDEEMED_JTIS`, shared across replicas when
+  `MCP_JIT_STORE` is configured, and surfaced as the
   `mcp_jit_idjag_replay_cache_size` gauge); `client_id` claim/request binding.
   Errors are RFC 6749 §5.2 token errors, counted in
-  `mcp_jit_denials_total{reason="idjag_*"}`.
+  `mcp_jit_denials_total{reason="idjag_*"}`. If token issuance fails *after*
+  the assertion verified, the `jti` is un-redeemed so the client can retry the
+  same assertion rather than round-tripping the IdP.
 - **Account linking** — the assertion `sub` is the audit identity (logged on
   issuance); tokens mint under `parent_key="enterprise-idp"` in metrics.
 

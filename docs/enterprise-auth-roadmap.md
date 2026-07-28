@@ -72,7 +72,7 @@ backend implements them via MULTI/Lua/transactions.
 
 ---
 
-## Phase 0 — Quick wins (no dependencies; ship in parallel)
+## Phase 0 — Quick wins (no dependencies; ship in parallel) — ✅ SHIPPED
 
 **Goal:** immediate correctness/interop value, none of it blocked by the store work.
 
@@ -98,7 +98,7 @@ the configurable cap + gauge.
 
 ---
 
-## Phase 1 — HA-deployable token store ★ closes the #1 enterprise blocker ★
+## Phase 1 — HA-deployable token store ★ closes the #1 enterprise blocker ★ — ✅ SHIPPED
 
 **Goal:** tokens and single-use replay state survive restart and work correctly
 across replicas behind a load balancer. **This is the phase that makes the
@@ -136,6 +136,30 @@ asserts (a) a token minted on A validates on B across restart, (b) `refresh()`
 once-only holds under concurrent rotate on A and B, (c) `insertIfUnderCapacity`
 never exceeds the cap under concurrent mint, (d) an ID-JAG redeemed on A is
 rejected on B.
+
+**As shipped** (`src/jit-store.ts`, `tests/jit-store.test.ts`): all four HA
+assertions are covered, plus a store-contract suite and adapter-loading tests.
+Deltas from the plan above, all simplifications:
+
+- The primitive is `insert(record, {cap, now})` returning
+  `inserted | capacity | duplicate` rather than `insertIfUnderCapacity` +
+  a separate uniqueness check — the id-collision retry the service used to do
+  against a Map is now the store's business, so one call covers both.
+- `rotate` returns a typed loser reason (`missing | revoked | rotated |
+  expired | duplicate`) so the service maps CAS failures onto the existing
+  `JitError` codes without a second read.
+- Added `revokeLineage(rootId)` to the interface (not in the original sketch):
+  the lineage index lives in the store now, so a whole-lineage kill-switch is
+  cheap there and would be expensive to rebuild in the service.
+- The denylist cap is retained as a memory-adapter safety bound
+  (`addIfAbsent` takes `cap: number | null`); TTL-native backends pass `null`
+  and self-bound by expiry, which is the fail-closed-as-DoS fix.
+- `sweep()` no longer runs on the ID-JAG hot path — the memory denylist only
+  sweeps when the cap is actually reached; the reaper handles the rest.
+- Not done here: the short-TTL local `validate()` cache. It is pure latency
+  optimization with a correctness cost (a revocation would lag by the cache
+  TTL), so it belongs with a real network adapter that can measure the RTT it
+  saves — noted in the store docs rather than built blind.
 
 ---
 

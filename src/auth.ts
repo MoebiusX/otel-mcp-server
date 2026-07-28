@@ -9,6 +9,7 @@
  *    the MCP server (HTTP transport only; stdio is inherently local).
  */
 
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildOAuthAuth } from './oauth.js';
@@ -207,8 +208,17 @@ export function validateClientKey(
 
   if (!providedKey) return null;
 
-  // Constant-time comparison would be ideal, but for API keys
-  // (not passwords), this is acceptable. Use crypto.timingSafeEqual
-  // if you need stronger guarantees.
-  return keys.find(k => k.key === providedKey) || null;
+  // Compare SHA-256 digests with timingSafeEqual: hashing normalizes lengths
+  // (timingSafeEqual requires equal-length inputs) and removes the byte-by-
+  // byte early-exit oracle of a string compare (OWASP MCP01). Every key is
+  // checked even after a match so timing does not reveal key order.
+  const provided = createHash('sha256').update(providedKey).digest();
+  let matched: ClientKey | null = null;
+  for (const k of keys) {
+    const candidate = createHash('sha256').update(k.key).digest();
+    if (timingSafeEqual(candidate, provided) && matched === null) {
+      matched = k;
+    }
+  }
+  return matched;
 }
