@@ -120,4 +120,15 @@ describe('trace context reaches backend requests (SEP-414)', () => {
     const seen = await callTool({ traceparent: 'garbage-value' });
     expect(seen[0]!['traceparent']).toBeUndefined();
   });
+
+  it('a baggage value fetch() cannot encode does not break the tool call', async () => {
+    // Regression: fetch() throws on a header value containing a character
+    // above U+00FF, so forwarding an emoji in baggage turned a valid tool
+    // call into a failed backend query. The call must still succeed, with
+    // the unusable value dropped and the valid traceparent preserved.
+    const seen = await callTool({ traceparent: TRACEPARENT, baggage: 'k=🔥' });
+    expect(seen.length, 'the backend query must still have happened').toBeGreaterThan(0);
+    expect(seen[0]!['traceparent']).toBe(TRACEPARENT);
+    expect(seen[0]!['baggage']).toBeUndefined();
+  });
 });

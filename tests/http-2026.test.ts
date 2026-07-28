@@ -207,11 +207,183 @@ describe('MCP 2026-07-28 over HTTP', () => {
     expect(text).toMatch(/mcp_routing_header_rejections_total\{header="Mcp-Method"\} \d+/);
   });
 
+  it('answers a stateless GET/DELETE promptly instead of hanging', async () => {
+    // Regression: GET on the stateless path opened the SDK's standalone SSE
+    // stream, whose body never ends — handleRequest never resolved, the
+    // cleanup in `finally` never ran, and every such request pinned an
+    // McpServer for the life of the process. In a session-less protocol there
+    // is no standalone stream and no session to delete, so only POST applies.
+    for (const method of ['GET', 'DELETE'] as const) {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 4000);
+      const started = Date.now();
+      const res = await fetch(`${baseUrl}/mcp`, {
+        method,
+        headers: { 'MCP-Protocol-Version': SPEC_2026, Accept: 'text/event-stream' },
+        signal: ctl.signal,
+      });
+      clearTimeout(timer);
+      expect(res.status, `${method} must be refused, not streamed`).toBe(405);
+      expect(Date.now() - started, `${method} must return promptly`).toBeLessThan(3000);
+      await res.arrayBuffer(); // body must be complete, not an open stream
+    }
+  });
+
+  it('rejects a batch that smuggles a second method past the routing header', async () => {
+    // Regression: only the first message was checked, so a gateway that
+    // allowed `tools/list` would wave through a batch calling anything.
+    const res = await fetch(`${baseUrl}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'MCP-Protocol-Version': SPEC_2026,
+        'Mcp-Method': 'tools/list',
+      },
+      body: JSON.stringify([
+        { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+        { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'system_health' } },
+      ]),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.message).toMatch(/Mcp-Method/);
+  });
+
   it('advertises the 2026 headers in the CORS preflight', async () => {
     const res = await fetch(`${baseUrl}/mcp`, { method: 'OPTIONS' });
     const allowed = res.headers.get('access-control-allow-headers') ?? '';
     expect(allowed).toMatch(/Mcp-Method/);
     expect(allowed).toMatch(/Mcp-Name/);
     expect(allowed).toMatch(/MCP-Protocol-Version/);
+  });
+});
+
+/**
+ * The stateless path must enforce authentication and `allowedTools` scoping
+ * exactly as the session path does. A regression where the newer path skips a
+ * check would be the worst possible outcome of adding it, so both paths are
+ * asserted against the same credentials in the same process.
+ */
+describe('auth and scope parity between stateless and session paths', () => {
+  let proc: ChildProcessWithoutNullStreams;
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    const port = 15500 + Math.floor(Math.random() * 400);
+    baseUrl = `http://127.0.0.1:${port}`;
+    proc = spawn(process.execPath, [ENTRY, '--http', String(port)], {
+      env: {
+        ...process.env,
+        MCP_AUTH_KEYS: JSON.stringify({
+          keys: [
+            { id: 'admin', key: 'sk-admin' },
+            { id: 'narrow', key: 'sk-narrow', allowedTools: ['metrics'] },
+          ],
+        }),
+        // Unreachable ports: these tests assert authorization, never backend data.
+        PROMETHEUS_URL: 'http://127.0.0.1:9',
+        JAEGER_URL: 'http://127.0.0.1:9',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('server did not start in time')), 15_000);
+      proc.stderr.on('data', (c: Buffer) => {
+        if (c.toString().includes('listening on')) { clearTimeout(timer); resolve(); }
+      });
+      proc.on('exit', (code) => { clearTimeout(timer); reject(new Error(`server exited early: ${code}`)); });
+    });
+  }, 20_000);
+
+  afterAll(() => { proc?.kill('SIGKILL'); });
+
+  /** Parse a response that may be JSON or a single SSE data frame. */
+  async function readBody(res: Response): Promise<any> {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      const line = text.split('\n').find((l) => l.startsWith('data:'));
+      return line ? JSON.parse(line.slice(5).trim()) : text;
+    }
+  }
+
+  async function stateless(body: Record<string, unknown>, auth?: string) {
+    const params = body.params as Record<string, unknown> | undefined;
+    const res = await fetch(`${baseUrl}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'MCP-Protocol-Version': SPEC_2026,
+        'Mcp-Method': String(body.method),
+        ...(typeof params?.name === 'string' ? { 'Mcp-Name': params.name } : {}),
+        ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, body: await readBody(res) };
+  }
+
+  /** Drive the legacy path: initialize, then call within that session. */
+  async function session(body: Record<string, unknown>, auth: string) {
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      'MCP-Protocol-Version': '2025-06-18',
+      Authorization: `Bearer ${auth}`,
+    };
+    const init = await fetch(`${baseUrl}/mcp`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'initialize',
+        params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'legacy', version: '1' } },
+      }),
+    });
+    const sid = init.headers.get('mcp-session-id')!;
+    expect(sid).toBeTruthy();
+    const res = await fetch(`${baseUrl}/mcp`, {
+      method: 'POST',
+      headers: { ...headers, 'Mcp-Session-Id': sid },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, body: await readBody(res) };
+  }
+
+  const listReq = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: { _meta: {} } };
+
+  it('rejects a missing or wrong credential on the stateless path', async () => {
+    expect((await stateless(listReq)).status).toBe(401);
+    expect((await stateless(listReq, 'sk-wrong')).status).toBe(401);
+  });
+
+  it('filters the tool list to the credential scope on BOTH paths', async () => {
+    const [adminStateless, narrowStateless, narrowSession] = await Promise.all([
+      stateless(listReq, 'sk-admin'),
+      stateless(listReq, 'sk-narrow'),
+      session(listReq, 'sk-narrow'),
+    ]);
+
+    const names = (r: any) => (r.body.result?.tools ?? []).map((t: any) => t.name).sort();
+    const narrowNames = names(narrowStateless);
+
+    expect(narrowNames.length).toBeGreaterThan(0);
+    expect(names(adminStateless).length).toBeGreaterThan(narrowNames.length);
+    expect(narrowNames.every((n: string) => n.startsWith('metrics_'))).toBe(true);
+    // The newer path must not be more permissive than the one it replaces.
+    expect(narrowNames).toEqual(names(narrowSession));
+  });
+
+  it('an out-of-scope tool does not exist for that credential on BOTH paths', async () => {
+    const call = { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'traces_search', arguments: { service: 'x' }, _meta: {} } };
+    const viaStateless = await stateless(call, 'sk-narrow');
+    const viaSession = await session(call, 'sk-narrow');
+
+    for (const [label, r] of [['stateless', viaStateless], ['session', viaSession]] as const) {
+      const text = JSON.stringify(r.body);
+      expect(text, `${label}: out-of-scope tool must not be callable`).toMatch(/not found/i);
+      expect(r.body.result?.isError, `${label}: must be flagged as an error`).toBe(true);
+    }
   });
 });

@@ -73,6 +73,16 @@ export interface JitTokenStore {
   /** Snapshot lookup by public token id. */
   get(id: string): Promise<JitTokenRecord | undefined>;
 
+  /**
+   * All records still tracked for a rotation lineage, newest generation last.
+   *
+   * Distinct from `get(rootId)`: the generation-0 record is pruned once the
+   * lineage rotates twice (and swept once its grace window passes), so a
+   * caller that needs to know *who owns a lineage* must ask the lineage, not
+   * the root id. Empty when the lineage is unknown.
+   */
+  getLineage(rootId: string): Promise<JitTokenRecord[]>;
+
   /** Mark one record revoked (expiry clamped to `now`). Undefined = unknown id. */
   revoke(id: string, now: number): Promise<JitTokenRecord | undefined>;
 
@@ -171,6 +181,17 @@ export class MemoryJitTokenStore implements JitTokenStore {
 
   async get(id: string): Promise<JitTokenRecord | undefined> {
     return this.tokens.get(id);
+  }
+
+  async getLineage(rootId: string): Promise<JitTokenRecord[]> {
+    const members = this.lineageMembers.get(rootId);
+    if (!members) return [];
+    const records: JitTokenRecord[] = [];
+    for (const id of members) {
+      const record = this.tokens.get(id);
+      if (record) records.push(record);
+    }
+    return records.sort((a, b) => a.generation - b.generation);
   }
 
   async revoke(id: string, now: number): Promise<JitTokenRecord | undefined> {

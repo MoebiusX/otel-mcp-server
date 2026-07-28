@@ -397,7 +397,9 @@ Revocation has three forms: a token holder revokes itself by presenting the
 token; an operator revokes one generation with `token_id`; or an operator kills
 an entire rotation lineage with `root_id` (useful when a credential leaked and
 the current generation's id is unknown). A scope-restricted static key may only
-revoke tokens it minted; unrestricted keys revoke anything.
+revoke tokens it minted — including after the lineage has rotated, where
+ownership is resolved from the lineage's live members rather than the (by then
+pruned) first-generation record. Unrestricted keys revoke anything.
 
 Renewal re-checks the parent key, so access review cascades: remove a key and
 its live lineages can no longer refresh (they die at their current TTL);
@@ -503,7 +505,7 @@ routing headers or `_meta` client info.
 
 | Change | Status |
 |--------|--------|
-| Stateless core — no handshake, no session id (SEP-2575, SEP-2567) | A 2026 client's first request can be a bare `tools/call`; no session id is issued and none is required |
+| Stateless core — no handshake, no session id (SEP-2575, SEP-2567) | A 2026 client's first request can be a bare `tools/call`; no session id is issued and none is required. Only POST applies — there is no standalone SSE stream and no session to delete, so GET/DELETE get `405` |
 | `Mcp-Method` / `Mcp-Name` routing headers (SEP-2243) | Validated against the request body; disagreement is rejected with JSON-RPC `-32600` |
 | `server/discover` (SEP-2575) | Returns server info, capabilities, supported revisions, and the skill inventory |
 | `ttlMs` / `cacheScope` cache hints (SEP-2549) | On `tools/list`, `resources/list`, and `resources/read`. Tool calls are never marked cacheable — they are live telemetry queries |

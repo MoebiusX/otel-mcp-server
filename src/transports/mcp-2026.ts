@@ -58,7 +58,11 @@ export interface ParsedMcpRequest {
 }
 
 /** A single JSON-RPC message from a body that may be a batch. */
-type JsonRpcMessage = { method?: unknown; params?: { name?: unknown; _meta?: unknown } };
+type JsonRpcMessage = {
+  id?: unknown;
+  method?: unknown;
+  params?: { name?: unknown; _meta?: unknown };
+};
 
 function messagesOf(body: unknown): JsonRpcMessage[] {
   if (Array.isArray(body)) return body.filter((m): m is JsonRpcMessage => !!m && typeof m === 'object');
@@ -148,29 +152,33 @@ export type RoutingCheck =
  * have routed or rate-limited on the headers, so a body that says something
  * else means the decision was made on false information.
  *
+ * **Every** message in a batch is checked, not just the first. A single pair
+ * of headers describes the whole request, so a batch whose later messages
+ * name a different method is precisely the smuggling case the requirement
+ * exists to prevent: the gateway sees `tools/list` and waves it through while
+ * message two calls something it would have blocked.
+ *
  * Absent headers are not an error here: this server accepts pre-2026 clients
  * on the same endpoint, and a 2026 client that omits them still gets correct
- * (if unroutable) service. Batches are checked against their first message,
- * which is what a gateway would have routed on.
+ * (if unroutable) service.
  */
 export function checkRoutingHeaders(req: IncomingMessage, body: unknown): RoutingCheck {
   const methodHeader = req.headers[METHOD_HEADER] as string | undefined;
   const nameHeader = req.headers[NAME_HEADER] as string | undefined;
   if (!methodHeader && !nameHeader) return { ok: true };
 
-  const first = messagesOf(body)[0];
-  if (!first) return { ok: true }; // no body to disagree with
-
-  if (methodHeader) {
-    const actual = typeof first.method === 'string' ? first.method : '';
-    if (methodHeader !== actual) {
-      return { ok: false, header: 'Mcp-Method', expected: methodHeader, actual };
+  for (const msg of messagesOf(body)) {
+    if (methodHeader) {
+      const actual = typeof msg.method === 'string' ? msg.method : '';
+      if (methodHeader !== actual) {
+        return { ok: false, header: 'Mcp-Method', expected: methodHeader, actual };
+      }
     }
-  }
-  if (nameHeader) {
-    const actual = typeof first.params?.name === 'string' ? (first.params.name as string) : '';
-    if (nameHeader !== actual) {
-      return { ok: false, header: 'Mcp-Name', expected: nameHeader, actual };
+    if (nameHeader) {
+      const actual = typeof msg.params?.name === 'string' ? (msg.params.name as string) : '';
+      if (nameHeader !== actual) {
+        return { ok: false, header: 'Mcp-Name', expected: nameHeader, actual };
+      }
     }
   }
   return { ok: true };
@@ -229,12 +237,20 @@ function setHeader(req: IncomingMessage, name: string, value: string): void {
  *   `2025-03-26`, which changes SSE/resumability behaviour.
  * - `Accept`: the SDK requires both `application/json` and `text/event-stream`
  *   on POST; a JSON-only 2026 client would otherwise get a 406.
+ *
+ * The `Accept` rewrite is deliberately limited to POST from a 2026 client.
+ * Rewriting it on GET would satisfy the SDK's check for a client that never
+ * asked for an event stream and hand it one anyway; rewriting it for a
+ * pre-2026 client would replace that client's honest 406 with a response it
+ * cannot parse. Only the case the shim exists for is touched.
  */
 export function adaptHeadersForSdk(req: IncomingMessage, specVersion: McpSpecVersion | undefined): void {
   const sdkVersion = sdkProtocolVersion(specVersion);
   if (sdkVersion && req.headers[PROTOCOL_VERSION_HEADER]) {
     setHeader(req, PROTOCOL_VERSION_HEADER, sdkVersion);
   }
+
+  if (req.method !== 'POST' || !specFeatures(specVersion).statelessLifecycle) return;
 
   const accept = String(req.headers['accept'] || '');
   if (!accept.includes('application/json') || !accept.includes('text/event-stream')) {
@@ -274,12 +290,18 @@ export interface SendableTransport {
 }
 
 /**
- * Attach SEP-2549 cache hints to the response for a cacheable method.
+ * Attach SEP-2549 cache hints to responses for cacheable methods.
  *
  * Wraps the transport's `send` — a public `Transport` interface method —
  * rather than re-registering SDK request handlers, so the SDK's own tool-list
  * generation (including zod → JSON Schema conversion) is untouched and no
  * private API is involved.
+ *
+ * Hints are keyed by **request id**, so in a batch each response gets the hint
+ * for the method that actually produced it. Deriving one hint from the first
+ * message and stamping it on everything would advertise a live `tools/call`
+ * result as cacheable for five minutes — an agent could then reuse a stale
+ * telemetry answer, which is worse than emitting no hint at all.
  *
  * `cacheScope: 'session'` rather than `'public'`: the tool list is filtered to
  * the presenting credential's scopes, so one client's list must never be
@@ -289,15 +311,20 @@ export interface SendableTransport {
  * a 2025-era client's response shape is left exactly as it was.
  */
 export function decorateWithCacheHints(transport: SendableTransport, body: unknown): void {
-  const method = messagesOf(body)[0]?.method;
-  const hint = cacheHintFor(typeof method === 'string' ? method : undefined);
-  if (!hint) return;
+  const hints = new Map<string, { ttlMs: number; cacheScope: string }>();
+  for (const msg of messagesOf(body)) {
+    if (msg.id === undefined || msg.id === null) continue; // notification — no response
+    const hint = cacheHintFor(typeof msg.method === 'string' ? msg.method : undefined);
+    if (hint) hints.set(String(msg.id), hint);
+  }
+  if (hints.size === 0) return;
 
   const send = transport.send.bind(transport);
   transport.send = async (message: unknown, options?: unknown) => {
-    const msg = message as { result?: Record<string, unknown> } | null;
+    const msg = message as { id?: unknown; result?: Record<string, unknown> } | null;
     if (msg && typeof msg === 'object' && msg.result && typeof msg.result === 'object') {
-      msg.result = { ...msg.result, ...hint };
+      const hint = msg.id === undefined || msg.id === null ? undefined : hints.get(String(msg.id));
+      if (hint) msg.result = { ...msg.result, ...hint };
     }
     return send(message, options);
   };

@@ -386,6 +386,25 @@ async function main(): Promise<void> {
         // request (SEP-2567). Scope enforcement is unchanged — the per-
         // request server registers only the credential's skills.
         if (features.statelessLifecycle) {
+          // Only POST carries meaning without a session. A GET would open the
+          // SDK's standalone SSE stream, whose body never ends — the await
+          // below would never resolve, the cleanup in `finally` would never
+          // run, and every such request would pin an McpServer for the life of
+          // the process. DELETE is equally meaningless: there is no session to
+          // close. 2026-07-28 removed SSE-delivered server requests anyway.
+          if (req.method !== 'POST') {
+            res.writeHead(405, { 'Content-Type': 'application/json', Allow: 'POST' });
+            res.end(JSON.stringify({
+              jsonrpc: '2.0',
+              id: null,
+              error: {
+                code: -32600,
+                message: `${req.method} is not supported for MCP ${parsed.specVersion}; the protocol is stateless — send requests as POST`,
+              },
+            }));
+            return;
+          }
+
           await withRequestContext(parsed, async () => {
             const mcpServer = createServer(serverOptions);
             const transport = new StreamableHTTPServerTransport({

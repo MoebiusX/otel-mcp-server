@@ -394,8 +394,16 @@ async function handleRevoke(
   if (typeof rootId === 'string' && rootId) {
     // Lineage kill: revokes the current generation and any in-grace
     // predecessor without chasing the latest token id through the audit log.
-    const target = await service.get(rootId);
-    if (target && !canRevoke(target.parentKeyId)) {
+    //
+    // Ownership is resolved from the lineage's live members, NOT from
+    // `get(rootId)`: the generation-0 record whose id *is* the rootId is
+    // pruned after the second rotation and swept after its grace window, so a
+    // root-id lookup returns undefined while the lineage is still very much
+    // alive. Checking `target && ...` against that lookup let the guard
+    // silently disappear — a restricted key could then kill any other key's
+    // rotated lineage, the exact cross-tenant lever this check exists to stop.
+    const lineage = await service.getLineage(rootId);
+    if (!lineage.every((r) => canRevoke(r.parentKeyId))) {
       return deny(res, 403, 'scope_violation', 'This key may only revoke tokens minted from itself');
     }
     const killed = await service.revokeLineage(rootId);

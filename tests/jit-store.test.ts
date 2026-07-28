@@ -201,6 +201,23 @@ describe('MemoryJitTokenStore', () => {
     expect(await store.rotate('gen1', gen1b, { graceUntil: now, now })).toMatchObject({ ok: false, reason: 'revoked' });
   });
 
+  it('getLineage still resolves after the root record is pruned', async () => {
+    // The ownership check for lineage revocation depends on this: get(rootId)
+    // goes undefined once the gen-0 record is pruned, but the lineage — and
+    // therefore its owner — is still perfectly knowable.
+    const store = new MemoryJitTokenStore();
+    const now = 1_000_000_000;
+    await store.insert(record('g0'), { cap: 10, now });
+    await store.rotate('g0', record('g1', { rootId: 'g0', generation: 1 }), { graceUntil: now + 30_000, now });
+    await store.rotate('g1', record('g2', { rootId: 'g0', generation: 2 }), { graceUntil: now + 30_000, now });
+
+    expect(await store.get('g0')).toBeUndefined();
+    const lineage = await store.getLineage('g0');
+    expect(lineage.map((r) => r.id)).toEqual(['g1', 'g2']);
+    expect(lineage.every((r) => r.parentKeyId === 'k')).toBe(true);
+    expect(await store.getLineage('unknown')).toEqual([]);
+  });
+
   it('rotate prunes older grace corpses, keeping {old, new}', async () => {
     const store = new MemoryJitTokenStore();
     const now = 1_000_000_000;
@@ -241,7 +258,7 @@ describe('createJitStores', () => {
         const marker = { adapter: 'test' };
         return {
           tokens: { marker, insert: async () => 'inserted', rotate: async () => ({ ok: true }),
-                    get: async () => undefined, revoke: async () => undefined,
+                    get: async () => undefined, getLineage: async () => [], revoke: async () => undefined,
                     revokeLineage: async () => [], count: async () => 0, sweep: async () => 0 },
           denylist: { addIfAbsent: async () => 'added', remove: async () => {},
                       size: async () => 0, sweep: async () => 0 },
