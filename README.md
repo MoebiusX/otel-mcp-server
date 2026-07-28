@@ -39,6 +39,7 @@ An [MCP](https://modelcontextprotocol.io) server that exposes your **OpenTelemet
 - **110 tools** across 25 skills — a provider-agnostic `traces` layer (Jaeger/Zipkin/Tempo/SkyWalking via `TRACES_PROVIDER`), metrics (Prometheus/InfluxDB/OpenTSDB), logs (Loki/ClickHouse/Graylog), Pinpoint, Elasticsearch, Alertmanager, vmalert rule evaluation, Grafana, Cilium, Grafana Beyla (eBPF auto-instrumentation), Kubernetes, Pyroscope, OPA, service mesh (Envoy/Consul/Kong/Traefik), collection pipelines (Fluent Bit/Beats/Vector/Alloy), AgentRelay agent coordination, ZK proofs, system health, public exchange transparency
 - **Skill plugin architecture** — each backend is a self-contained plugin; add new ones with a single file
 - **Two transports** — stdio (Claude Desktop, Copilot) and HTTP (remote, multi-client)
+- **MCP 2026-07-28 ready** — serves the stateless protocol core (no handshake, no session id) alongside ≤2025-11-25 clients on the same endpoint, validates the `Mcp-Method`/`Mcp-Name` routing headers, emits `ttlMs`/`cacheScope` cache hints, answers `server/discover`, and propagates W3C trace context from `_meta` into backend queries (see [MCP 2026-07-28 support](#mcp-2026-07-28-support))
 - **Layered auth** — backend credentials (Bearer/Basic/OAuth client-credentials/custom headers per backend) and client identity via static API keys, **Just-in-Time scoped ephemeral tokens** (OWASP MCP Top 10), or **enterprise-managed authorization** through your corporate IdP (MCP ext-auth ID-JAG). `allowedTools` scopes are enforced per session (see [Client Authentication](#client-authentication-http-mode))
 - **Selective skills** — enable only the skills you need (`--tools traces,metrics,logs`)
 - **Multi-version aware** — a typed `capability → product → protocol-adapter` model tracks which versions and protocol features each backend supports; runtime detection surfaces live product/version on `/health`, and `MCP_VERSION_GATING` (`off`/`warn`/`enforce`) can guard version-sensitive features (unknown versions always pass optimistically)
@@ -490,6 +491,46 @@ curl -X POST https://mcp.example.com/auth/token \
   -d assertion="$ID_JAG" -d client_id=my-mcp-client
 # → { "access_token": "mcpj_…", "token_type": "Bearer", "expires_in": 900, "scope": "metrics traces" }
 ```
+
+### MCP 2026-07-28 support
+
+The 2026-07-28 revision made MCP stateless: the `initialize` handshake and
+`Mcp-Session-Id` are gone, so any request can land on any server instance.
+This server implements that revision **and** keeps serving ≤2025-11-25 clients
+on the same endpoint — the revision is resolved per request, from the
+`MCP-Protocol-Version` header or (when absent) from the presence of the 2026
+routing headers or `_meta` client info.
+
+| Change | Status |
+|--------|--------|
+| Stateless core — no handshake, no session id (SEP-2575, SEP-2567) | A 2026 client's first request can be a bare `tools/call`; no session id is issued and none is required |
+| `Mcp-Method` / `Mcp-Name` routing headers (SEP-2243) | Validated against the request body; disagreement is rejected with JSON-RPC `-32600` |
+| `server/discover` (SEP-2575) | Returns server info, capabilities, supported revisions, and the skill inventory |
+| `ttlMs` / `cacheScope` cache hints (SEP-2549) | On `tools/list`, `resources/list`, and `resources/read`. Tool calls are never marked cacheable — they are live telemetry queries |
+| W3C Trace Context in `_meta` (SEP-414) | `traceparent`/`tracestate`/`baggage` propagate to every backend query, so one trace spans host → MCP server → Prometheus/Jaeger/Loki |
+| Extensions map (SEP-2133) | Enterprise-managed authorization is declared as `io.modelcontextprotocol/enterprise-managed-authorization` when configured |
+| Resource-not-found is `-32602` (SEP-2164) | Already emitted; covered by a regression test |
+| Roots / Sampling / Logging deprecations | Never used — diagnostics go to stderr and `/metrics`, which is the replacement the spec points to |
+
+Trace propagation is the piece worth calling out: a tool call and the backend
+queries it triggers used to be unrelated spans. With a `traceparent` in the
+call's `_meta`, they now join up in any OpenTelemetry-compatible backend. If a
+proxy stamps HTTP trace headers instead, those are used as a fallback;
+`_meta` wins when both are present, and malformed values are dropped rather
+than forwarded.
+
+`GET /health` reports the supported revisions, and `/metrics` carries
+`mcp_spec_requests_total{version,mode}`,
+`mcp_trace_context_propagated_total{source}`, and
+`mcp_routing_header_rejections_total{header}`.
+
+**On the SDK:** `@modelcontextprotocol/sdk` v1 tops out at protocol
+`2025-11-25` and rejects a newer version header outright, so this support is
+implemented in this server's HTTP layer above the SDK: the body is buffered
+once (which is what makes the header/body cross-check possible), the version
+header is translated to one the SDK accepts, and 2026 requests are served from
+a fresh session-less transport per request. When an SDK with native support
+ships, that shim collapses; the behaviour clients see does not change.
 
 ### Kubernetes Deployment
 

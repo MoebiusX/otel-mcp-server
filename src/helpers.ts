@@ -5,11 +5,14 @@
 import type { BackendAuth } from './auth.js';
 import { resolveAuthHeaders } from './auth.js';
 import { instrumentFetcher } from './metrics.js';
+import { outboundTraceHeaders } from './request-context.js';
 
 /** Extra fetch options beyond the standard auth/timeout. */
 export interface FetchOptions {
   method?: string;
   body?: string;
+  /** Extra request headers. Merged over trace context, under auth headers. */
+  headers?: Record<string, string>;
 }
 
 /** Fetch JSON with timeout, error handling, and optional auth headers. */
@@ -22,7 +25,12 @@ export async function fetchJSON(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const headers: Record<string, string> = auth ? await resolveAuthHeaders(auth) : {};
+    // Trace context first so an explicit header or auth can override it: the
+    // caller's intent and the backend credential both outrank ambient
+    // propagation (W3C Trace Context / MCP 2026-07-28 SEP-414).
+    const headers: Record<string, string> = outboundTraceHeaders();
+    if (options?.headers) Object.assign(headers, options.headers);
+    if (auth) Object.assign(headers, await resolveAuthHeaders(auth));
     if (options?.body) headers['Content-Type'] = 'application/json';
     const res = await fetch(url, {
       signal: controller.signal,
