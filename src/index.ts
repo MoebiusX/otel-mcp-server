@@ -28,8 +28,19 @@ import {
   EnterpriseAuthService,
   authorizationServerMetadata,
   protectedResourceMetadata,
+  ENTERPRISE_AUTH_EXTENSION_ID,
 } from './enterprise-auth.js';
 import { handleJitRequest } from './transports/jit-endpoints.js';
+import {
+  parseMcpRequest,
+  checkRoutingHeaders,
+  rejectRoutingMismatch,
+  adaptHeadersForSdk,
+  withRequestContext,
+  decorateWithCacheHints,
+  type ParsedMcpRequest,
+} from './transports/mcp-2026.js';
+import { specFeatures, MCP_SPEC_LATEST, MCP_SPEC_VERSIONS } from './mcp-spec.js';
 import { metrics, serializeMetrics } from './metrics.js';
 import { createSkillHelpers } from './skill.js';
 import { versionRegistry } from './version-registry.js';
@@ -194,6 +205,14 @@ async function main(): Promise<void> {
             enterpriseAuth: enterpriseService
               ? { configured: true, issuer: enterpriseConfig!.issuer }
               : { configured: false },
+            mcpSpec: {
+              latest: MCP_SPEC_LATEST,
+              supported: [...MCP_SPEC_VERSIONS],
+              // Stateless serving is selected per request from the client's
+              // declared revision — both eras are served concurrently.
+              statelessFrom: '2026-07-28',
+              extensions: enterpriseConfig ? [ENTERPRISE_AUTH_EXTENSION_ID] : [],
+            },
             skills: allSkills
               .filter(s => enabledIds.has(s.id))
               .map(s => ({ id: s.id, available: s.isAvailable(), tools: s.tools })),
@@ -228,13 +247,17 @@ async function main(): Promise<void> {
           }
         }
 
-        // CORS preflight — always open
+        // CORS preflight — always open. The allow-list covers both protocol
+        // eras: Mcp-Session-Id for ≤2025-11-25 clients, and the 2026-07-28
+        // routing/version headers (SEP-2243, SEP-2575) for newer ones.
         if (req.method === 'OPTIONS') {
           res.writeHead(204, {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
             'Access-Control-Allow-Headers':
-              'Content-Type, Authorization, X-API-Key, Mcp-Session-Id',
+              'Content-Type, Authorization, X-API-Key, Mcp-Session-Id, ' +
+              'MCP-Protocol-Version, Mcp-Method, Mcp-Name, traceparent, tracestate, baggage',
+            'Access-Control-Expose-Headers': 'Mcp-Session-Id, MCP-Protocol-Version',
           });
           res.end();
           return;
@@ -318,6 +341,72 @@ async function main(): Promise<void> {
           }
         }
 
+        // ── MCP request pre-processing (2026-07-28 readiness) ──────────
+        // Buffer the body once here: it is what makes the SEP-2243 header/
+        // body cross-check possible and what carries _meta trace context.
+        // The SDK accepts it as `parsedBody` so nothing re-reads the stream.
+        let parsed: ParsedMcpRequest;
+        try {
+          parsed = await parseMcpRequest(req, principal);
+        } catch (err) {
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Payload Too Large',
+            message: err instanceof Error ? err.message : 'Request body too large',
+          }));
+          return;
+        }
+
+        const features = specFeatures(parsed.specVersion);
+
+        // SEP-2243: a gateway may have routed or rate-limited on these
+        // headers, so a body that disagrees means that decision was made on
+        // false information. The spec requires rejection.
+        const routing = checkRoutingHeaders(req, parsed.body);
+        if (!routing.ok) {
+          rejectRoutingMismatch(res, routing);
+          return;
+        }
+
+        // SDK v1 hard-rejects protocol versions it does not know and demands
+        // both Accept media types; translate before it ever sees the request.
+        adaptHeadersForSdk(req, parsed.specVersion);
+
+        const sessionScopes = scopes;
+        const serverOptions = {
+          ...(sessionScopes
+            ? { tools: [...enabledIds].filter((id) => sessionScopes.includes(id)) }
+            : options),
+          ...(enterpriseConfig ? { extensions: [ENTERPRISE_AUTH_EXTENSION_ID] } : {}),
+        };
+
+        // ── Stateless path (MCP 2026-07-28) ────────────────────────────
+        // No handshake, no session id: a fresh Server+transport pair serves
+        // one request and is discarded, so any replica can answer any
+        // request (SEP-2567). Scope enforcement is unchanged — the per-
+        // request server registers only the credential's skills.
+        if (features.statelessLifecycle) {
+          await withRequestContext(parsed, async () => {
+            const mcpServer = createServer(serverOptions);
+            const transport = new StreamableHTTPServerTransport({
+              sessionIdGenerator: undefined,
+              enableJsonResponse: true,
+            });
+            if (features.cacheHints) decorateWithCacheHints(transport, parsed.body);
+            try {
+              await mcpServer.connect(transport);
+              await transport.handleRequest(req, res, parsed.body);
+            } finally {
+              // One-shot by design: the SDK refuses to reuse a stateless
+              // transport, and nothing here may outlive the response.
+              try { await transport.close(); } catch { /* already closed */ }
+              try { await mcpServer.close(); } catch { /* already closed */ }
+            }
+          });
+          return;
+        }
+
+        // ── Session path (≤ 2025-11-25 clients) ────────────────────────
         // Look up existing session
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         if (sessionId) {
@@ -338,7 +427,9 @@ async function main(): Promise<void> {
             }));
             return;
           } else {
-            await session.transport.handleRequest(req, res);
+            await withRequestContext(parsed, () =>
+              session.transport.handleRequest(req, res, parsed.body),
+            );
             return;
           }
         }
@@ -346,21 +437,23 @@ async function main(): Promise<void> {
         // New session (initialize request). The session's McpServer registers
         // only the skills the presented credential is scoped to — out-of-scope
         // tools do not exist for this session.
-        const sessionScopes = scopes;
-        const sessionOptions = sessionScopes
-          ? { tools: [...enabledIds].filter((id) => sessionScopes.includes(id)) }
-          : options;
-        const mcpServer = createServer(sessionOptions);
+        const mcpServer = createServer(serverOptions);
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
         });
         sessions.bind(transport, mcpServer);
 
         await mcpServer.connect(transport);
-        await transport.handleRequest(req, res);
+        await withRequestContext(parsed, () => transport.handleRequest(req, res, parsed.body));
 
         if (transport.sessionId) {
           sessions.register(transport, mcpServer, principal);
+        } else {
+          // No session id was assigned (e.g. a non-initialize request with an
+          // unknown session id). Nothing will ever close this pair otherwise,
+          // so the active-sessions gauge would drift up permanently and the
+          // McpServer would leak until GC.
+          try { transport.close(); } catch { /* already closing */ }
         }
       });
 
