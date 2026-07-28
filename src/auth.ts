@@ -215,6 +215,11 @@ export function validateClientKey(
   const provided = createHash('sha256').update(providedKey).digest();
   let matched: ClientKey | null = null;
   for (const k of keys) {
+    // Entries come from operator-supplied JSON and are not schema-validated.
+    // A malformed entry must be skipped, not thrown on: hashing a non-string
+    // raises and would take down the request handler that is merely trying to
+    // check a credential against the *other*, valid keys.
+    if (typeof k?.key !== 'string' || k.key === '') continue;
     const candidate = createHash('sha256').update(k.key).digest();
     if (timingSafeEqual(candidate, provided) && matched === null) {
       matched = k;

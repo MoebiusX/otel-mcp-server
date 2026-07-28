@@ -563,6 +563,58 @@ describe('POST /auth/token/revoke', () => {
     );
     expect(r.status).toBe(404);
   });
+
+  it('a restricted key cannot kill another key\'s lineage AFTER it has rotated', async () => {
+    // Regression (auth bypass): ownership was resolved with get(rootId), but
+    // the generation-0 record whose id IS the rootId is pruned on the second
+    // rotation. The `target &&` guard then short-circuited to "allowed" while
+    // revokeLineage still worked off the lineage index — so any restricted key
+    // could kill any other key's live session once it had rotated twice, which
+    // is the steady state for every refresh-using client.
+    const { ctx: c, service, clock } = ctx();
+    const victim = await service!.issue({ parentKeyId: 'admin', grantableScopes: null, enabledSkillIds: ENABLED });
+
+    clock.now += 60_000;
+    const gen1 = await service!.refresh(victim.token);
+    clock.now += 60_000;
+    const gen2 = await service!.refresh(gen1.token);
+
+    // The gen-0 record is gone; only the lineage index still knows the owner.
+    expect(await service!.get(victim.record.id)).toBeUndefined();
+
+    const attack = await call(
+      {
+        url: '/auth/token/revoke',
+        headers: { authorization: 'Bearer sk-ci' }, // scope-restricted key
+        body: JSON.stringify({ root_id: victim.record.id }),
+      },
+      c,
+    );
+    expect(attack.status).toBe(403);
+    expect(attack.json().reason).toBe('scope_violation');
+    // The victim's live token must be untouched.
+    expect((await service!.validate(gen2.token)).ok).toBe(true);
+  });
+
+  it('a restricted key can still kill its OWN rotated lineage', async () => {
+    const { ctx: c, service, clock } = ctx();
+    const own = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    clock.now += 60_000;
+    const gen1 = await service!.refresh(own.token);
+    clock.now += 60_000;
+    await service!.refresh(gen1.token);
+
+    const r = await call(
+      {
+        url: '/auth/token/revoke',
+        headers: { authorization: 'Bearer sk-ci' },
+        body: JSON.stringify({ root_id: own.record.id }),
+      },
+      c,
+    );
+    expect(r.status).toBe(200);
+    expect(await service!.activeCount()).toBe(0);
+  });
 });
 
 // ─── Single-use un-burn on issuance failure ──────────────────────────────────

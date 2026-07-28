@@ -426,6 +426,16 @@ export class JitTokenService {
   }
 
   /**
+   * Records still tracked for a rotation lineage. Use this — not `get(rootId)`
+   * — to answer "who owns this lineage": the generation-0 record whose id *is*
+   * the rootId is pruned after the second rotation and swept after its grace
+   * window, so a root-id lookup goes empty while the lineage is still live.
+   */
+  getLineage(rootId: string): Promise<JitTokenRecord[]> {
+    return this.store.getLineage(rootId);
+  }
+
+  /**
    * Administrative revocation of an entire rotation lineage by its root id —
    * kills the current generation and any in-grace predecessor without the
    * operator needing to chase the latest token id through the audit log.

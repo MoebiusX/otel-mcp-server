@@ -17,8 +17,16 @@
  * should compare version strings directly.
  */
 
-/** MCP spec revisions this server knows about, oldest first. */
+/**
+ * MCP spec revisions this server knows about, oldest first.
+ *
+ * Must stay a superset of the bundled SDK's `SUPPORTED_PROTOCOL_VERSIONS`: a
+ * revision the SDK accepts but this list omits would be treated as
+ * unrecognized and served with the newest behaviour, silently giving an old
+ * client stateless handling it cannot use.
+ */
 export const MCP_SPEC_VERSIONS = [
+  '2024-10-07',
   '2024-11-05',
   '2025-03-26',
   '2025-06-18',
@@ -117,6 +125,9 @@ export function isKnownSpecVersion(value: string): value is McpSpecVersion {
   return (MCP_SPEC_VERSIONS as readonly string[]).includes(value);
 }
 
+/** MCP revisions are dated `YYYY-MM-DD`. */
+const SPEC_VERSION_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * Resolve the spec revision a request is speaking.
  *
@@ -137,10 +148,19 @@ export function resolveSpecVersion(input: {
   const header = input.header?.trim();
   if (header && isKnownSpecVersion(header)) return header;
   if (header) {
-    // An unrecognized revision is almost certainly newer than what we know
-    // (the spec's own deprecation policy means old revisions stay valid for
-    // ≥12 months). Serve it with our newest behaviour rather than refusing.
-    return MCP_SPEC_LATEST;
+    // Revisions are dates, so a well-formed value later than our newest is a
+    // revision published after this build: serve it with our newest behaviour
+    // rather than refusing, since the spec's deprecation policy guarantees
+    // what we implement stays valid for >=12 months.
+    //
+    // The date-shape check is load-bearing, not decoration: these are string
+    // comparisons, and letters sort after digits, so a bare `header >
+    // MCP_SPEC_LATEST` treats "garbage" as a future revision. Anything not
+    // date-shaped, or dated before our newest, falls through to pre-2026
+    // handling — stateless serving is behaviour a client asks for, never
+    // something inferred from an unparseable string.
+    if (SPEC_VERSION_SHAPE.test(header) && header > MCP_SPEC_LATEST) return MCP_SPEC_LATEST;
+    return undefined;
   }
   if (input.hasRoutingHeaders || input.hasClientInfoMeta) return '2026-07-28';
   return undefined;

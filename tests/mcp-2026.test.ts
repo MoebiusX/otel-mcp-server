@@ -79,10 +79,29 @@ describe('MCP spec version resolution', () => {
     expect(resolveSpecVersion({})).toBeUndefined();
   });
 
-  it('treats an unrecognized revision as the newest we implement', () => {
+  it('treats a FUTURE unrecognized revision as the newest we implement', () => {
     // Old revisions stay valid for >=12 months under the spec's deprecation
-    // policy, so an unknown value is almost certainly newer than we know.
+    // policy, so a value dated after ours is a revision published after this
+    // build; serving it with our newest behaviour is the forward-compatible
+    // reading.
     expect(resolveSpecVersion({ header: '2027-01-01' })).toBe(MCP_SPEC_LATEST);
+  });
+
+  it('does NOT infer stateless serving from an older or malformed revision', () => {
+    // Regression: any unrecognized value returned MCP_SPEC_LATEST, so a typo
+    // or a pre-dating revision was silently given 2026 stateless handling it
+    // cannot use. Stateless must be something a client asks for.
+    expect(resolveSpecVersion({ header: '2019-01-01' })).toBeUndefined();
+    expect(resolveSpecVersion({ header: 'garbage' })).toBeUndefined();
+  });
+
+  it('covers every protocol version the bundled SDK accepts', async () => {
+    // A revision the SDK honours but this list omits would be treated as
+    // unrecognized — the class of bug that made 2024-10-07 misroute.
+    const { SUPPORTED_PROTOCOL_VERSIONS } = await import('@modelcontextprotocol/sdk/types.js');
+    for (const v of SUPPORTED_PROTOCOL_VERSIONS as string[]) {
+      expect(isKnownSpecVersion(v), `SDK supports ${v}; add it to MCP_SPEC_VERSIONS`).toBe(true);
+    }
   });
 
   it('translates a newer revision down to what the SDK accepts', () => {
@@ -138,6 +157,32 @@ describe('trace context extraction (SEP-414)', () => {
     expect(ctx.traceparent).toBe(TRACEPARENT);
     expect(ctx.tracestate).toBeUndefined();
     expect(ctx.baggage).toBe('ok=1');
+  });
+
+  it('drops values fetch() would throw on, so a client cannot break its own call', () => {
+    // Regression: only CR/LF/NUL were rejected, but fetch() throws on any
+    // header value with a character above U+00FF or a DEL — so an emoji in
+    // baggage turned a valid tool call into a failed backend query.
+    for (const bad of ['k=🔥', 'k=ab', 'k=café']) {
+      const ctx = contextFromRequest({ meta: { traceparent: TRACEPARENT, baggage: bad } });
+      expect(ctx.traceparent, `traceparent should survive alongside a bad baggage`).toBe(TRACEPARENT);
+      expect(ctx.baggage, `baggage ${JSON.stringify(bad)} must be dropped`).toBeUndefined();
+    }
+  });
+
+  it('drops an over-long value (W3C caps baggage at 8192)', () => {
+    const ctx = contextFromRequest({
+      meta: { traceparent: TRACEPARENT, baggage: 'k=' + 'a'.repeat(9000) },
+    });
+    expect(ctx.baggage).toBeUndefined();
+  });
+
+  it('keeps ordinary tracestate and baggage syntax intact', () => {
+    const ctx = contextFromRequest({
+      meta: { traceparent: TRACEPARENT, tracestate: 'rojo=00f067aa0ba902b7,congo=t61rcWkgMzE', baggage: 'userId=alice,serverNode=DF%2028' },
+    });
+    expect(ctx.tracestate).toBe('rojo=00f067aa0ba902b7,congo=t61rcWkgMzE');
+    expect(ctx.baggage).toBe('userId=alice,serverNode=DF%2028');
   });
 
   it('extracts client info from the 2026 _meta key', () => {
@@ -197,16 +242,48 @@ describe('routing header validation (SEP-2243)', () => {
     expect(checkRoutingHeaders(mockReq({}), body)).toEqual({ ok: true });
   });
 
-  it('validates a batch against its first message', () => {
+  it('rejects a batch whose first message disagrees with the headers', () => {
     const batch = [body, { jsonrpc: '2.0', id: 2, method: 'tools/list' }];
-    const ok = mockReq({ headers: { 'mcp-method': 'tools/call' } });
-    expect(checkRoutingHeaders(ok, batch)).toEqual({ ok: true });
     const bad = mockReq({ headers: { 'mcp-method': 'tools/list' } });
     expect(checkRoutingHeaders(bad, batch)).toMatchObject({ ok: false });
   });
 
   it('does not reject when there is no body to disagree with', () => {
     expect(checkRoutingHeaders(mockReq({ headers: { 'mcp-method': 'tools/list' } }), undefined)).toEqual({ ok: true });
+  });
+
+  it('rejects a batch whose LATER message names a different method', () => {
+    // Regression: only the first message was checked, so a batch could show a
+    // gateway a benign Mcp-Method while message two called something the
+    // gateway would have blocked — exactly the smuggling SEP-2243 prevents.
+    const batch = [
+      { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'traces_search' } },
+    ];
+    const req = mockReq({ headers: { 'mcp-method': 'tools/list' } });
+    expect(checkRoutingHeaders(req, batch)).toMatchObject({
+      ok: false,
+      header: 'Mcp-Method',
+      actual: 'tools/call',
+    });
+  });
+
+  it('rejects a batch whose later message names a different tool', () => {
+    const batch = [
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'metrics_query' } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'traces_search' } },
+    ];
+    const req = mockReq({ headers: { 'mcp-method': 'tools/call', 'mcp-name': 'metrics_query' } });
+    expect(checkRoutingHeaders(req, batch)).toMatchObject({ ok: false, header: 'Mcp-Name' });
+  });
+
+  it('accepts a batch where every message agrees with the headers', () => {
+    const batch = [
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'metrics_query' } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'metrics_query' } },
+    ];
+    const req = mockReq({ headers: { 'mcp-method': 'tools/call', 'mcp-name': 'metrics_query' } });
+    expect(checkRoutingHeaders(req, batch)).toEqual({ ok: true });
   });
 });
 
@@ -254,6 +331,22 @@ describe('SDK header adaptation', () => {
     const req = mockReq({ headers: { accept: 'application/json, text/event-stream' } });
     adaptHeadersForSdk(req, '2026-07-28');
     expect(req.headers['accept']).toBe('application/json, text/event-stream');
+  });
+
+  it('does not rewrite Accept for a pre-2026 client', () => {
+    // Regression: the rewrite was unconditional, so a 2025 client asking for
+    // JSON only got an SSE response it cannot parse instead of an honest 406.
+    const req = mockReq({ headers: { accept: 'application/json' } });
+    adaptHeadersForSdk(req, '2025-06-18');
+    expect(req.headers['accept']).toBe('application/json');
+  });
+
+  it('does not rewrite Accept on GET', () => {
+    // Regression: forcing text/event-stream on a GET satisfied the SDK's check
+    // for a client that never asked for a stream, handing it one anyway.
+    const req = mockReq({ method: 'GET', headers: { accept: 'application/json' } });
+    adaptHeadersForSdk(req, '2026-07-28');
+    expect(req.headers['accept']).toBe('application/json');
   });
 });
 
@@ -325,14 +418,21 @@ describe('cache hints (SEP-2549)', () => {
 
   it('uses a shorter TTL for resources/read', async () => {
     const list = fakeTransport();
-    decorateWithCacheHints(list.transport, { method: 'tools/list' });
-    await list.transport.send({ id: 1, result: {} });
+    decorateWithCacheHints(list.transport, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    await list.transport.send({ jsonrpc: '2.0', id: 1, result: {} });
 
     const read = fakeTransport();
-    decorateWithCacheHints(read.transport, { method: 'resources/read' });
-    await read.transport.send({ id: 1, result: {} });
+    decorateWithCacheHints(read.transport, { jsonrpc: '2.0', id: 1, method: 'resources/read' });
+    await read.transport.send({ jsonrpc: '2.0', id: 1, result: {} });
 
     expect(read.sent[0].result.ttlMs).toBeLessThan(list.sent[0].result.ttlMs);
+  });
+
+  it('ignores a notification (no id, so no response to hint)', async () => {
+    const { sent, transport } = fakeTransport();
+    decorateWithCacheHints(transport, { jsonrpc: '2.0', method: 'tools/list' });
+    await transport.send({ jsonrpc: '2.0', id: 1, result: { tools: [] } });
+    expect(sent[0].result.ttlMs).toBeUndefined();
   });
 
   it('never marks a tool call cacheable — it is a live telemetry query', async () => {
@@ -345,9 +445,35 @@ describe('cache hints (SEP-2549)', () => {
 
   it('leaves error responses alone', async () => {
     const { sent, transport } = fakeTransport();
-    decorateWithCacheHints(transport, { method: 'tools/list' });
+    decorateWithCacheHints(transport, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
     await transport.send({ jsonrpc: '2.0', id: 1, error: { code: -32600, message: 'nope' } });
     expect(sent[0].result).toBeUndefined();
     expect(sent[0].error).toBeDefined();
+  });
+
+  it('hints each batch response by its own method, not the batch head', async () => {
+    // Regression: one hint was derived from the first message and stamped on
+    // every response, so a tools/call result riding behind a tools/list in a
+    // batch was advertised cacheable for 5 minutes — an agent could then reuse
+    // a stale telemetry answer.
+    const { sent, transport } = fakeTransport();
+    decorateWithCacheHints(transport, [
+      { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'metrics_query' } },
+    ]);
+
+    await transport.send({ jsonrpc: '2.0', id: 1, result: { tools: [] } });
+    await transport.send({ jsonrpc: '2.0', id: 2, result: { content: [] } });
+
+    expect(sent[0].result.ttlMs, 'tools/list is cacheable').toBeGreaterThan(0);
+    expect(sent[1].result.ttlMs, 'tools/call must never be cacheable').toBeUndefined();
+    expect(sent[1].result.cacheScope).toBeUndefined();
+  });
+
+  it('does not hint a response whose id was never requested', async () => {
+    const { sent, transport } = fakeTransport();
+    decorateWithCacheHints(transport, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    await transport.send({ jsonrpc: '2.0', id: 99, result: { tools: [] } });
+    expect(sent[0].result.ttlMs).toBeUndefined();
   });
 });

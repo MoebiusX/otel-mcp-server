@@ -82,14 +82,28 @@ export function outboundTraceHeaders(): Record<string, string> {
  */
 const TRACEPARENT_RE = /^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/;
 
-/** Header values must not smuggle CR/LF or run unbounded. */
+/** W3C caps `baggage` at 8192 bytes; `tracestate` is far smaller in practice. */
 const MAX_HEADER_VALUE = 8192;
+
+/**
+ * Printable ASCII (plus space and tab) — the character set W3C defines
+ * `tracestate` and `baggage` over.
+ *
+ * Anything outside it is rejected rather than forwarded, for two reasons:
+ * CR/LF would be header injection, and — the case that actually bites —
+ * `fetch()` *throws* on a header value containing a character above U+00FF
+ * (e.g. an emoji) or a DEL character. Forwarding such a value would turn a
+ * client-supplied string into a failed backend query, letting any client
+ * break its own tool calls through a field that is supposed to be inert
+ * metadata.
+ */
+const SAFE_HEADER_VALUE_RE = /^[\t\x20-\x7e]+$/;
 
 function safeHeaderValue(value: unknown, max = MAX_HEADER_VALUE): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > max) return undefined;
-  return /[\r\n\0]/.test(trimmed) ? undefined : trimmed;
+  return SAFE_HEADER_VALUE_RE.test(trimmed) ? trimmed : undefined;
 }
 
 function validTraceparent(value: unknown): string | undefined {
