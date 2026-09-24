@@ -31,12 +31,18 @@
  *   - `required` — zero standing privilege: static keys can ONLY mint tokens;
  *                  MCP endpoints accept JIT tokens exclusively.
  *
- * The token store is deliberately in-memory, like the HTTP session store: a
- * restart invalidates all outstanding tokens, which is the desired failure
- * mode for ephemeral credentials (clients re-mint via their static key).
+ * State lives behind the async {@link JitTokenStore} abstraction (jit-store.ts).
+ * The default `MemoryJitTokenStore` keeps the original semantics — a restart
+ * invalidates all outstanding tokens, the desired failure mode for ephemeral
+ * credentials on a single instance. A shared adapter (`MCP_JIT_STORE`) makes
+ * tokens, revocation, and the capacity guard correct across replicas behind a
+ * load balancer. All check-then-act sequences (capacity gate, once-only
+ * rotation) are delegated to the store's atomic primitives so they hold under
+ * concurrency and across replicas — the service keeps crypto and policy only.
  */
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { MemoryJitTokenStore, type JitTokenStore } from './jit-store.js';
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -93,6 +99,8 @@ export function getJitMode(
  *   MCP_JIT_TTL_SECONDS           — token TTL, 60..3600        (default 900)
  *   MCP_JIT_MAX_LIFETIME_SECONDS  — lineage cap, ttl..86400    (default 28800)
  *   MCP_JIT_MAX_ACTIVE_TOKENS     — store capacity, ≥1         (default 1000)
+ *   MCP_JIT_STORE                 — memory | <adapter module>  (default memory;
+ *                                   resolved by jit-store.ts, not here)
  */
 export function readJitConfig(
   env: (k: string) => string | undefined = (k) => process.env[k],
@@ -158,7 +166,8 @@ export type JitDenialReason =
   | 'lifetime_exhausted'
   | 'static_key_blocked'
   | 'token_minting_with_token'
-  | 'session_principal_mismatch';
+  | 'session_principal_mismatch'
+  | 'parent_key_revoked';
 
 export type JitValidation =
   | { ok: true; record: JitTokenRecord }
@@ -227,12 +236,15 @@ export function jitPrincipal(record: JitTokenRecord): string {
 export interface JitTokenServiceOptions {
   /** Injectable clock for tests. */
   now?: () => number;
+  /** State backend; defaults to the in-process store (see jit-store.ts). */
+  store?: JitTokenStore;
 }
 
+/** Random-id collisions are ~2^-72 per attempt; retries beyond this indicate a broken store. */
+const MAX_ID_ATTEMPTS = 4;
+
 export class JitTokenService {
-  private readonly tokens = new Map<string, JitTokenRecord>();
-  /** rootId → live record ids in that lineage (bounds refresh accumulation). */
-  private readonly lineageMembers = new Map<string, Set<string>>();
+  private readonly store: JitTokenStore;
   private readonly now: () => number;
 
   constructor(
@@ -240,21 +252,17 @@ export class JitTokenService {
     options: JitTokenServiceOptions = {},
   ) {
     this.now = options.now ?? Date.now;
+    this.store = options.store ?? new MemoryJitTokenStore();
   }
 
   /** Tokens that are neither revoked nor expired. */
-  activeCount(): number {
-    const now = this.now();
-    let count = 0;
-    for (const rec of this.tokens.values()) {
-      if (!rec.revoked && now < rec.expiresAt) count++;
-    }
-    return count;
+  activeCount(): Promise<number> {
+    return this.store.count(this.now());
   }
 
   /** Lookup by public token id (no secret involved). */
-  get(id: string): JitTokenRecord | undefined {
-    return this.tokens.get(id);
+  get(id: string): Promise<JitTokenRecord | undefined> {
+    return this.store.get(id);
   }
 
   /**
@@ -264,7 +272,7 @@ export class JitTokenService {
    * the parent key may grant. Requesting nothing inherits the full grantable
    * set — narrowing is encouraged, escalation is impossible.
    */
-  issue(req: IssueRequest): IssuedToken {
+  async issue(req: IssueRequest): Promise<IssuedToken> {
     const grantable = req.grantableScopes ?? req.enabledSkillIds;
     const requested = req.requestedScopes?.length
       ? [...new Set(req.requestedScopes)]
@@ -279,14 +287,6 @@ export class JitTokenService {
       );
     }
 
-    if (this.activeCount() >= this.config.maxActiveTokens) {
-      throw new JitError(
-        'capacity',
-        429,
-        `Active token limit reached (${this.config.maxActiveTokens}); revoke tokens or raise MCP_JIT_MAX_ACTIVE_TOKENS`,
-      );
-    }
-
     const ttlS = clamp(
       req.requestedTtlSeconds ?? this.config.ttlSeconds,
       JIT_TTL_MIN_S,
@@ -295,22 +295,43 @@ export class JitTokenService {
 
     const now = this.now();
     const notAfter = now + this.config.maxLifetimeSeconds * 1_000;
-    return this.mint({
-      parentKeyId: req.parentKeyId,
-      rootId: null,
-      scopes: requested.sort(),
-      generation: 0,
-      ttlMs: ttlS * 1_000,
-      notAfter,
-    });
+
+    // Capacity check + unique-id check + insert are one atomic store operation
+    // — under a shared store, concurrent mints across replicas cannot exceed
+    // the cap, and an (astronomically unlikely) id collision just re-rolls.
+    for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt++) {
+      const issued = this.buildToken({
+        parentKeyId: req.parentKeyId,
+        rootId: null,
+        scopes: requested.sort(),
+        generation: 0,
+        ttlMs: ttlS * 1_000,
+        notAfter,
+        now,
+      });
+      const result = await this.store.insert(issued.record, {
+        cap: this.config.maxActiveTokens,
+        now,
+      });
+      if (result === 'inserted') return issued;
+      if (result === 'capacity') {
+        throw new JitError(
+          'capacity',
+          429,
+          `Active token limit reached (${this.config.maxActiveTokens}); revoke tokens or raise MCP_JIT_MAX_ACTIVE_TOKENS`,
+        );
+      }
+      // 'duplicate' → regenerate the id and try again.
+    }
+    throw new JitError('capacity', 500, 'Token id generation failed repeatedly — store misbehaving');
   }
 
   /** Validate a presented bearer token string against the store. */
-  validate(tokenString: string): JitValidation {
+  async validate(tokenString: string): Promise<JitValidation> {
     const match = TOKEN_RE.exec(tokenString);
     if (!match) return { ok: false, reason: 'malformed' };
 
-    const record = this.tokens.get(match[1]!);
+    const record = await this.store.get(match[1]!);
     if (!record || !hashesEqual(record.tokenHash, sha256Hex(tokenString))) {
       return { ok: false, reason: 'unknown' };
     }
@@ -324,19 +345,18 @@ export class JitTokenService {
    * same hard cap) and shorten the old one to a small grace window so in-flight
    * requests complete. Refuses once the lineage cap (`notAfter`) is reached —
    * the agent must re-authenticate with its static key, which is the point.
+   *
+   * Only the current generation may refresh; the once-only guarantee is a
+   * store-level compare-and-set, so concurrent refreshes of the same token
+   * (including on different replicas) mint exactly one successor and every
+   * loser gets `rotated` — a lineage can never branch.
    */
-  refresh(tokenString: string): IssuedToken {
-    const v = this.validate(tokenString);
+  async refresh(tokenString: string): Promise<IssuedToken> {
+    const v = await this.validate(tokenString);
     if (!v.ok) {
       throw new JitError(v.reason, 401, `Cannot refresh: token is ${v.reason}`);
     }
     const old = v.record;
-    const now = this.now();
-
-    // Only the current generation may refresh. A rotated token still
-    // authenticates in-flight requests during its grace window, but letting it
-    // mint again would let one lineage branch — and, looped within the grace
-    // window, grow the store without bound past the capacity guard.
     if (old.rotated) {
       throw new JitError(
         'rotated',
@@ -345,6 +365,7 @@ export class JitTokenService {
       );
     }
 
+    const now = this.now();
     const expiresAt = Math.min(now + this.config.ttlSeconds * 1_000, old.notAfter);
     if (expiresAt <= now) {
       throw new JitError(
@@ -356,112 +377,105 @@ export class JitTokenService {
 
     // Rotation is exempt from the capacity check: it replaces a live token, so
     // hitting the cap must not brick every existing session's renewal.
-    const issued = this.mint({
-      parentKeyId: old.parentKeyId,
-      rootId: old.rootId,
-      scopes: [...old.scopes],
-      generation: old.generation + 1,
-      ttlMs: expiresAt - now,
-      notAfter: old.notAfter,
-    });
-
-    old.rotated = true;
-    old.expiresAt = Math.min(old.expiresAt, now + JIT_ROTATION_GRACE_MS);
-
-    // Keep the lineage to {current, single grace token}: hard-drop any earlier
-    // grace corpses so a rapid refresh loop cannot accumulate records past the
-    // capacity guard. Safe because a rotated token can no longer refresh, so
-    // nothing in-flight advances from a pre-`old` generation.
-    const members = this.lineageMembers.get(old.rootId);
-    if (members) {
-      for (const memberId of [...members]) {
-        if (memberId === old.id || memberId === issued.record.id) continue;
-        this.tokens.delete(memberId);
-        members.delete(memberId);
+    for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt++) {
+      const issued = this.buildToken({
+        parentKeyId: old.parentKeyId,
+        rootId: old.rootId,
+        scopes: [...old.scopes],
+        generation: old.generation + 1,
+        ttlMs: expiresAt - now,
+        notAfter: old.notAfter,
+        now,
+      });
+      const result = await this.store.rotate(old.id, issued.record, {
+        graceUntil: now + JIT_ROTATION_GRACE_MS,
+        now,
+      });
+      if (result.ok) return issued;
+      if (result.reason === 'duplicate') continue; // re-roll the id
+      if (result.reason === 'rotated') {
+        throw new JitError(
+          'rotated',
+          409,
+          'Token already rotated; use the current token returned by the latest refresh',
+        );
       }
+      if (result.reason === 'revoked') {
+        throw new JitError('revoked', 401, 'Cannot refresh: token is revoked');
+      }
+      // 'missing' (swept mid-flight) or 'expired' (raced past expiry)
+      const reason = result.reason === 'missing' ? 'unknown' : 'expired';
+      throw new JitError(reason, 401, `Cannot refresh: token is ${reason}`);
     }
-    return issued;
+    throw new JitError('capacity', 500, 'Token id generation failed repeatedly — store misbehaving');
   }
 
   /** Self-revocation with the token string. Throws when the token is not live. */
-  revoke(tokenString: string): JitTokenRecord {
-    const v = this.validate(tokenString);
+  async revoke(tokenString: string): Promise<JitTokenRecord> {
+    const v = await this.validate(tokenString);
     if (!v.ok) {
       throw new JitError(v.reason, 401, `Cannot revoke: token is ${v.reason}`);
     }
-    return this.kill(v.record);
+    const killed = await this.store.revoke(v.record.id, this.now());
+    return killed ?? v.record;
   }
 
   /** Administrative revocation by public token id (kill-switch). */
-  revokeById(id: string): JitTokenRecord | undefined {
-    const record = this.tokens.get(id);
-    return record ? this.kill(record) : undefined;
+  revokeById(id: string): Promise<JitTokenRecord | undefined> {
+    return this.store.revoke(id, this.now());
+  }
+
+  /**
+   * Records still tracked for a rotation lineage. Use this — not `get(rootId)`
+   * — to answer "who owns this lineage": the generation-0 record whose id *is*
+   * the rootId is pruned after the second rotation and swept after its grace
+   * window, so a root-id lookup goes empty while the lineage is still live.
+   */
+  getLineage(rootId: string): Promise<JitTokenRecord[]> {
+    return this.store.getLineage(rootId);
+  }
+
+  /**
+   * Administrative revocation of an entire rotation lineage by its root id —
+   * kills the current generation and any in-grace predecessor without the
+   * operator needing to chase the latest token id through the audit log.
+   */
+  revokeLineage(rootId: string): Promise<JitTokenRecord[]> {
+    return this.store.revokeLineage(rootId, this.now());
   }
 
   /** Drop expired and revoked records. Returns how many were removed. */
-  sweep(): number {
-    const now = this.now();
-    let removed = 0;
-    for (const [id, rec] of this.tokens) {
-      if (rec.revoked || now >= rec.expiresAt) {
-        this.tokens.delete(id);
-        this.dropFromLineage(rec);
-        removed++;
-      }
-    }
-    return removed;
+  sweep(): Promise<number> {
+    return this.store.sweep(this.now());
   }
 
-  private kill(record: JitTokenRecord): JitTokenRecord {
-    record.revoked = true;
-    record.expiresAt = Math.min(record.expiresAt, this.now());
-    return record;
-  }
-
-  /** Remove a record from its lineage index, pruning empty lineages. */
-  private dropFromLineage(rec: JitTokenRecord): void {
-    const members = this.lineageMembers.get(rec.rootId);
-    if (!members) return;
-    members.delete(rec.id);
-    if (members.size === 0) this.lineageMembers.delete(rec.rootId);
-  }
-
-  private mint(args: {
+  /** Mint the token string + record pair. Pure — no store interaction. */
+  private buildToken(args: {
     parentKeyId: string;
     rootId: string | null;
     scopes: string[];
     generation: number;
     ttlMs: number;
     notAfter: number;
+    now: number;
   }): IssuedToken {
-    let id = randomBytes(9).toString('base64url');
-    while (this.tokens.has(id)) id = randomBytes(9).toString('base64url');
+    const id = randomBytes(9).toString('base64url');
     const secret = randomBytes(32).toString('base64url');
     const token = `${TOKEN_PREFIX}${id}.${secret}`;
 
-    const now = this.now();
     const record: JitTokenRecord = {
       id,
       tokenHash: sha256Hex(token),
       parentKeyId: args.parentKeyId,
       rootId: args.rootId ?? id,
       scopes: args.scopes,
-      issuedAt: now,
-      expiresAt: Math.min(now + args.ttlMs, args.notAfter),
+      issuedAt: args.now,
+      expiresAt: Math.min(args.now + args.ttlMs, args.notAfter),
       notAfter: args.notAfter,
       generation: args.generation,
       revoked: false,
       rotated: false,
     };
-    this.tokens.set(id, record);
-
-    let members = this.lineageMembers.get(record.rootId);
-    if (!members) {
-      members = new Set();
-      this.lineageMembers.set(record.rootId, members);
-    }
-    members.add(id);
-
     return { token, record };
   }
 }

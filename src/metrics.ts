@@ -215,6 +215,22 @@ export const metrics = {
     'mcp_jit_idjag_replay_cache_size',
     'Remembered redeemed ID-JAG jtis (enterprise-managed authorization replay cache)',
   ),
+
+  // ── MCP spec-version awareness (see mcp-spec.ts) ──
+  specRequests: new Counter(
+    'mcp_spec_requests_total',
+    'MCP requests by negotiated spec version and lifecycle mode (stateless|session)',
+  ),
+
+  traceContextPropagated: new Counter(
+    'mcp_trace_context_propagated_total',
+    'Inbound MCP requests by W3C trace-context source (meta|http|none)',
+  ),
+
+  routingHeaderRejections: new Counter(
+    'mcp_routing_header_rejections_total',
+    'Requests rejected because Mcp-Method/Mcp-Name disagreed with the body (SEP-2243)',
+  ),
 };
 
 /** Serialize all metrics to Prometheus text exposition format. */
@@ -227,23 +243,14 @@ export function serializeMetrics(): string {
     `mcp_uptime_seconds ${((Date.now() - startTime) / 1000).toFixed(1)}`,
   ];
 
+  // Derived from the registry rather than a hand-maintained list: a metric
+  // added above but forgotten here would silently never be exported.
   const parts = [
     uptimeLines.join('\n'),
-    metrics.toolCalls.serialize(),
-    metrics.toolDuration.serialize(),
-    metrics.toolErrors.serialize(),
-    metrics.backendRequests.serialize(),
-    metrics.backendDuration.serialize(),
-    metrics.authAttempts.serialize(),
-    metrics.activeSessions.serialize(),
-    metrics.serverInfo.serialize(),
-    metrics.buildInfo.serialize(),
-    metrics.jitTokensIssued.serialize(),
-    metrics.jitRotations.serialize(),
-    metrics.jitRevocations.serialize(),
-    metrics.jitDenials.serialize(),
-    metrics.jitActiveTokens.serialize(),
-    metrics.jitIdjagReplayCacheSize.serialize(),
+    ...Object.values(metrics)
+      .filter((m): m is Counter | Gauge | Histogram =>
+        typeof m === 'object' && m !== null && typeof (m as { serialize?: unknown }).serialize === 'function')
+      .map((m) => m.serialize()),
   ].filter(s => s.includes('\n')); // skip empty metrics
 
   return parts.join('\n\n') + '\n';
