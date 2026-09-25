@@ -201,6 +201,33 @@ mismatch → `invalid_target`; token bound to resource A rejected for B; RFC 700
 200 for known+unknown; introspection `active:false` for revoked/expired; AS
 metadata validates against an RFC 8414 schema).
 
+**Status (2026-09-25): not started** — confirmed against current `develop`
+(`73ef5e5`): `handleRevoke` in `src/transports/jit-endpoints.ts` is still the
+pre-existing JSON-body revoke, not the RFC 7009 form-encoded alias; no
+`resource`/`audience` handling, `client_credentials` grant branch,
+`handleIntrospect`, or `revocation_endpoint`/`introspection_endpoint` metadata
+exist yet.
+
+**Sequencing note:** this phase is Effort: L across 5 independent RFC
+surfaces — too large for one PR to stay reviewable. Recommended split, in
+dependency order (each independently shippable and test-coverable):
+
+1. **RFC 8707 Resource Indicators** first — the one genuinely MCP-normative
+   item, and every other sub-item below benefits from `audience` already
+   existing on `JitTokenRecord`.
+2. **RFC 6749 `client_credentials` grant** — additive `grant_type` branch,
+   independent of (1) once `audience` defaulting is in place.
+3. **RFC 7009 Revocation + RFC 7662 Introspection together** — both are thin
+   RFC-shape wrappers over existing `validate()`/`revoke()` semantics, small
+   enough to pair in one PR.
+4. **Metadata correctness + discovery gating** last — it's additive
+   advertisement of whatever (1)-(3) actually ship, so doing it last avoids
+   advertising endpoints/grants before they exist (the plan's own risk note).
+
+Each sub-PR should carry its own RFC-conformance tests per the "Verify" list
+above, scoped to just the RFCs it implements. No implementation started as
+part of this note — recon and sequencing only.
+
 ---
 
 ## Phase 3 — Sender-constrained tokens + client auth (gaps #3, #6)
