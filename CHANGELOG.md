@@ -52,11 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **JIT refresh cannot be used to exhaust memory.** An adversarial review found that `POST /auth/token/refresh` bypassed the active-token capacity guard and left every rotated token alive for its grace window, so a refresh loop could grow the token store without bound. A rotated token can no longer refresh again (`409`), and each rotation now hard-drops the lineage's earlier grace records — a lineage holds at most its current token plus one in-grace predecessor, keeping the store bounded by `MCP_JIT_MAX_ACTIVE_TOKENS`.
 - **ID-JAG assertions stay single-use through the clock-skew tail.** The redeemed-`jti` replay record was evicted at the assertion's `exp`, but assertions remain acceptable until `exp + 60 s` skew — a window in which a captured, already-redeemed assertion could be replayed to mint a second token. Redeemed ids are now retained until `exp + skew`, closing the window.
 
-## [1.7.1] - 2026-06-07
+## [1.7.1] - 2026-06-11
 
 ### Changed
 
-- CI release workflow now builds and pushes multi-arch Docker images (`linux/amd64`, `linux/arm64`) to Docker Hub as part of every tagged release.
+- CI release workflow now builds and pushes multi-arch Docker images (`linux/amd64`, `linux/arm64`) to Docker Hub as part of every tagged release. (Originally released as `1.7.0` on 2026-06-07; re-tagged `1.7.1` after a dev-dependency bump before wider adoption, with no separate documented change.)
 
 ## [1.6.0] - 2026-06-06
 

@@ -225,7 +225,7 @@ Special:
 | `LOKI_TENANT_ID` | Sets `X-Scope-OrgID` header for multi-tenant Loki |
 | `GRAFANA_ORG_ID` | Sets `X-Grafana-Org-Id` header for multi-org Grafana |
 
-> **Kubernetes** uses its own credential scheme rather than the prefix above: it presents a ServiceAccount bearer token (auto-loaded from the in-cluster mount, or `KUBERNETES_TOKEN` / `KUBERNETES_TOKEN_FILE`) and validates TLS against the cluster CA (`KUBERNETES_CA_FILE`, or the in-cluster mount). See [`.env.example`](.env.example).
+> **Kubernetes** uses its own credential scheme rather than the prefix above: it presents a ServiceAccount bearer token (auto-loaded from the in-cluster mount, or `KUBERNETES_TOKEN` / `KUBERNETES_TOKEN_FILE`) and validates TLS against the cluster CA (`KUBERNETES_CA_FILE`, or the in-cluster mount; `KUBERNETES_INSECURE_SKIP_TLS_VERIFY=true` skips verification, dev only). See [`.env.example`](.env.example).
 
 **Example — Prometheus behind OAuth proxy + multi-tenant Loki:**
 
@@ -745,7 +745,7 @@ regardless of configuration.
 
 ### Grafana — `grafana` — 10 tools
 
-> Enabled when `GRAFANA_URL` is set. The 10 tools below are read-only and intended for verification/interrogation workflows. Three additional **write** tools are available when `MCP_ENABLE_WRITES` is set — see [Write tools](#write-tools-opt-in).
+> Enabled when `GRAFANA_URL` is set. The 10 tools below are read-only and intended for verification/interrogation workflows. Five additional **write** tools are available when `MCP_ENABLE_WRITES` is set — see [Write tools](#write-tools-opt-in).
 
 | Tool | Description |
 |------|-------------|
@@ -1221,9 +1221,8 @@ export const skill: Skill = {
   register: registerTools,
 };
 
-// 2. Add to src/skills.ts
-import { skill as tempo } from './tools/tempo.js';
-export const allSkills: Skill[] = [...existingSkills, tempo];
+// 2. Regenerate the registry — do NOT hand-edit src/skills.generated.ts
+npm run gen:skills
 ```
 
 ### Auth Flow
