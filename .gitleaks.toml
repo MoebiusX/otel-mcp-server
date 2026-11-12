@@ -1,0 +1,29 @@
+# gitleaks configuration — extends the built-in ruleset.
+# Run locally:  gitleaks git --config .gitleaks.toml --redact
+# CI runs it on every push/PR over the full fetched history.
+
+title = "otel-mcp-server"
+
+[extend]
+useDefault = true
+
+# Keys for this server's role-based auth (auth-keys.json). The default rules
+# key on field names like api_key; these literals sit under arbitrary field
+# names (traderKey:, "key": ...) so match the shape of the value itself.
+# Placeholders such as sk-kx-admin-CHANGE-ME are intentionally not matched.
+[[rules]]
+id = "krystalinex-mcp-key"
+description = "KrystalineX MCP server API key"
+regex = '''sk-kx-[a-z][a-z0-9-]*-(?:[0-9a-f]{16,}|20\d{2})\b'''
+keywords = ["sk-kx-"]
+
+[allowlist]
+description = "Documentation placeholders and fixtures"
+regexes = [
+  '''sk-my-secret-key-here''',
+  '''my-(?:prom|loki|tempo|jaeger)-token''',
+]
+paths = [
+  '''^auth-keys\.example\.json$''',
+  '''^tests/''',
+]

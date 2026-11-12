@@ -9,8 +9,11 @@
  *                                 same session token, enterprise-managed
  *                                 (MCP ext-auth enterprise-managed-authorization).
  *   POST /auth/token/refresh  — rotate a live token to its next generation.
- *   POST /auth/token/revoke   — revoke: self (with the token) or by id
- *                               (kill-switch, with a static key).
+ *                               Re-checks the parent key first, so revoking or
+ *                               narrowing a key cascades into its live lineages.
+ *   POST /auth/token/revoke   — revoke: self (with the token), by token_id, or
+ *                               by root_id (whole-lineage kill-switch, with a
+ *                               static key; restricted keys only revoke their own).
  *
  * Every outcome is audit-logged with the public token id — never the secret —
  * and counted in /metrics (OWASP MCP08).
@@ -145,8 +148,14 @@ function tokenResponse(issued: IssuedToken): Record<string, unknown> {
   };
 }
 
-function syncActiveGauge(service: JitTokenService): void {
-  metrics.jitActiveTokens.set({}, service.activeCount());
+async function syncActiveGauge(service: JitTokenService): Promise<void> {
+  metrics.jitActiveTokens.set({}, await service.activeCount());
+}
+
+/** Is `scopes` still within what the parent key may currently grant? */
+function withinCurrentGrant(scopes: string[], parent: ClientKey): boolean {
+  if (!parent.allowedTools) return true; // unrestricted key
+  return scopes.every((s) => parent.allowedTools!.includes(s));
 }
 
 // ─── Route handlers ──────────────────────────────────────────────────────────
@@ -194,7 +203,7 @@ async function handleMint(
     throw new JitError('malformed', 400, '"ttlSeconds" must be a number');
   }
 
-  const issued = service.issue({
+  const issued = await service.issue({
     parentKeyId: parentKey.id,
     grantableScopes: parentKey.allowedTools ?? null,
     enabledSkillIds: ctx.enabledSkillIds,
@@ -203,7 +212,7 @@ async function handleMint(
   });
 
   metrics.jitTokensIssued.inc({ parent_key: parentKey.id });
-  syncActiveGauge(service);
+  await syncActiveGauge(service);
   const r = issued.record;
   console.error(
     `  JIT:     issued ${r.id} (key=${r.parentKeyId} scopes=[${r.scopes.join(',')}] ` +
@@ -247,17 +256,27 @@ async function handleEnterpriseGrant(
     const clientId = typeof body['client_id'] === 'string' ? (body['client_id'] as string) : undefined;
 
     const verified = await ctx.enterprise.verifyIdJag(assertion, clientId);
-    const scopes = ctx.enterprise.grantedScopes(verified, ctx.enabledSkillIds);
 
-    const issued = service.issue({
-      parentKeyId: ENTERPRISE_PARENT_KEY,
-      grantableScopes: scopes,
-      enabledSkillIds: ctx.enabledSkillIds,
-      requestedScopes: scopes,
-    });
+    // The assertion's single-use jti is burned at verification. If anything
+    // downstream fails (scope resolution, capacity), the client received no
+    // token — un-redeem so a retry with the same assertion is not bounced
+    // with idjag_replayed, forcing a pointless IdP round-trip.
+    let issued: IssuedToken;
+    try {
+      const scopes = ctx.enterprise.grantedScopes(verified, ctx.enabledSkillIds);
+      issued = await service.issue({
+        parentKeyId: ENTERPRISE_PARENT_KEY,
+        grantableScopes: scopes,
+        enabledSkillIds: ctx.enabledSkillIds,
+        requestedScopes: scopes,
+      });
+    } catch (err) {
+      await ctx.enterprise.unredeem(verified.jti).catch(() => undefined);
+      throw err;
+    }
 
     metrics.jitTokensIssued.inc({ parent_key: ENTERPRISE_PARENT_KEY });
-    syncActiveGauge(service);
+    await syncActiveGauge(service);
     const r = issued.record;
     console.error(
       `  JIT:     issued ${r.id} (idp sub=${verified.sub}${verified.clientId ? ` client=${verified.clientId}` : ''} ` +
@@ -290,6 +309,7 @@ async function handleRefresh(
   req: IncomingMessage,
   res: ServerResponse,
   service: JitTokenService,
+  ctx: JitEndpointContext,
 ): Promise<void> {
   const credential = extractCredential(
     req.headers['authorization'] as string | undefined,
@@ -299,9 +319,36 @@ async function handleRefresh(
     return deny(res, 401, 'unknown', 'Present the current session token to refresh it');
   }
 
-  const issued = service.refresh(credential);
+  // Access review cascades into live lineages (OWASP MCP02): rotation
+  // re-checks the *current* parent key. A key the operator has removed can no
+  // longer renew its lineages, and a narrowed key cannot renew tokens whose
+  // scopes exceed today's grant — the lineage dies at its current TTL instead
+  // of surviving to notAfter. Enterprise-minted tokens have no local parent
+  // key; their review lever is the IdP (assertions are single-use).
+  const current = await service.validate(credential);
+  if (current.ok && current.record.parentKeyId !== ENTERPRISE_PARENT_KEY) {
+    const parent = ctx.clientKeys.find((k) => k.id === current.record.parentKeyId);
+    if (!parent) {
+      return deny(
+        res,
+        403,
+        'parent_key_revoked',
+        `Parent key "${current.record.parentKeyId}" no longer exists; token lineage cannot be renewed`,
+      );
+    }
+    if (!withinCurrentGrant(current.record.scopes, parent)) {
+      return deny(
+        res,
+        403,
+        'scope_violation',
+        `Parent key "${parent.id}" no longer grants this token's scopes; mint a new token via POST /auth/token`,
+      );
+    }
+  }
+
+  const issued = await service.refresh(credential);
   metrics.jitRotations.inc();
-  syncActiveGauge(service);
+  await syncActiveGauge(service);
   const r = issued.record;
   console.error(
     `  JIT:     rotated → ${r.id} (key=${r.parentKeyId} root=${r.rootId} gen=${r.generation})`,
@@ -321,29 +368,69 @@ async function handleRevoke(
 
   // Self-revocation: the token holder hands its badge back.
   if (credential && looksLikeJitToken(credential)) {
-    const record = service.revoke(credential);
+    const record = await service.revoke(credential);
     metrics.jitRevocations.inc({ source: 'self' });
-    syncActiveGauge(service);
+    await syncActiveGauge(service);
     console.error(`  JIT:     revoked ${record.id} (self, key=${record.parentKeyId})`);
     return json(res, 200, { revoked: true, token_id: record.id });
   }
 
-  // Administrative kill-switch: any valid static key may revoke by token id.
+  // Administrative kill-switch by token id or lineage root id. An
+  // unrestricted key (no allowedTools) may revoke anything; a restricted key
+  // may only revoke tokens minted from itself — least privilege applies to
+  // revocation too, or the smallest tenant key becomes a cross-tenant
+  // availability lever (OWASP MCP02).
   const adminKey = validateClientKey(ctx.clientKeys, authHeader, apiKeyHeader);
   if (!adminKey) {
     return deny(res, 401, 'invalid_parent_key', 'Revocation requires the session token or a valid static API key');
   }
+  const canRevoke = (parentKeyId: string): boolean =>
+    !adminKey.allowedTools || parentKeyId === adminKey.id;
+
   const body = await readBody(req);
   const tokenId = body['token_id'];
-  if (typeof tokenId !== 'string' || !tokenId) {
-    throw new JitError('malformed', 400, '"token_id" is required when revoking with a static key');
+  const rootId = body['root_id'];
+
+  if (typeof rootId === 'string' && rootId) {
+    // Lineage kill: revokes the current generation and any in-grace
+    // predecessor without chasing the latest token id through the audit log.
+    //
+    // Ownership is resolved from the lineage's live members, NOT from
+    // `get(rootId)`: the generation-0 record whose id *is* the rootId is
+    // pruned after the second rotation and swept after its grace window, so a
+    // root-id lookup returns undefined while the lineage is still very much
+    // alive. Checking `target && ...` against that lookup let the guard
+    // silently disappear — a restricted key could then kill any other key's
+    // rotated lineage, the exact cross-tenant lever this check exists to stop.
+    const lineage = await service.getLineage(rootId);
+    if (!lineage.every((r) => canRevoke(r.parentKeyId))) {
+      return deny(res, 403, 'scope_violation', 'This key may only revoke tokens minted from itself');
+    }
+    const killed = await service.revokeLineage(rootId);
+    if (killed.length === 0) {
+      return json(res, 404, { error: 'Not Found', message: `No live tokens in lineage "${rootId}"` });
+    }
+    metrics.jitRevocations.inc({ source: 'admin' }, killed.length);
+    await syncActiveGauge(service);
+    console.error(
+      `  JIT:     revoked lineage ${rootId} → [${killed.map((r) => r.id).join(',')}] (admin key=${adminKey.id})`,
+    );
+    return json(res, 200, { revoked: true, root_id: rootId, token_ids: killed.map((r) => r.id) });
   }
-  const record = service.revokeById(tokenId);
+
+  if (typeof tokenId !== 'string' || !tokenId) {
+    throw new JitError('malformed', 400, '"token_id" (or "root_id") is required when revoking with a static key');
+  }
+  const target = await service.get(tokenId);
+  if (target && !canRevoke(target.parentKeyId)) {
+    return deny(res, 403, 'scope_violation', 'This key may only revoke tokens minted from itself');
+  }
+  const record = await service.revokeById(tokenId);
   if (!record) {
     return json(res, 404, { error: 'Not Found', message: `No token with id "${tokenId}"` });
   }
   metrics.jitRevocations.inc({ source: 'admin' });
-  syncActiveGauge(service);
+  await syncActiveGauge(service);
   console.error(`  JIT:     revoked ${record.id} (admin key=${adminKey.id})`);
   json(res, 200, { revoked: true, token_id: record.id });
 }
@@ -381,7 +468,7 @@ export async function handleJitRequest(
         await handleMint(req, res, ctx.service, ctx);
         break;
       case '/auth/token/refresh':
-        await handleRefresh(req, res, ctx.service);
+        await handleRefresh(req, res, ctx.service, ctx);
         break;
       case '/auth/token/revoke':
         await handleRevoke(req, res, ctx.service, ctx);

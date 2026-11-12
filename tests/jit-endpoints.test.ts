@@ -216,7 +216,7 @@ describe('POST /auth/token (static key)', () => {
 
   it('forbids a JIT token minting another token', async () => {
     const { ctx: c, service } = ctx();
-    const issued = service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
     const r = await call({ headers: { authorization: `Bearer ${issued.token}` }, body: '{}' }, c);
     expect(r.status).toBe(403);
     expect(r.json().reason).toBe('token_minting_with_token');
@@ -317,7 +317,7 @@ describe('POST /auth/token (jwt-bearer / ID-JAG)', () => {
     const { ctx: c, service } = ctx({ withEnterprise: true });
     const r = await call({ body: JSON.stringify({ grant_type: GRANT, assertion: makeJag() }) }, c);
     const tokenId = r.json().token_id;
-    expect(service!.get(tokenId)!.parentKeyId).toBe(ENTERPRISE_PARENT_KEY);
+    expect((await service!.get(tokenId))!.parentKeyId).toBe(ENTERPRISE_PARENT_KEY);
   });
 
   it('returns unsupported_grant_type when enterprise auth is not configured', async () => {
@@ -387,7 +387,7 @@ describe('POST /auth/token (jwt-bearer / ID-JAG)', () => {
 describe('POST /auth/token/refresh', () => {
   it('rotates a live token', async () => {
     const { ctx: c, service } = ctx();
-    const issued = service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
     const r = await call({ url: '/auth/token/refresh', headers: { authorization: `Bearer ${issued.token}` } }, c);
     expect(r.status).toBe(201);
     expect(r.json().generation).toBe(1);
@@ -407,20 +407,53 @@ describe('POST /auth/token/refresh', () => {
 
   it('maps a revoked-token refresh to its JitError status', async () => {
     const { ctx: c, service } = ctx();
-    const issued = service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
-    service!.revoke(issued.token);
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    await service!.revoke(issued.token);
     const r = await call({ url: '/auth/token/refresh', headers: { authorization: `Bearer ${issued.token}` } }, c);
     expect(r.status).toBe(401);
   });
 
   it('returns 409 Conflict when re-refreshing an already-rotated token', async () => {
     const { ctx: c, service } = ctx();
-    const issued = service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
-    service!.refresh(issued.token); // first rotation
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    await service!.refresh(issued.token); // first rotation
     const r = await call({ url: '/auth/token/refresh', headers: { authorization: `Bearer ${issued.token}` } }, c);
     expect(r.status).toBe(409);
     expect(r.json().error).toBe('Conflict');
     expect(r.json().reason).toBe('rotated');
+  });
+
+  it('denies refresh once the parent key has been removed (access-review cascade)', async () => {
+    const { ctx: c, service } = ctx();
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    const withoutCi = { ...c, clientKeys: c.clientKeys.filter((k: ClientKey) => k.id !== 'ci') };
+    const r = await call({ url: '/auth/token/refresh', headers: { authorization: `Bearer ${issued.token}` } }, withoutCi);
+    expect(r.status).toBe(403);
+    expect(r.json().reason).toBe('parent_key_revoked');
+  });
+
+  it('denies refresh once the parent key no longer grants the token scopes', async () => {
+    const { ctx: c, service } = ctx();
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces', 'metrics'], enabledSkillIds: ENABLED });
+    const narrowed = {
+      ...c,
+      clientKeys: c.clientKeys.map((k: ClientKey) => (k.id === 'ci' ? { ...k, allowedTools: ['logs'] } : k)),
+    };
+    const r = await call({ url: '/auth/token/refresh', headers: { authorization: `Bearer ${issued.token}` } }, narrowed);
+    expect(r.status).toBe(403);
+    expect(r.json().reason).toBe('scope_violation');
+  });
+
+  it('enterprise-minted tokens refresh without a local parent key', async () => {
+    const { ctx: c, service } = ctx({ withEnterprise: true });
+    const grant = await call(
+      { body: JSON.stringify({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: makeJag() }) },
+      c,
+    );
+    const token = grant.json().access_token;
+    void service;
+    const r = await call({ url: '/auth/token/refresh', headers: { authorization: `Bearer ${token}` } }, c);
+    expect(r.status).toBe(201);
   });
 });
 
@@ -429,16 +462,16 @@ describe('POST /auth/token/refresh', () => {
 describe('POST /auth/token/revoke', () => {
   it('self-revokes with the token', async () => {
     const { ctx: c, service } = ctx();
-    const issued = service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
     const r = await call({ url: '/auth/token/revoke', headers: { authorization: `Bearer ${issued.token}` } }, c);
     expect(r.status).toBe(200);
     expect(r.json().revoked).toBe(true);
-    expect(service!.validate(issued.token).ok).toBe(false);
+    expect((await service!.validate(issued.token)).ok).toBe(false);
   });
 
   it('admin-revokes by token_id with a static key', async () => {
     const { ctx: c, service } = ctx();
-    const issued = service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
     const r = await call(
       {
         url: '/auth/token/revoke',
@@ -470,5 +503,144 @@ describe('POST /auth/token/revoke', () => {
     const { ctx: c } = ctx();
     const r = await call({ url: '/auth/token/revoke', body: '{}' }, c);
     expect(r.status).toBe(401);
+  });
+
+  it('a restricted key may not revoke another key\'s token (403)', async () => {
+    const { ctx: c, service } = ctx();
+    const adminToken = await service!.issue({ parentKeyId: 'admin', grantableScopes: null, enabledSkillIds: ENABLED });
+    const r = await call(
+      {
+        url: '/auth/token/revoke',
+        headers: { authorization: 'Bearer sk-ci' }, // 'ci' is scope-restricted
+        body: JSON.stringify({ token_id: adminToken.record.id }),
+      },
+      c,
+    );
+    expect(r.status).toBe(403);
+    // The admin token is untouched.
+    expect((await service!.validate(adminToken.token)).ok).toBe(true);
+  });
+
+  it('a restricted key may revoke its own tokens', async () => {
+    const { ctx: c, service } = ctx();
+    const own = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    const r = await call(
+      {
+        url: '/auth/token/revoke',
+        headers: { authorization: 'Bearer sk-ci' },
+        body: JSON.stringify({ token_id: own.record.id }),
+      },
+      c,
+    );
+    expect(r.status).toBe(200);
+  });
+
+  it('admin-revokes a whole lineage by root_id', async () => {
+    const { ctx: c, service, clock } = ctx();
+    const issued = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    clock.now += 60_000;
+    const rotated = await service!.refresh(issued.token);
+
+    const r = await call(
+      {
+        url: '/auth/token/revoke',
+        headers: { authorization: 'Bearer sk-admin' },
+        body: JSON.stringify({ root_id: issued.record.id }),
+      },
+      c,
+    );
+    expect(r.status).toBe(200);
+    expect(r.json().root_id).toBe(issued.record.id);
+    expect(r.json().token_ids).toContain(rotated.record.id);
+    expect((await service!.validate(rotated.token)).ok).toBe(false);
+  });
+
+  it('returns 404 for a lineage with no live tokens', async () => {
+    const { ctx: c } = ctx();
+    const r = await call(
+      { url: '/auth/token/revoke', headers: { authorization: 'Bearer sk-admin' }, body: JSON.stringify({ root_id: 'ghost' }) },
+      c,
+    );
+    expect(r.status).toBe(404);
+  });
+
+  it('a restricted key cannot kill another key\'s lineage AFTER it has rotated', async () => {
+    // Regression (auth bypass): ownership was resolved with get(rootId), but
+    // the generation-0 record whose id IS the rootId is pruned on the second
+    // rotation. The `target &&` guard then short-circuited to "allowed" while
+    // revokeLineage still worked off the lineage index — so any restricted key
+    // could kill any other key's live session once it had rotated twice, which
+    // is the steady state for every refresh-using client.
+    const { ctx: c, service, clock } = ctx();
+    const victim = await service!.issue({ parentKeyId: 'admin', grantableScopes: null, enabledSkillIds: ENABLED });
+
+    clock.now += 60_000;
+    const gen1 = await service!.refresh(victim.token);
+    clock.now += 60_000;
+    const gen2 = await service!.refresh(gen1.token);
+
+    // The gen-0 record is gone; only the lineage index still knows the owner.
+    expect(await service!.get(victim.record.id)).toBeUndefined();
+
+    const attack = await call(
+      {
+        url: '/auth/token/revoke',
+        headers: { authorization: 'Bearer sk-ci' }, // scope-restricted key
+        body: JSON.stringify({ root_id: victim.record.id }),
+      },
+      c,
+    );
+    expect(attack.status).toBe(403);
+    expect(attack.json().reason).toBe('scope_violation');
+    // The victim's live token must be untouched.
+    expect((await service!.validate(gen2.token)).ok).toBe(true);
+  });
+
+  it('a restricted key can still kill its OWN rotated lineage', async () => {
+    const { ctx: c, service, clock } = ctx();
+    const own = await service!.issue({ parentKeyId: 'ci', grantableScopes: ['traces'], enabledSkillIds: ENABLED });
+    clock.now += 60_000;
+    const gen1 = await service!.refresh(own.token);
+    clock.now += 60_000;
+    await service!.refresh(gen1.token);
+
+    const r = await call(
+      {
+        url: '/auth/token/revoke',
+        headers: { authorization: 'Bearer sk-ci' },
+        body: JSON.stringify({ root_id: own.record.id }),
+      },
+      c,
+    );
+    expect(r.status).toBe(200);
+    expect(await service!.activeCount()).toBe(0);
+  });
+});
+
+// ─── Single-use un-burn on issuance failure ──────────────────────────────────
+
+describe('ID-JAG un-redeem on downstream failure', () => {
+  const GRANT = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+
+  it('a capacity failure does not burn the assertion — retry succeeds after space frees', async () => {
+    const clock = { now: T0 };
+    const service = new JitTokenService({ ...JIT_CONFIG, maxActiveTokens: 1 }, { now: () => clock.now });
+    const enterprise = new EnterpriseAuthService(ENTERPRISE_CONFIG, {
+      now: () => clock.now,
+      fetchJson: async () => JWKS,
+    });
+    const c = { service, enterprise, clientKeys: CLIENT_KEYS, enabledSkillIds: ENABLED };
+
+    const filler = await call({ body: JSON.stringify({ grant_type: GRANT, assertion: makeJag() }) }, c);
+    expect(filler.status).toBe(200);
+
+    const jag = makeJag();
+    const denied = await call({ body: JSON.stringify({ grant_type: GRANT, assertion: jag }) }, c);
+    expect(denied.status).toBe(500); // capacity → server_error
+
+    // Free capacity, then retry the SAME assertion: it must not be 'replayed'.
+    await service.revokeById(filler.json().token_id);
+    const retry = await call({ body: JSON.stringify({ grant_type: GRANT, assertion: jag }) }, c);
+    expect(retry.status).toBe(200);
   });
 });
